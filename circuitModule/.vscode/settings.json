@@ -1,0 +1,14 @@
+{
+    "files.associations": {
+        "hpp": "c++",
+        "cmath": "cpp",
+        "qsvggenerator": "cpp",
+        "span": "cpp"
+    },
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/**",
+        "D:/Qt-4.8.7/include/**",
+        "${workspaceFolder}/include/**"
+    ],
+    "files.encoding": "gb2312",
+}

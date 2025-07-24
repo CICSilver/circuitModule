@@ -1,0 +1,358 @@
+#pragma once
+#include "circuitconfig.h"
+#include <qmath.h>
+#include <QPainter>
+#include <QSvgGenerator>
+
+#define SVG_VIEWBOX_WIDTH	1920
+#define SVG_VIEWBOX_HEIGHT	1080
+#define ARROW_LEN			10	// 箭头长度
+#define CONN_R				3	// 连接点半径
+class LogicSvg;
+class OpticalSvg;
+class VirtualSvg;
+class WholeCircuitSvg;
+class IedRect;
+class SwitcherRect;
+class SvgRect;
+class OpticalCircuitLine_old;
+class OpticalCircuitLine;
+class CircuitLine;
+class SvgTransformer
+{
+private:
+	typedef pugi::xpath_node_set::const_iterator nodeSetConstIterator;
+	struct ColorHelper
+	{
+		// color
+		static QColor Color(quint32 hex)
+		{
+			return QColor((hex >> 16) & 0xFF, (hex >> 8) & 0xFF, hex & 0xFF);
+		}
+		static const quint32 pure_white = 0xffffff;
+		static const quint32 pure_red = 0xff0000;
+		static const quint32 pure_green = 0x00ff00;
+		static const quint32 pure_black = 0x000000;
+
+		static const quint32 line_gse = 0xd3603d;
+		static const quint32 line_smv = 0x00b0f0;
+
+		static const quint32 ied_underground = 0x233f4f;
+		static const quint32 ied_border = 0x447c9b;
+
+		static const quint32 side_ied_underground = 0x203c32;
+
+	};
+public:
+	SvgTransformer();
+	~SvgTransformer();
+
+	void GenerateSvgByIedName(const QString& iedName);
+
+	void GenerateLogicSvg(const IED* pIed, const QString& filePath);
+	void GenerateOpticalSvg(const IED* pIed, const QString& filePath);
+	void GenerateWholeCircuitSvg(const IED* pIed, const QString& filePath);
+
+protected:
+
+	template <typename SvgType>
+	void GenerateSvg(const IED* pIed, const QString& filePath, void (SvgTransformer::* generateSvgFunc)(const IED*, SvgType&), void (SvgTransformer::* drawSvgFunc)(SvgType&))
+	{
+		if (!pIed || filePath.isEmpty()) return;
+		QSvgGenerator svgGenerator;
+
+		svgGenerator.setFileName(filePath);
+		svgGenerator.setViewBox(QRect(0, 0, 1920, 1080));
+		//svgGenerator.setSize(QSize(SVG_VIEWBOX_WIDTH, SVG_VIEWBOX_HEIGHT));
+
+		m_painter->begin(&svgGenerator);
+
+		SvgType svg;
+		(this->*generateSvgFunc)(pIed, svg);
+		(this->*drawSvgFunc)(svg);
+
+		m_painter->end();
+		svgGenerator.setFileName(QString());
+		ReSignSvg(filePath);
+	}
+	//************************************
+	// 函数名称:	GenerateLogicSvgByIed
+	// 函数全名:	SvgTransformer::GenerateLogicSvgByIed
+	// 访问权限:	protected 
+	// 函数说明:	生成逻辑图SVG描述结构
+	// 函数参数:	const IED * pIed
+	// 函数参数:	LogicSvg & svg
+	// 返回值:		void
+	//************************************
+	void GenerateLogicSvgByIed(const IED* pIed, LogicSvg& svg);
+
+	//************************************
+	// 函数名称:	ParseCircuitFromIed
+	// 函数全名:	SvgTransformer::ParseCircuitFromIed
+	// 访问权限:	protected 
+	// 函数说明:	从IED结构中获取逻辑链路及相关IED，填充svg描述
+	// 函数参数:	LogicSvg & svg
+	// 函数参数:	const IED * pIed
+	// 返回值:		void
+	//************************************
+	void ParseCircuitFromIed(LogicSvg& svg, const IED* pIed);
+
+	//************************************
+	// 函数名称:	GenerateOpticalSvgByIed
+	// 函数全名:	SvgTransformer::GenerateOpticalSvgByIed
+	// 访问权限:	protected 
+	// 函数说明:	生成光纤图SVG描述结构，上下结构，上下为IED，中间为交换机
+	// 函数参数:	const IED * pIed
+	// 函数参数:	OpticalSvg & svg
+	// 返回值:		void
+	//************************************
+	//void GenerateOpticalSvgByIed_old(const IED* pIed, OpticalSvg& svg);
+
+	//************************************
+	// 函数名称:	GenerateOpticalSvgByIed_old
+	// 函数全名:	SvgTransformer::GenerateOpticalSvgByIed_old
+	// 访问权限:	protected 
+	// 函数说明:	生成光纤图SVG描述结构，上下结构，主IED在上层中心，中间为交换机，下层为周边IED
+	// 函数参数:	const IED * pIed
+	// 函数参数:	OpticalSvg & svg
+	// 返回值:		void
+	//************************************
+	//void GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg);
+	void GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg);
+
+	//************************************
+	// 函数名称:	GenerateVirtualSvgByIed
+	// 函数全名:	SvgTransformer::GenerateVirtualSvgByIed
+	// 访问权限:	protected 
+	// 函数说明:	生成虚回路图SVG描述结构（相较于完整二次回路图，不显示交换机连接关系）
+	// 函数参数:	const IED * pIed
+	// 函数参数:	VirtualSvg & svg
+	// 返回值:		void
+	//************************************
+	void GenerateVirtualSvgByIed(const IED* pIed, VirtualSvg& svg);
+	//************************************
+	// 函数名称:	GenerateVirtualSvgByIed
+	// 函数全名:	SvgTransformer::GenerateVirtualSvgByIed
+	// 访问权限:	protected 
+	// 函数说明:	生成完整二次回路图SVG描述结构
+	// 函数参数:	const IED * pIed
+	// 函数参数:	VirtualSvg & svg
+	// 返回值:		void
+	//************************************
+	void GenerateWholeCircuitSvgByIed(const IED* pIed, WholeCircuitSvg& svg);
+
+	//************************************
+	// 函数名称:	DrawLogicSvg
+	// 函数全名:	SvgTransformer::DrawLogicSvg
+	// 访问权限:	protected 
+	// 函数说明:	绘制指定逻辑链路svg描述结构
+	// 函数参数:	LogicSvg & svg
+	// 返回值:		void
+	//************************************
+	void DrawLogicSvg(LogicSvg& svg);
+	//************************************
+	// 函数名称:	DrawOpticalSvg
+	// 函数全名:	SvgTransformer::DrawOpticalSvg
+	// 访问权限:	protected 
+	// 函数说明:	绘制光纤链路svg描述结构
+	// 函数参数:	OpticalSvg & svg
+	// 返回值:		void
+	//************************************
+	void DrawOpticalSvg(OpticalSvg& svg);
+
+	//************************************
+	// 函数名称:	DrawVirtualSvg
+	// 函数全名:	SvgTransformer::DrawVirtualSvg
+	// 访问权限:	protected 
+	// 函数说明:	绘制虚回路svg描述结构
+	// 函数参数:	VirtualSvg & svg
+	// 返回值:		void
+	//************************************
+	void DrawVirtualSvg(VirtualSvg& svg);
+
+	//************************************
+	// 函数名称:	DrawWholeSvg
+	// 函数全名:	SvgTransformer::DrawVirtualSvg
+	// 访问权限:	protected 
+	// 函数说明:	绘制虚回路svg描述结构（相较于完整二次回路，不显示交换机部分）
+	// 函数参数:	WholeCircuitSvg & svg
+	// 返回值:		void
+	//************************************
+	void DrawWholeSvg(WholeCircuitSvg& svg);
+
+	//************************************
+	// 函数名称:	DrawArrowLine
+	// 函数全名:	SvgTransformer::DrawArrowLine
+	// 访问权限:	protected 
+	// 函数说明:	在end点绘制箭头线段
+	// 函数参数:	const QPoint & start
+	// 函数参数:	const QPoint & end
+	// 返回值:		void
+	//************************************
+	void DrawArrowLine(const QPoint& start, const QPoint& end, const QPoint& arrowPt);
+
+	//************************************
+	// 函数名称:	DrawConnCircle
+	// 函数全名:	SvgTransformer::DrawConnCircle
+	// 访问权限:	protected 
+	// 函数说明:	对于指定点绘制连接点
+	// 函数参数:	const QPoint & pt 指定点
+	// 函数参数:	int radius 连接点半径
+	// 函数参数:	bool isCircleUnderPt 连接点是否位于指定点下方
+	// 返回值:		void
+	//************************************
+	void DrawConnCircle(const QPoint& pt, int radius, bool isCircleUnderPt = true);
+
+	//************************************
+	// 函数名称:	AdjustOtherIedRectPosition
+	// 函数全名:	SvgTransformer::AdjustOtherIedRectPosition
+	// 访问权限:	protected 
+	// 函数说明:	生成全部IED后，根据关联IED数量，将其调整到主IED两侧位置
+	// 函数参数:	QList<IedRect * > & rectList
+	// 函数参数:	const IedRect & mainIedRect
+	// 返回值:		void
+	//************************************
+	void AdjustOtherIedRectPosition(QList<IedRect*>& rectList, const IedRect* mainIedRect);
+
+	//************************************
+	// 函数名称:	AdjustCircuitLinePosition
+	// 函数全名:	SvgTransformer::AdjustCircuitLinePosition
+	// 访问权限:	protected 
+	// 函数说明:	在确定IED位置后，调整链路位置
+	// 函数参数:	LogicSvg & svg
+	// 返回值:		void
+	//************************************
+	void AdjustCircuitLinePosition(LogicSvg& svg);
+
+	//************************************
+	// 函数名称:	AdjustExtendRectByCircuit
+	// 函数全名:	SvgTransformer::AdjustExtendRectByCircuit
+	// 访问权限:	protected 
+	// 函数说明:	根据IED的链路数量，调整外部矩形高度
+	// 函数参数:	IedRect & pRect
+	// 返回值:		void
+	//************************************
+	void AdjustExtendRectByCircuit(IedRect& pRect);
+	void AdjustExtendRectByCircuit(QList<IedRect*>& iedList, LogicSvg& svg);
+
+private:
+	inline double AngleToRadians(double angle)
+	{
+		return angle * M_PI / 180.0;
+	}
+	//************************************
+	// 函数名称:	drawArrowHeader
+	// 函数全名:	SvgTransformer::drawArrowHeader
+	// 访问权限:	private 
+	// 函数说明:	绘制箭头头部
+	// 函数参数:	const QPoint & endPoint
+	// 函数参数:	double arrowAngle
+	// 返回值:		void
+	//************************************
+	void drawArrowHeader(const QPoint& endPoint, double arrowAngle, QColor color = ColorHelper::pure_green, int arrowLen = ARROW_LEN);
+	double GetAngleByVec(const QPointF& vec) const;
+	QPoint GetArrowPt(const QPoint& pt, int arrowLen, int conn_r, double angle, bool isUnderConnpt);
+	// 关联IED图形，两侧绘制。rectIndex为ied矩形编号，用于控制矩形位置
+	IedRect* GetOtherIedRect(quint16 rectIndex, IedRect* mainIedRect, const IED* pIed, const quint32 border_color, const quint32 underground_color = ColorHelper::pure_black);
+
+	IedRect* GetIedRect(QString iedName, QString iedDesc, const quint16 x, const quint16 y, const quint16 width, const quint16 height, const quint32 border_color, const quint32 underground_color = ColorHelper::pure_black);
+
+	SwitcherRect* GetSwitcherRect(const QString& switcherName, const quint16 x, const quint16 y, const quint16 width, const quint16 height, const quint32 border_color, const quint32 underground_color = ColorHelper::pure_black);
+
+	void GetBaseRect(SvgRect* rect, const quint16 x, const quint16 y, const quint16 width, const quint16 height, const quint32 border_color, const quint32 underground_color = ColorHelper::pure_black);
+
+	// 调整主IED两侧链路位置
+	void AdjustMainSideCircuitLinePosition(const size_t circuitCnt, QList<IedRect*>& rectList, IedRect* mainIed, bool isLeft = true);
+
+	// 绘制单个IED矩形
+	void DrawIedRect(IedRect* rect);
+	// 绘制两侧关联矩形列表
+	void DrawIedRect(QList<IedRect*>& rectList);
+	// 绘制交换机矩形
+	void DrawSwitcherRect(IedRect* rect);
+	// 绘制描述矩形
+	void DrawDescRect(const IedRect& leftTopRect);
+	// 居中绘制文本，超过矩形长度自动换行
+	void DrawTextInRect(SvgRect* rect, QString name, QString desc, int pointSize = 15);
+	// 根据传入的IED列表，绘制外部矩形
+	void DrawExternalRect(QList<IedRect*>& rectList, QString title, bool hasDescIedRect = false);
+	void DrawExternalRect(IedRect* rect, QString title, bool hasDescIedRect = false);
+	// 绘制带链路图标的矩形
+	void DrawWholeRect(IedRect* rect);
+
+	// 绘制链路
+	void DrawCircuitLine(QList<IedRect*>& rectList);
+
+	void DrawOpticalLine(OpticalCircuitLine* optLine);
+
+	// 绘制光纤链路
+	void DrawPortText(OpticalCircuitLine* line, int conn_r);
+	//void DrawPortText(OpticalCircuitLine* line);
+
+	// 绘制带有标识图案的虚实链路
+	void DrawWholeCircuitLine(CircuitLine* pCircuit, QPoint& startPoint);
+
+	//************************************
+	// 函数名称:	DrawGseIcon
+	// 函数全名:	SvgTransformer::DrawGseIcon
+	// 访问权限:	private 
+	// 函数说明:	绘制GSE图标，输入点为图标左上角坐标
+	// 函数参数:	const QPoint & pt
+	// 函数参数:	const quint32 color
+	// 返回值:		void
+	//************************************
+	void DrawGseIcon(const QPoint& pt, const quint32 color = ColorHelper::line_gse);
+
+	//************************************
+	// 函数名称:	DrawSvIcon
+	// 函数全名:	SvgTransformer::DrawSvIcon
+	// 访问权限:	private 
+	// 函数说明:	绘制SV图标，输入点为图标左上角坐标
+	// 函数参数:	const QPoint & pt
+	// 函数参数:	const quint32 color
+	// 返回值:		void
+	//************************************
+	void DrawSvIcon(const QPoint& pt, const quint32 color = ColorHelper::line_smv);
+	//************************************
+	// 函数名称:	DrawPlateIcon
+	// 函数全名:	SvgTransformer::DrawPlateIcon
+	// 访问权限:	private 
+	// 函数说明:	绘制检修压板图标，输入点为左侧圆的圆心位置。
+	// 函数参数:	const QPoint & pt
+	// 函数参数:	const quint32 color
+	// 返回值:		void
+	//************************************
+	void DrawPlateIcon(const QPoint& pt, bool isClosed = false, const quint32 defaultColor = 0);
+	//************************************
+	// 函数名称:	DrawPlateIconWithRect
+	// 函数全名:	SvgTransformer::DrawPlateIconWithRect
+	// 访问权限:	private 
+	// 函数说明:	绘制链路压板图标
+	// 函数参数:	const QPoint & pt
+	// 函数参数:	const quint32 color
+	// 返回值:		void
+	//************************************
+	void DrawPlateIconWithRect(const QPoint& pt, const quint32 color);
+
+
+	// 对SVG文件进行解析重标识
+	void ReSignSvg(const QString&filename);
+	// 重标识IED属性
+	void ReSignIedRect(pugi::xml_document& doc);
+	// 重标识链路属性
+	void ReSignCircuitLine(pugi::xml_document& doc);
+	void GetSwitcherFromLogicCircuits(QList<LogicCircuit*> logicCircuitList, OpticalSvg& svg);
+private:
+	CircuitConfig* m_circuitConfig;
+	QSvgGenerator* m_svgGenerator;
+	QPainter* m_painter;
+	QString m_errStr;
+	enum svgType
+	{
+		TYPE_IED = 90,
+		TYPE_Circuit = 100,
+		TYPE_Switcher = 110,
+		TYPE_OpticalCircuit = 120
+	};
+};
+

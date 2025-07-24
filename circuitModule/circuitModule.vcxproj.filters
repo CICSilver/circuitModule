@@ -1,0 +1,116 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="circuitconfig.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="customsvgitem.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="mainwindow.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="basemodel.h">
+      <Filter>header</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Debug\moc_mainwindow.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_mainwindow.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\qrc_mainwindow.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SvgTransformer.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="include\pugixml\pugixml.cpp">
+      <Filter>thirdparty\pugixml</Filter>
+    </ClCompile>
+    <ClCompile Include="viewwindow.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Debug\moc_viewwindow.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="circuitconfig.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="customsvgitem.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="GeneratedFiles\ui_mainwindow.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SvgTransformer.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="svgmodel.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\pugixml\pugiconfig.hpp">
+      <Filter>thirdparty\pugixml</Filter>
+    </ClInclude>
+    <ClInclude Include="include\pugixml\pugixml.hpp">
+      <Filter>thirdparty\pugixml</Filter>
+    </ClInclude>
+    <ClInclude Include="GeneratedFiles\ui_viewwindow.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\cime\cime.h">
+      <Filter>thirdparty\cime</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="mainwindow.h">
+      <Filter>header</Filter>
+    </CustomBuild>
+    <CustomBuild Include="mainwindow.ui">
+      <Filter>forms</Filter>
+    </CustomBuild>
+    <CustomBuild Include="mainwindow.qrc">
+      <Filter>resources</Filter>
+    </CustomBuild>
+    <CustomBuild Include="viewwindow.ui">
+      <Filter>forms</Filter>
+    </CustomBuild>
+    <CustomBuild Include="viewwindow.h">
+      <Filter>header</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="src">
+      <UniqueIdentifier>{ced7ac39-38f2-443b-953b-bd0d07071146}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="header">
+      <UniqueIdentifier>{7859f2ac-e991-4fb6-b89d-8319061f4fdb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Generated Files">
+      <UniqueIdentifier>{0775a521-aa5d-4cb5-929d-3b1436d255d0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="forms">
+      <UniqueIdentifier>{7d403ccf-e707-4cb4-a83f-92d68f79bda4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="resources">
+      <UniqueIdentifier>{89154dd3-b1be-4dcf-be27-6f409590c755}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty">
+      <UniqueIdentifier>{2f41d17d-8958-48ce-9b90-a5d0da61f0a5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\pugixml">
+      <UniqueIdentifier>{d7dd28f9-5f07-451d-89e1-0207c162ac4e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\cime">
+      <UniqueIdentifier>{01085d42-215b-4231-9c49-9af4c480455e}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="cpp.hint" />
+  </ItemGroup>
+</Project>

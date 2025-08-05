@@ -136,7 +136,6 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <unordered_map>
 #include <sstream>
 #include <iostream>
 #include <fstream>
@@ -403,12 +402,12 @@ namespace xcime
         /// 获取字段列号
         int fieldIndex(const std::string &fieldName) const
         {
-            std::unordered_map<std::string, int>::const_iterator it = m_fieldIndexMap.find(fieldName);
+            std::map<std::string, int>::const_iterator it = m_fieldIndexMap.find(fieldName);
             return it == m_fieldIndexMap.end() ? -1 : it->second;
         }
 
-        std::unordered_map<std::string, int> &getFieldIndexMap() { return m_fieldIndexMap; }
-        std::unordered_map<std::string, int> &getAutoIncrementMap() { return m_autoIncrementMap; }
+        std::map<std::string, int> &getFieldIndexMap() { return m_fieldIndexMap; }
+        std::map<std::string, int> &getAutoIncrementMap() { return m_autoIncrementMap; }
 
     private:
         std::string m_fullName;                                      ///< 数据块名称
@@ -417,8 +416,8 @@ namespace xcime
         std::vector<CimeField> m_fields;                         ///< 字段定义集合
         std::vector<CimeRecord> m_records;                       ///< 记录集合
         std::map<std::string, std::string> m_attributes;   ///< 数据块属性集合
-        std::unordered_map<std::string, int> m_fieldIndexMap;    ///< 记录字段的列索引, [fieldName, col]
-        std::unordered_map<std::string, int> m_autoIncrementMap; ///< 自增字段的列索引, [fieldName, col]
+        std::map<std::string, int> m_fieldIndexMap;    ///< 记录字段的列索引, [fieldName, col]
+        std::map<std::string, int> m_autoIncrementMap; ///< 自增字段的列索引, [fieldName, col]
         bool m_isTypeVisible;                                    ///< 是否显示字段类型标识
         bool m_isUnitVisible;                                    ///< 是否显示字段单位
         bool m_isValueLimitVisible;                              ///< 是否显示字段值限制
@@ -684,7 +683,7 @@ namespace xcime
             // 删除字段
             m_block->m_fields.erase(m_block->m_fields.begin() + m_col);
             // 更新后续字段列号映射
-            for (std::unordered_map<std::string, int>::iterator it = m_block->m_fieldIndexMap.begin(); it != m_block->m_fieldIndexMap.end(); ++it)
+            for (std::map<std::string, int>::iterator it = m_block->m_fieldIndexMap.begin(); it != m_block->m_fieldIndexMap.end(); ++it)
             {
                 if (it->second > static_cast<int>(m_col))
                 {
@@ -871,7 +870,7 @@ namespace xcime
             if(col <= m_block->m_fieldIndexMap.size())
             {
                 // 列号小于当前列数，是修改列顺序，修改后续全部列顺序
-                for(std::unordered_map<std::string, int>::iterator it = m_block->m_fieldIndexMap.begin(); it != m_block->m_fieldIndexMap.end(); ++it)
+                for(std::map<std::string, int>::iterator it = m_block->m_fieldIndexMap.begin(); it != m_block->m_fieldIndexMap.end(); ++it)
                 {
                     if(it->second >= (int)col && it->second < (int)col)
                     {
@@ -1680,8 +1679,8 @@ namespace xcime
                 // 假定文件格式：先一行以 @ 开头定义字段，再有若干行以 # 开头的记录
                 bool fieldsParsed = false;
                 std::vector<CimeField> &fields = const_cast<std::vector<CimeField> &>(block->getFields());
-                std::vector<CimeRecord> &records = const_cast<std::vector<CimeRecord> &>(block->getRecords());;
-                std::unordered_map<std::string, int> &fieldIndexMap = block->getFieldIndexMap();
+                std::vector<CimeRecord> &records = const_cast<std::vector<CimeRecord> &>(block->getRecords());
+                std::map<std::string, int> &fieldIndexMap = block->getFieldIndexMap();
                 while(std::getline(ifs, line))
                 {
                     if(line.empty()) continue;

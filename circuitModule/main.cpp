@@ -103,42 +103,25 @@ void scd_xpath_test()
 
 int main(int argc, char* argv[]) {
 	QApplication app(argc, argv);
-	QString iedName = "PL2205LA";
+	QString iedName = "IMM2201L1";
 	// 解析SCD文件
 	//QString scdPath = QCoreApplication::applicationDirPath() + "/scd_test.scd";
 	//QString configPath = QCoreApplication::applicationDirPath() + "/circuit_config.csv";
 
 
-	CircuitConfig* circuitConfig = CircuitConfig::Instance();
-	circuitConfig->LoadCimeFile();
-	//circuitConfig->LoadCimeFile(configPath);
-	//circuitConfig->LoadScdFile(scdPath);
-	SvgTransformer transformer;
-	transformer.GenerateSvgByIedName(iedName);
-	// 写入配置文件
-	//circuitConfig->SaveConfigAsCime(configPath);
-
 	// 读取配置文件
-	//circuitConfig->LoadCimeFile(configPath);
-	//QString dataAddr = "PIGO/GOINGGIO2.DPCSO1.stVal";
-	//Data data(dataAddr);
-	//qDebug() <<
-	//	data.ldInst << " " <<
-	//	data.prefix << " " <<
-	//	data.lnClass << " " <<
-	//	data.lnInst << " " <<
-	//	data.doName << " " <<
-	//	data.daName << " ";
-	// 生成验证文件，验证读取的完整性
-	//QList<IED*> iedList = circuitConfig->GetIedList();
-	//QString secConfigPath = QCoreApplication::applicationDirPath() + "/circuit_config_new.csv";
-	//circuitConfig->SaveConfigAsCime(secConfigPath);
-	//qDebug() << "new cime configFile generated";
-	// 生成SVG文件
+	CircuitConfig* pCircuitConfig = CircuitConfig::Instance();
+	pCircuitConfig->LoadCimeFile();
+	SvgTransformer transformer;
+	// 单设备文件生成测试
+	transformer.GenerateSvgByIedName(iedName);
+
+	//// 生成SVG文件
 	//QList<QString> pathList;
-	//pathList 
+	//pathList
 	//	<< QCoreApplication::applicationDirPath() + "/logic"		// 逻辑链路
 	//	<< QCoreApplication::applicationDirPath() + "/optical"		// 光纤链路
+	//	<< QCoreApplication::applicationDirPath() + "/virtual"		// 虚链路
 	//	<< QCoreApplication::applicationDirPath() + "/whole";		// 整体链路
 	//foreach(QString path, pathList)
 	//{
@@ -149,16 +132,22 @@ int main(int argc, char* argv[]) {
 	//	}
 	//}
 	//
-	//foreach(IED * pIed, iedList)
+	//foreach(IED * pIed, pCircuitConfig->GetIedList())
 	//{
 	//	QString path;
+	//	if (pIed->name.contains("SW"))
+	//		continue;
 	//	// 逻辑链路
 	//	transformer.GenerateLogicSvg(pIed, pathList.at(0) + "/" + pIed->name + "_logic_circuit.svg");
 	//	// 光纤链路
 	//	transformer.GenerateOpticalSvg(pIed, pathList.at(1) + "/" + pIed->name + "_optical_circuit.svg");
+	//	// 虚回路
+	//	transformer.GenerateVirtualSvg(pIed, pathList.at(2) + "/" + pIed->name + "_virtual_circuit.svg");
 	//	// 整体链路
-	//	transformer.GenerateWholeCircuitSvg(pIed, pathList.at(2) + "/" + pIed->name + "_whole_circuit.svg");
+	//	//transformer.GenerateWholeCircuitSvg(pIed, pathList.at(3) + "/" + pIed->name + "_whole_circuit.svg");
 	//}
+	qDebug() << "SVG files generated successfully.";
+
 
 	// 显示SVG文件
 	//QGraphicsScene scene;

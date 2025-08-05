@@ -6,27 +6,6 @@
 #include "cime/cime.h"
 bool debug = false;
 
-//bool CircuitConfig::LoadScdFile(QString file)
-//{
-//	m_errMsg = "";
-//	pugi::xml_document doc;
-//	pugi::xml_parse_result result = doc.load_file(file.toLocal8Bit());
-//	if (!result)
-//	{
-//		m_errMsg = "scdÎÄ¼þ" + file + "¶ÁÈ¡Ê§°Ü";
-//		return false;
-//	}
-//	pugi::xml_node sclNode = doc.child("SCL");
-//
-//	if (!ParseIed(sclNode))
-//	{
-//		return false;
-//	}
-//
-//	qDebug() << "Parse SCL file success";
-//	return true;
-//}
-
 bool CircuitConfig::LoadCimeFile(/*QString file*/)
 {
 	Clear();

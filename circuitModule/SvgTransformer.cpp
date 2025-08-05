@@ -4,12 +4,12 @@
 #include <QDebug>
 #include <include/pugixml/pugixml.hpp>
 #include "svgmodel.h"
-#define GET_RADIANS(angle) (angle * M_PI / 180)
+
 SvgTransformer::SvgTransformer()
 {
 	m_circuitConfig = CircuitConfig::Instance();
 	m_svgGenerator = new QSvgGenerator();
-	m_painter = new QPainter();
+	m_painter = new QPainter;
 }
 
 SvgTransformer::~SvgTransformer()
@@ -61,14 +61,13 @@ void SvgTransformer::GenerateSvgByIedName(const QString& iedName)
 	m_svgGenerator->setFileName(virtualFileName);
 	m_svgGenerator->setViewBox(QRect(0, 0, 2160, 1440));
 	m_painter->begin(m_svgGenerator);
-	m_painter->drawPoint(QPoint(100, 100));
 
-	m_svgGenerator->setFileName(QString());
 	VirtualSvg vtSvg;
 	GenerateVirtualSvgByIed(pIed, vtSvg);
 	DrawVirtualSvg(vtSvg);
 	m_painter->end();
-	//ReSignSvg(virtualFileName);
+	m_svgGenerator->setFileName(QString());
+	ReSignSvg(virtualFileName);
 	if (!m_errStr.isEmpty())
 	{
 		qDebug() << m_errStr;
@@ -83,6 +82,11 @@ void SvgTransformer::GenerateLogicSvg(const IED* pIed, const QString& filePath)
 void SvgTransformer::GenerateOpticalSvg(const IED* pIed, const QString& filePath)
 {
 	GenerateSvg<OpticalSvg>(pIed, filePath, &SvgTransformer::GenerateOpticalSvgByIed, &SvgTransformer::DrawOpticalSvg);
+}
+
+void SvgTransformer::GenerateVirtualSvg(const IED* pIed, const QString& filePath)
+{
+	GenerateSvg<VirtualSvg>(pIed, filePath, &SvgTransformer::GenerateVirtualSvgByIed, &SvgTransformer::DrawVirtualSvg);
 }
 
 void SvgTransformer::GenerateWholeCircuitSvg(const IED* pIed, const QString& filePath)
@@ -112,7 +116,7 @@ void SvgTransformer::GenerateLogicSvgByIed(const IED* pIed, LogicSvg& svg)
     AdjustOtherIedRectPosition(svg.leftIedRectList, svg.mainIedRect);
 	AdjustOtherIedRectPosition(svg.rightIedRectList, svg.mainIedRect);
 	// 调整链路位置
-	AdjustCircuitLinePosition(svg);
+	AdjustLogicCircuitLinePosition(svg);
 }
 
 void SvgTransformer::ParseCircuitFromIed(LogicSvg& svg, const IED* pIed)
@@ -143,7 +147,7 @@ void SvgTransformer::ParseCircuitFromIed(LogicSvg& svg, const IED* pIed)
 				line->pSrcIedRect = otherIedRect;
 				line->pDestIedRect = svg.mainIedRect;
 				line->pLogicCircuit = pLogicCircuit;
-				otherIedRect->logic_circuit_line_list.append(line);
+				otherIedRect->logic_line_list.append(line);
 			}
 		}
 		// 出链路
@@ -156,7 +160,7 @@ void SvgTransformer::ParseCircuitFromIed(LogicSvg& svg, const IED* pIed)
 				line->pSrcIedRect = svg.mainIedRect;
 				line->pDestIedRect = otherIedRect;
 				line->pLogicCircuit = pLogicCircuit;
-				otherIedRect->logic_circuit_line_list.append(line);
+				otherIedRect->logic_line_list.append(line);
 			}
 		}
 		list->append(otherIedRect);
@@ -190,6 +194,11 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 		RECT_DEFAULT_HEIGHT,
 		ColorHelper::ied_border,
 		ColorHelper::ied_underground);
+	if(pIed->connectedIedNameSet.isEmpty())
+	{
+		// 主IED没有连接其他设备，直接返回
+		return;
+	}
 	foreach(OpticalCircuit * optCircuit, pIed->optical_list_new)
 	{
 		// 一端为主IED，另一端为对侧IED的光纤链路
@@ -302,44 +311,49 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 	}
 	// 直连IED全部靠左排列
 	int x = 0;
-	int belowIedY = svg.switcherRectList.last()->y + svg.switcherRectList.last()->height + vertical_distance;	// 交换机下方的IED y
+	
+	int belowIedY = svg.switcherRectList.isEmpty() ? 3 * IED_VERTICAL_DISTANCE + vertical_distance : svg.switcherRectList.last()->y + svg.switcherRectList.last()->height + vertical_distance;	// 交换机下方的IED y
 	for (size_t i = 0; i < directRectList.size(); ++i)
 	{
 		IedRect* rect = directRectList.at(i);
 			rect->x = horizontal_distance + i * (rect->width + horizontal_distance);
 			rect->y = belowIedY;
 	}
-	svg.mainIedRect->x = directRectList.last()->x + directRectList.last()->width;	// 主IED移动到直连
+	// 有直连情况则主IED与直连IED对齐，否则主IED居中
+	svg.mainIedRect->x = directRectList.isEmpty() ? (SVG_VIEWBOX_WIDTH - RECT_DEFAULT_WIDTH) / 2 : directRectList.last()->x + directRectList.last()->width;	
 	int switcherX = svg.mainIedRect->x;		// 交换机起始X，默认为与主IED对齐
 	int totalWidth = 0;
-	if(indirectRectList.size() == 1)
+	if (!indirectRectList.isEmpty())
 	{
-		// 只有一个过交换机的IED，放在主IED右侧，交换机与主IED对齐
-		// 位置关系为: 
-		//			主IED	对侧IED
-		//			交    换    机
-		// 直连IED
-		IedRect* rect = indirectRectList.first();
-		rect->x = svg.mainIedRect->x + svg.mainIedRect->width + horizontal_distance;
-		rect->y = svg.mainIedRect->y;
-		totalWidth = svg.mainIedRect->width + rect->width + horizontal_distance;
-	}else
-	{
-		// 不止一个过交换机的IED，位置关系为：
-		// 位置关系为: 
-		//			主IED	
-		//			交换机
-		// 直连IED  对侧IED
-		for (size_t i = 0; i < indirectRectList.size(); ++i)
+		if(indirectRectList.size() == 1)
 		{
-			IedRect* rect = indirectRectList.at(i);
-			quint16 startX = directRectList.last()->x + directRectList.last()->width;
-			rect->x = startX + horizontal_distance + i * (horizontal_distance + rect->width);
-			rect->y = directRectList.last()->y;
-			totalWidth += rect->width + horizontal_distance;
+			// 只有一个过交换机的IED，放在主IED右侧，交换机与主IED对齐
+			// 位置关系为: 
+			//			主IED	对侧IED
+			//			交    换    机
+			// 直连IED
+			IedRect* rect = indirectRectList.first();
+			rect->x = svg.mainIedRect->x + svg.mainIedRect->width + horizontal_distance;
+			rect->y = svg.mainIedRect->y;
+			totalWidth = svg.mainIedRect->width + rect->width + horizontal_distance;
+		}else
+		{
+			// 不止一个过交换机的IED，位置关系为：
+			// 位置关系为: 
+			//			主IED	
+			//			交换机
+			// 直连IED  对侧IED
+			for (size_t i = 0; i < indirectRectList.size(); ++i)
+			{
+				IedRect* rect = indirectRectList.at(i);
+				quint16 startX = directRectList.last()->x + directRectList.last()->width;
+				rect->x = startX + horizontal_distance + i * (horizontal_distance + rect->width);
+				rect->y = directRectList.last()->y;
+				totalWidth += rect->width + horizontal_distance;
+			}
+			totalWidth -= horizontal_distance;
+			switcherX = indirectRectList.first()->x;		// 多个交换机IED时，交换机与第一个经过交换机的IED对齐
 		}
-		totalWidth -= horizontal_distance;
-		switcherX = indirectRectList.first()->x;		// 多个交换机IED时，交换机与第一个经过交换机的IED对齐
 	}
 	// 交换机位置
 	foreach(IedRect* switcher, svg.switcherRectList)
@@ -418,15 +432,19 @@ void SvgTransformer::GenerateVirtualSvgByIed(const IED* pIed, VirtualSvg& svg)
 		pIed->desc,
 		(SVG_VIEWBOX_WIDTH - RECT_DEFAULT_WIDTH) / 2,
 		20,
-		RECT_DEFAULT_WIDTH,
+		RECT_DEFAULT_WIDTH * 1.5,
 		RECT_DEFAULT_HEIGHT,
-		ColorHelper::pure_red,
-		ColorHelper::ied_underground
+		ColorHelper::pure_red
 	);
+	if(pIed->connectedIedNameSet.isEmpty())
+	{
+		// 主IED没有连接其他设备，直接返回
+		return;
+	}
 	// 主设备高度 = max(侧边IED矩形高度) + margin + IED描述矩形高度;
-	// 关联IED
+	// 关联IED，增加矩形间隔用于显示回路信息
 	ParseCircuitFromIed(svg, pIed);
-
+	
 
 	//// 调整矩形位置
 	// 根据单侧关联IED数量，调整高度
@@ -436,9 +454,10 @@ void SvgTransformer::GenerateVirtualSvgByIed(const IED* pIed, VirtualSvg& svg)
 	size_t leftCircuitSize = svg.GetLeftCircuitSize();
 	size_t rightCircuitSize = svg.GetRightCircuitSize();
 	// 计算主IED高度
-	size_t mainCircuitSize = leftCircuitSize > rightCircuitSize ? leftCircuitSize : rightCircuitSize;
-	size_t margin = ICON_LENGTH * 2;
-	svg.mainIedRect->extend_height = ICON_LENGTH * (mainCircuitSize + CIRCUIT_VERTICAL_DISTANCE) + margin;// 总数据引用数量+间距+margin
+	size_t maxY = qMax(svg.leftIedRectList.last()->GetExtendBottomY(), svg.rightIedRectList.last()->GetExtendBottomY());
+	svg.mainIedRect->extend_height = maxY;
+	// 生成并调整回路位置、回路信息、软压板位置
+	AdjustVirtualCircuitLinePosition(svg);
 }
 
 void SvgTransformer::GenerateWholeCircuitSvgByIed(const IED* pIed, WholeCircuitSvg& svg)
@@ -483,8 +502,8 @@ void SvgTransformer::DrawLogicSvg(LogicSvg& svg)
 	DrawExternalRect(svg.rightIedRectList, QString::fromLocal8Bit("影响域"));	// 右侧外部虚线框
 	
 	// 关联链路
-	DrawCircuitLine(svg.leftIedRectList);
-	DrawCircuitLine(svg.rightIedRectList);
+	DrawLogicCircuitLine(svg.leftIedRectList);
+	DrawLogicCircuitLine(svg.rightIedRectList);
 
 }
 
@@ -517,9 +536,17 @@ void SvgTransformer::DrawOpticalSvg(OpticalSvg& svg)
 
 void SvgTransformer::DrawVirtualSvg(VirtualSvg& svg)
 {
+	// 绘制IED矩形
 	DrawIedRect(svg.mainIedRect);
 	DrawIedRect(svg.leftIedRectList);
 	DrawIedRect(svg.rightIedRectList);
+
+	// 绘制链路
+	DrawVirtualCircuitLine(svg.leftIedRectList);
+	DrawVirtualCircuitLine(svg.rightIedRectList);
+
+	// 绘制压板
+	DrawPlate(svg.plateRectHash);
 }
 
 void SvgTransformer::DrawWholeSvg(WholeCircuitSvg& svg)
@@ -533,28 +560,21 @@ void SvgTransformer::DrawWholeSvg(WholeCircuitSvg& svg)
 	foreach(IedRect * pIedRect, svg.leftIedRectList)
 	{
 		QPoint iconStartPos = QPoint(pIedRect->x + pIedRect->width - ICON_LENGTH * 2, pIedRect->y + pIedRect->height + ICON_LENGTH);
-		foreach(LogicCircuitLine* pLogicCircuit, pIedRect->logic_circuit_line_list)
+		foreach(LogicCircuitLine* pLogicCircuit, pIedRect->logic_line_list)
 		{
 		}
 	}
 	//svg.mainIedRect.pIed->
 }
 
-void SvgTransformer::DrawArrowLine(const QPoint& start, const QPoint& end, const QPoint& arrowPt)
-{
-	double angle = GetAngleByVec(end - start);
-	//m_painter->drawLine(start, end);
-	drawArrowHeader(arrowPt, angle);
-}
-
-
 void SvgTransformer::DrawConnCircle(const QPoint& pt, int radius, bool isCircleUnderPt)
 {
+	m_painter->save();
 	QBrush brush(ColorHelper::Color(ColorHelper::pure_green));
 	m_painter->setBrush(brush);
 	int y = isCircleUnderPt ? pt.y() + radius : pt.y() - radius;
 	m_painter->drawEllipse(QPoint(pt.x(), y), radius, radius);
-	m_painter->setBrush(Qt::NoBrush);
+	m_painter->restore();
 }
 
 
@@ -578,21 +598,27 @@ void SvgTransformer::AdjustOtherIedRectPosition(QList<IedRect*>& rectList, const
 	}
 }
 
-void SvgTransformer::AdjustCircuitLinePosition(LogicSvg& svg)
+void SvgTransformer::AdjustLogicCircuitLinePosition(LogicSvg& svg)
 {
 	// 调整左侧IED到主IED链路位置
 	AdjustMainSideCircuitLinePosition(svg.GetLeftLogicCircuitSize(), svg.leftIedRectList, svg.mainIedRect);
 	AdjustMainSideCircuitLinePosition(svg.GetRightLogicCircuitSize(), svg.rightIedRectList, svg.mainIedRect, false);
 }
 
+void SvgTransformer::AdjustVirtualCircuitLinePosition(VirtualSvg& svg)
+{
+	AdjustVirtualCircuitLinePosition(svg, svg.leftIedRectList, svg.mainIedRect);
+	AdjustVirtualCircuitLinePosition(svg, svg.rightIedRectList, svg.mainIedRect, false);
+}
+
 void SvgTransformer::AdjustExtendRectByCircuit(IedRect& pRect)
 {
 	int circuitSize = 0;
-	foreach(LogicCircuitLine * line, pRect.logic_circuit_line_list)
+	foreach(LogicCircuitLine * line, pRect.logic_line_list)
 	{
 		circuitSize += line->pLogicCircuit->circuitList.size();
 	}
-	pRect.extend_height = circuitSize * (CIRCUIT_VERTICAL_DISTANCE + ICON_LENGTH) + ICON_LENGTH;
+	pRect.extend_height = circuitSize * (CIRCUIT_VERTICAL_DISTANCE + ICON_LENGTH) + pRect.inner_gap + PLATE_HEIGHT;
 }
 
 void SvgTransformer::AdjustExtendRectByCircuit(QList<IedRect*>& iedList, LogicSvg& svg)
@@ -697,14 +723,6 @@ IedRect * SvgTransformer::GetIedRect(QString iedName, QString iedDesc, const qui
 	return iedRect;
 }
 
-SwitcherRect* SvgTransformer::GetSwitcherRect(const QString& switcherName, const quint16 x, const quint16 y, const quint16 width, const quint16 height, const quint32 border_color, const quint32 underground_color)
-{
-	SwitcherRect* pRect = new SwitcherRect;
-	pRect->switcher_name = switcherName;
-	GetBaseRect(pRect, x, y, width, height, border_color, underground_color);
-	return pRect;
-}
-
 void SvgTransformer::DrawDescRect(const IedRect& leftTopRect)
 {
 	QFont descFont;
@@ -748,11 +766,11 @@ void SvgTransformer::AdjustMainSideCircuitLinePosition(const size_t circuitCnt, 
 	quint16 mainConnectPoint_x = isLeft ? mainIedRect->x : mainIedRect->x + mainIedRect->width;
 	foreach(IedRect* rect, rectList)
 	{
-		size_t circuitCnt = rect->logic_circuit_line_list.size();
+		size_t circuitCnt = rect->logic_line_list.size();
 		size_t circuitDiff = rect->height / (circuitCnt + 1);
 		// 左侧IED列表，当前IED连接点位于右侧；右侧IED列表，当前IED连接点位于左侧
 		quint8* connectPointIndex = isLeft ? &rect->right_connect_index : &rect->left_connect_index;
-		foreach(LogicCircuitLine* line, rect->logic_circuit_line_list)
+		foreach(LogicCircuitLine* line, rect->logic_line_list)
 		{
 			quint16 connectPoint_x = isLeft ? rect->x + rect->width : rect->x;
 			quint16 connectPoint_y = rect->y + (*connectPointIndex + 1) * circuitDiff;
@@ -768,6 +786,183 @@ void SvgTransformer::AdjustMainSideCircuitLinePosition(const size_t circuitCnt, 
 			++(*connectPointIndex);
 			++(*mainConnectPointIndex);
 		}
+	}
+}
+
+void SvgTransformer::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QList<IedRect*>& rectList, IedRect* mainIed, bool isLeft)
+{
+	m_painter->save();
+    foreach(IedRect* rect, rectList)
+    {
+        foreach(LogicCircuitLine* pLogicLine, rect->logic_line_list)
+        {
+            foreach(VirtualCircuit* pCircuit, pLogicLine->pLogicCircuit->circuitList)
+            {
+                // 设备当前逻辑链路下所属的全部通道
+                VirtualCircuitLine* pVtLine = new VirtualCircuitLine(pCircuit);
+                // 确定源矩形和目标矩形
+                bool isSideSource = (pCircuit->srcIedName == rect->iedName);
+                IedRect* srcRect = isSideSource ? rect : mainIed;
+                IedRect* destRect = isSideSource ? mainIed : rect;
+                pVtLine->pSrcIedRect = srcRect;
+                pVtLine->pDestIedRect = destRect;
+                // 确定连接点索引
+                quint8* pConnectPtIndex = isLeft ? &rect->right_connect_index : &rect->left_connect_index;
+                quint8* pMainConnectPtIndex = isLeft ? &mainIed->right_connect_index : &mainIed->left_connect_index;
+                
+                // 确定起始点X坐标和结束点X坐标
+                quint16 startPt_X, endPt_X, startIconPt_X, endIconPt_X, startVal_X, endVal_X;
+				QFont font;
+				font.setPointSize(18);
+				m_painter->setFont(font);
+				QFontMetrics fm = m_painter->fontMetrics();
+				int valWidth = fm.width(pVtLine->valStr);
+
+				int startOffset = ICON_LENGTH * 4 + rect->inner_gap;
+				int iconOffset = ICON_LENGTH + rect->inner_gap;
+				int valGap = rect->inner_gap * 2 + valWidth;
+				int iedDistance = IED_HORIZONTAL_DISTANCE - rect->inner_gap * 4;
+				if (isSideSource) {
+					// 侧边设备到主设备
+					startPt_X = isLeft ?
+						rect->x + rect->width - startOffset :
+						rect->x + startOffset;
+
+					endPt_X = isLeft ?
+						mainIed->x + startOffset :
+						mainIed->x + mainIed->width - startOffset;
+
+					// 计算起始点和结束点的图标X坐标
+					startIconPt_X = isLeft ?
+						startPt_X - iconOffset :
+						startPt_X + rect->inner_gap;
+
+					endIconPt_X = isLeft ?
+						endPt_X + rect->inner_gap :
+						endPt_X - iconOffset;
+
+					startVal_X = isLeft ?
+						startIconPt_X - valGap :
+						startIconPt_X + iconOffset;
+
+					endVal_X = isLeft ?
+						endIconPt_X + iconOffset :
+						endIconPt_X - valGap;
+
+					pVtLine->circuitDesc = isLeft ?
+						QString("%1 -> %2").arg(pCircuit->srcDesc, pCircuit->destDesc) :
+						QString("%1 <- %2").arg(pCircuit->destDesc, pCircuit->srcDesc);
+				}
+				else {
+					// 主设备到侧边设备
+					startPt_X = isLeft ?
+						mainIed->x + startOffset :
+						mainIed->x + mainIed->width - startOffset;
+
+					endPt_X = isLeft ?
+						rect->x + rect->width - startOffset :
+						rect->x + startOffset;
+
+					// 计算起始点和结束点的图标X坐标
+					startIconPt_X = isLeft ?
+						startPt_X + rect->inner_gap :
+						startPt_X - iconOffset;
+
+					endIconPt_X = isLeft ?
+						endPt_X - iconOffset :
+						endPt_X + rect->inner_gap;
+
+					startVal_X = isLeft ?
+						startIconPt_X + iconOffset :
+						startIconPt_X - valGap;
+
+					endVal_X = isLeft ?
+						endIconPt_X - valGap :
+						endIconPt_X + iconOffset;
+
+					pVtLine->circuitDesc = isLeft ?
+						QString("%1 <- %2").arg(pCircuit->srcDesc, pCircuit->destDesc) :
+						QString("%1 -> %2").arg(pCircuit->destDesc, pCircuit->srcDesc);
+				}
+				// 描述信息位于设备矩形中间空白处，即左侧矩形的最右侧位置
+				quint16 descRect_X = srcRect->x < destRect->x ? srcRect->x + srcRect->width + srcRect->inner_gap * 2 : destRect->x + destRect->width + destRect->inner_gap * 2;
+				if (fm.width(pVtLine->circuitDesc) > iedDistance)
+				{
+					// 若描述信息过长，则在右侧进行省略
+					pVtLine->circuitDesc = fm.elidedText(pVtLine->circuitDesc, Qt::ElideRight, iedDistance);
+				}
+                // 计算Y坐标，全部链路平行所以均以侧边设备位置计算
+				quint16 pt_Y = rect->GetInnerBottomY() + CIRCUIT_VERTICAL_DISTANCE + ICON_LENGTH +
+					*pConnectPtIndex * (CIRCUIT_VERTICAL_DISTANCE + ICON_LENGTH);
+				quint16 icon_Y = pt_Y - ICON_LENGTH / 2;	// 保持中心与线段对齐
+
+
+                // 设置线路起止点
+                pVtLine->startPoint = QPoint(startPt_X, pt_Y);
+                pVtLine->endPoint = QPoint(endPt_X, pt_Y);
+				pVtLine->startIconPt = QPoint(startIconPt_X, icon_Y);
+				pVtLine->endIconPt = QPoint(endIconPt_X, icon_Y);
+				pVtLine->startValRect = QRect(QPoint(startVal_X, icon_Y), QPoint(startVal_X + valWidth, icon_Y));
+				pVtLine->endValRect = QRect(QPoint(endVal_X, icon_Y), QPoint(endVal_X + valWidth, icon_Y));
+				pVtLine->circuitDescRect = QRect(QPoint(descRect_X, pt_Y - fm.height() * 1.2), QSize(iedDistance, fm.height()));
+                pLogicLine->virtual_line_list.append(pVtLine);
+				// 生成并调整当前通道的压板矩形位置
+				// 开入软压板，图形位于回路终点
+				AdjustVirtualCircuitPlatePosition(svg.plateRectHash, pVtLine->endPoint, pCircuit->destSoftPlateDesc, pCircuit->destSoftPlateRef, false, isSideSource, isLeft);
+				// 开出软压板，图形位于回路起点
+				AdjustVirtualCircuitPlatePosition(svg.plateRectHash, pVtLine->startPoint, pCircuit->srcSoftPlateDesc, pCircuit->srcSoftPlateRef, true, isSideSource, isLeft);
+                // 增加连接点索引
+                ++(*pConnectPtIndex);
+            }
+        }
+    }
+	m_painter->restore();
+}
+
+void SvgTransformer::AdjustVirtualCircuitPlatePosition(QHash<QString, PlateRect>& hash, const QPoint& linePt, const QString& plateDesc, const QString& plateRef, bool isSrcPlate, bool isSideSrc, bool isLeft)
+{
+	if( plateDesc.isEmpty() || plateRef.isEmpty())
+		return;
+
+	if (!hash.contains(plateRef))
+	{
+		// 当前通道压板未记录，则创建一个新的压板矩形
+		PlateRect plateRect;
+		plateRect.desc = plateDesc;
+		plateRect.ref = plateRef;
+		int plate_X, plate_Y = linePt.y() - ICON_LENGTH / 2;
+		int startOffset = ARROW_LEN * 1.5;
+		int rectWidth = PLATE_WIDTH + 2 * PLATE_GAP;
+		if (isSideSrc)
+		{
+			plate_X = 
+				isLeft ?
+					isSrcPlate ?
+						linePt.x() + startOffset :					// 左侧设备开出压板
+						linePt.x() - rectWidth - startOffset :	// 左侧设备开入压板
+					isSrcPlate ?
+						linePt.x() - startOffset - rectWidth :	// 右侧设备开出压板
+						linePt.x() + startOffset;					// 右侧设备开入压板
+		}
+		else
+		{
+			plate_X = 
+				isLeft ?
+					isSrcPlate ?
+						linePt.x() - startOffset - rectWidth :	// 左侧设备开出压板
+						linePt.x() + startOffset :					// 左侧设备开入压板
+					isSrcPlate ?
+						linePt.x() + startOffset :					// 右侧设备开出压板
+						linePt.x() - startOffset - rectWidth;	// 右侧设备开入压板
+		}
+		plateRect.rect = QRect(QPoint(plate_X, plate_Y), QSize(rectWidth, ICON_LENGTH));
+		hash.insert(plateRef, plateRect);
+	}
+	else
+	{
+		// 更新压板底部位置
+		PlateRect& plateRect = hash[plateRef];
+		plateRect.rect.setHeight(plateRect.rect.height() + ICON_LENGTH + CIRCUIT_VERTICAL_DISTANCE);
 	}
 }
 
@@ -801,7 +996,10 @@ void SvgTransformer::DrawIedRect(IedRect* rect)
 	if (rect->underground_color == 0) // 透明
 		m_painter->drawRect(rect->x, rect->y, rect->width, rect->height);
 	else
+	{
 		m_painter->fillRect(rect->x, rect->y, rect->width, rect->height, brush);
+		//m_painter->drawRect(rect->x, rect->y, rect->width, rect->height);
+	}
 
 
 	m_painter->restore();
@@ -958,11 +1156,21 @@ void SvgTransformer::DrawWholeRect(IedRect* rect)
 	DrawIedRect(rect);
 }
 
-void SvgTransformer::DrawCircuitLine(QList<IedRect*>& rectList)
+void SvgTransformer::DrawPlateRect(QPoint lt, QPoint rb)
+{
+	m_painter->save();
+	QPen pen;
+	pen.setColor(ColorHelper::Color(ColorHelper::pure_grey));
+	pen.setStyle(Qt::DashLine);
+
+	m_painter->restore();
+}
+
+void SvgTransformer::DrawLogicCircuitLine(QList<IedRect*>& rectList)
 {
 	foreach(IedRect* rect, rectList)
 	{
-		foreach(LogicCircuitLine* line, rect->logic_circuit_line_list)
+		foreach(LogicCircuitLine* line, rect->logic_line_list)
 		{
 			QPen pen;
 			pen.setStyle(Qt::SolidLine);
@@ -972,12 +1180,13 @@ void SvgTransformer::DrawCircuitLine(QList<IedRect*>& rectList)
 
 			// 仅作链路区分，对图像显示无影响
 			QFont font;
-			font.setPointSize(TYPE_Circuit);	// 标识该<g>节点为链路父节点
+			font.setPointSize(TYPE_LogicCircuit);	// 标识该<g>节点为链路父节点
 			//font.setWeight(line->id);	// 标识链路id
-			QString signStr = QString("%1:%2-%3")
-				.arg(line->pLogicCircuit->pSrcIed->name)
-				.arg(line->pLogicCircuit->cbName)
-				.arg(line->pLogicCircuit->pDestIed->name);	// 标识链路的 srcIed - destIed 信息
+			QString signStr = joinGroups() <<
+				// srcIedName cbName
+				(QString)(joinFields() << line->pLogicCircuit->pSrcIed->name << line->pLogicCircuit->cbName) <<
+				// destIedName
+				(QString)(joinFields() << line->pLogicCircuit->pDestIed->name);
 			font.setFamily(signStr);
 			m_painter->setFont(font);
 			// 起点为子设备连接点，终点为主设备连接点
@@ -985,6 +1194,56 @@ void SvgTransformer::DrawCircuitLine(QList<IedRect*>& rectList)
 			m_painter->drawLine(line->midPoint, line->endPoint);
 			double angle = GetAngleByVec(line->endPoint - line->midPoint);
 			drawArrowHeader(GetArrowPt(line->endPoint, ARROW_LEN, 0, angle, false), angle, color);
+		}
+	}
+}
+
+void SvgTransformer::DrawVirtualCircuitLine(QList<IedRect*>& rectList)
+{
+	foreach(IedRect * rect, rectList)
+	{
+		foreach(LogicCircuitLine * pLogicLine, rect->logic_line_list)
+		{
+			foreach(VirtualCircuitLine * pVtLine, pLogicLine->virtual_line_list)
+			{
+				m_painter->save();
+				QPen pen;
+				QColor green = ColorHelper::Color(ColorHelper::pure_green);
+				pen.setColor(green);
+				m_painter->setPen(pen);
+				// 绘制图标，静态绘制时按连通状态绘制
+				DrawVirtualIcon(pVtLine->startIconPt, pLogicLine->pLogicCircuit->type, ColorHelper::pure_green);
+				DrawVirtualIcon(pVtLine->endIconPt, pLogicLine->pLogicCircuit->type, ColorHelper::pure_green);
+				// 绘制值
+				DrawVirtualText(pVtLine->startValRect, pVtLine->valStr);
+				DrawVirtualText(pVtLine->endValRect, pVtLine->valStr);
+				// 绘制描述信息
+				DrawVirtualText(pVtLine->circuitDescRect, pVtLine->circuitDesc);
+				drawArrowHeader(pVtLine->endPoint, GetAngleByVec(pVtLine->endPoint - pVtLine->startPoint));
+
+				// 记录信息到回路图像
+				QFont font;
+				font.setPointSize(TYPE_VirtualCircuit);
+				// 信息整合
+				QString vtLineInfo = joinGroups() << 
+					// srcIedName:destIedName 0
+					(QString)(joinFields() << pVtLine->pVirtualCircuit->srcIedName << pVtLine->pVirtualCircuit->destIedName) <<
+					// srcSoftPlateDesc:destSoftPlateDesc 1
+					(QString)(joinFields() << pVtLine->pVirtualCircuit->srcSoftPlateDesc << pVtLine->pVirtualCircuit->destSoftPlateDesc) <<
+					// srcSoftPlateRef:destSoftPlateRef 2
+					(QString)(joinFields() << pVtLine->pVirtualCircuit->srcSoftPlateRef << pVtLine->pVirtualCircuit->destSoftPlateRef) <<
+					// srcRef:destRef 3
+					(QString)(joinFields() << pVtLine->pVirtualCircuit->srcRef << pVtLine->pVirtualCircuit->destRef) <<
+					// srcName:destName 4
+					(QString)(joinFields() << pVtLine->pVirtualCircuit->srcName << pVtLine->pVirtualCircuit->destName) <<
+					// remoteId:remoteSigId_A:remoteSigId_B 5
+					(QString)(joinFields() << pVtLine->pVirtualCircuit->remoteId << pVtLine->pVirtualCircuit->remoteSigId_A << pVtLine->pVirtualCircuit->remoteSigId_B) <<
+					(QString)(joinFields() << (pVtLine->pVirtualCircuit->type == GOOSE ? "gse" : "sv"));
+				font.setFamily(vtLineInfo);
+				m_painter->setFont(font);
+				m_painter->drawLine(pVtLine->startPoint, pVtLine->endPoint);
+				m_painter->restore();
+			}
 		}
 	}
 }
@@ -998,7 +1257,13 @@ void SvgTransformer::DrawOpticalLine(OpticalCircuitLine* optLine)
 	// 记录链路信息到SVG文件
 	QFont font;
 	QString connStatus = optLine->pOpticalCircuit->connStatus ? "true" : "false";	// true/false
-	QString optInfo = QString("%1_%2_%3").arg(optLine->pOpticalCircuit->cableDesc).arg(connStatus).arg(optLine->pOpticalCircuit->code);	// PL2205LA:5-C_IL2202ALM:1-A_connstatus_lineCode
+	QString optInfo = joinGroups() <<
+		(QString(joinFields() << optLine->pOpticalCircuit->code)) <<
+		(QString)(joinFields() << optLine->pOpticalCircuit->srcIedName << optLine->pOpticalCircuit->srcIedPort) <<
+		(QString)(joinFields() << optLine->pOpticalCircuit->destIedName << optLine->pOpticalCircuit->destIedPort) <<
+		(QString)(joinFields() << optLine->pOpticalCircuit->connStatus) <<
+		(QString(joinFields() << optLine->pOpticalCircuit->remoteId));
+		//optLine->pOpticalCircuit->cableDesc << connStatus << optLine->pOpticalCircuit->code;
 	font.setFamily(optInfo);
 	font.setPointSize(TYPE_OpticalCircuit);
 	m_painter->setFont(font);
@@ -1035,28 +1300,6 @@ void SvgTransformer::DrawOpticalLine(OpticalCircuitLine* optLine)
 
 void SvgTransformer::DrawPortText(OpticalCircuitLine* line, int conn_r)
 {
-	//QPen pen;
-	//bool isSwitcherOnTop = line->endPoint.y() < line->startPoint.y();	// 交换机位于IED矩形上方
-	//int scale = isSwitcherOnTop ? 1 : -1;
-	//pen.setColor(ColorHelper::Color(ColorHelper::pure_white));
-
-	//// 绘制交换机端口号 endPoint
-	//QFont font;
-	//font.setPointSize(18);
-	//m_painter->setPen(pen);
-	//QFontMetrics fm(m_painter->font());
-	//int portStrWidth = fm.width(line->switcherPort);
-	//int portStrPoint_x = line->endPoint.x() - portStrWidth / 2;
-	//int portStrPoint_rt_y = isSwitcherOnTop ? line->endPoint.y() - fm.height() : line->endPoint.y();
-	//int portStrPoint_lb_y = isSwitcherOnTop ? line->endPoint.y() : line->endPoint.y() + fm.height();
-	//m_painter->drawText(QRect(QPoint(portStrPoint_x, portStrPoint_rt_y), QPoint(portStrPoint_x + portStrWidth, portStrPoint_lb_y)), line->switcherPort);
-
-	//// 绘制IED端口号 startPoint
-	//portStrWidth = fm.width(line->iedPort);
-	//portStrPoint_x = line->endPoint.x() - portStrWidth / 2;
-	//portStrPoint_rt_y = isSwitcherOnTop ? line->startPoint.y() : line->startPoint.y() - fm.height();
-	//portStrPoint_lb_y = isSwitcherOnTop ? line->startPoint.y() + fm.height() : line->startPoint.y();
-	//m_painter->drawText(QRect(QPoint(portStrPoint_x, portStrPoint_rt_y), QPoint(portStrPoint_x + portStrWidth, portStrPoint_lb_y)), line->iedPort);
 	// 端口号绘制在矩形和连接点直接
 	m_painter->save();
 	int offset = conn_r * 2 + 10;	// 端口号与连接点的偏移量
@@ -1095,6 +1338,71 @@ void SvgTransformer::DrawWholeCircuitLine(CircuitLine* pCircuitLine, QPoint& sta
 
 }
 
+void SvgTransformer::DrawVirtualIcon(const QPoint& pt, VirtualType _type, const quint32 color)
+{
+	if(_type == GOOSE)
+	{
+		DrawGseIcon(pt, color);
+	}
+	else if(_type == SV)
+	{
+		DrawSvIcon(pt, color);
+	}
+	else
+	{
+		qWarning() << "SvgTransformer::DrawVirtualIcon: Unsupported virtual type";
+	}
+}
+
+void SvgTransformer::DrawVirtualText(const QRect& rect, QString val)
+{
+	m_painter->save();
+	QPen pen;
+	pen.setColor(Qt::white);
+	QFont font;
+	font.setPointSize(18);
+	m_painter->setPen(pen);
+	m_painter->setFont(font);
+	m_painter->drawText(rect, val);
+	m_painter->restore();
+}
+
+void SvgTransformer::DrawPlate(const QHash<QString, PlateRect>& hash)
+{
+	foreach(const PlateRect& plateRect, hash)
+	{
+		m_painter->save();
+		// 绘制压板矩形
+		QPen pen;
+		pen.setColor(ColorHelper::Color(ColorHelper::pure_white));
+		QBrush brush(ColorHelper::Color(ColorHelper::ied_underground));
+		pen.setWidth(2);
+		pen.setStyle(Qt::DashDotLine);
+		QVector<qreal> dashPattern;
+		dashPattern << 3 << 3;
+		pen.setDashPattern(dashPattern);
+		m_painter->setPen(pen);
+		m_painter->setBrush(brush);
+		m_painter->fillRect(plateRect.rect, brush);
+		m_painter->drawRect(plateRect.rect);
+		// 绘制压板图标
+		QPoint centerPt(plateRect.rect.x() + plateRect.rect.width() / 2 - PLATE_WIDTH / 2 + PLATE_CIRCLE_RADIUS + PLATE_GAP, plateRect.rect.y() + plateRect.rect.height() / 2);
+		DrawPlateIcon(centerPt, true);	// 根据压板描述判断闭合状态
+		// 绘制hitbox
+		m_painter->setPen(Qt::NoPen);
+		m_painter->setBrush(Qt::NoBrush);
+		// 记录压板信息
+		QString plateInfo = joinGroups() <<
+			(QString)(joinFields() << plateRect.desc << plateRect.ref);
+		QFont font;
+		font.setPointSize(TYPE_Plate);
+		font.setFamily(plateInfo);
+		m_painter->setFont(font);
+		m_painter->drawRect(QRect(QPoint(centerPt.x() - PLATE_CIRCLE_RADIUS, centerPt.y() - PLATE_CIRCLE_RADIUS), QSize(PLATE_WIDTH, PLATE_HEIGHT)));
+		m_painter->restore();
+	}
+}
+
 void SvgTransformer::DrawGseIcon(const QPoint& pt, const quint32 color)
 {
 	m_painter->save();
@@ -1106,7 +1414,6 @@ void SvgTransformer::DrawGseIcon(const QPoint& pt, const quint32 color)
 	m_painter->setPen(pen);
 	m_painter->drawRect(pt.x(), pt.y(), ICON_LENGTH, ICON_LENGTH);
 	// 绘制内容
-	//QPointF contentStartPoint(pt.x() + contentMargin, pt.y() + contentMargin);
 	qreal contentMargin = 3;
 	qreal contentVerticalMargin = 7;
 	qreal lineWidth = (ICON_LENGTH - contentMargin * 2) / 3;
@@ -1158,44 +1465,41 @@ void SvgTransformer::DrawSvIcon(const QPoint& pt, const quint32 color)
 	m_painter->restore();
 }
 
-void SvgTransformer::DrawPlateIcon(const QPoint& centerPt, bool isClosed, const quint32 defaultColor)
+void SvgTransformer::DrawPlateIcon(const QPoint& centerPt, bool status)
 {
 	m_painter->save();
-	quint32 color = defaultColor != 0 ? 
-		defaultColor : isClosed ? ColorHelper::pure_green : ColorHelper::pure_red; // 有指定颜色时，使用指定颜色，否则根据闭合状态使用默认颜色
+	quint32 color = status ? ColorHelper::pure_green : ColorHelper::pure_red; // 根据闭合状态使用默认颜色
 	QPen pen;
 	pen.setWidth(2);
 	pen.setColor(ColorHelper::Color(color));
 	m_painter->setPen(pen);
-	int distance = 40;	// 两个圆之间的距离
-	int radius = 5;
+	int distance = PLATE_WIDTH - PLATE_CIRCLE_RADIUS * 4;	// 两个圆之间的距离 = 压板图形总宽度 - 两个圆的直径
 	// 直径20的圆
-	m_painter->drawEllipse(centerPt, radius, radius);
-	m_painter->drawEllipse(centerPt + QPoint(distance, 0), radius, radius);
+	m_painter->drawEllipse(centerPt, PLATE_CIRCLE_RADIUS, PLATE_CIRCLE_RADIUS);
+	m_painter->drawEllipse(centerPt + QPoint(distance, 0), PLATE_CIRCLE_RADIUS, PLATE_CIRCLE_RADIUS);
 	// 矩形连接左侧圆
-	int rectWidth = 40;
-	int rectHeight = radius * 2;
+	//int rectWidth = 50;
+	int rectHeight = PLATE_CIRCLE_RADIUS * 2;
 	m_painter->translate(centerPt);
 	QPoint ptList[4] = {
 		QPoint(0, -rectHeight / 2),
-		QPoint(rectWidth, -rectHeight / 2),
-		QPoint(rectWidth, rectHeight / 2),
+		QPoint(distance, -rectHeight / 2),
+		QPoint(distance, rectHeight / 2),
 		QPoint(0, rectHeight / 2),
 	};
-	if (!isClosed)
+	if (!status)
 	{
-		// 未闭合状态
-		m_painter->rotate(-45);
-		m_painter->drawPolyline(ptList, 4);
+		// 未闭合状态矩形
+		//m_painter->rotate(-45);
+		//m_painter->drawPolyline(ptList, 4);
 	}
 	else
 	{
-		// 闭合状态
+		// 闭合状态矩形
 		m_painter->drawLine(ptList[0], ptList[1]);
 		m_painter->drawLine(ptList[2], ptList[3]);
 	}
 	m_painter->restore();
-	
 }
 
 void SvgTransformer::ReSignIedRect(pugi::xml_document& doc)
@@ -1215,10 +1519,6 @@ void SvgTransformer::ReSignIedRect(pugi::xml_document& doc)
 	}
 }
 
-void SvgTransformer::DrawPlateIconWithRect(const QPoint& pt, const quint32 color)
-{
-}
-
 void SvgTransformer::ReSignSvg(const QString& filename)
 {
 	pugi::xml_document doc;
@@ -1231,6 +1531,7 @@ void SvgTransformer::ReSignSvg(const QString& filename)
 
 	ReSignIedRect(doc);
 	ReSignCircuitLine(doc);
+	ReSignPlate(doc);
 
 	if (!doc.save_file(filename.toLocal8Bit()))
 	{
@@ -1240,14 +1541,17 @@ void SvgTransformer::ReSignSvg(const QString& filename)
 
 void SvgTransformer::ReSignCircuitLine(pugi::xml_document& doc)
 {
-	pugi::xpath_node_set circuitLineNodeSet = doc.select_nodes(QString("//g[@font-size='%1']").arg(TYPE_Circuit).toLocal8Bit());
+	// 逻辑回路
+	pugi::xpath_node_set circuitLineNodeSet = doc.select_nodes(QString("//g[@font-size='%1']").arg(TYPE_LogicCircuit).toLocal8Bit());
 	for (nodeSetConstIterator it = circuitLineNodeSet.begin(); it != circuitLineNodeSet.end(); ++it)
 	{
 		pugi::xml_node circuitLineNode = it->node();
 		QString circuitDesc = circuitLineNode.attribute("font-family").value();
-		QString srcIedName = circuitDesc.split("-").first().split(":").first();
-		QString cbName = circuitDesc.split("-").first().split(":").last();
-		QString destIedName = circuitDesc.split("-").last();
+		QList<QStringList> circuitDescGrp = splitGroupAndFields(circuitDesc);
+		// (srcIedName, cbName) & (destIedName)
+		QString srcIedName = getField(circuitDescGrp, 0, 0);
+		QString cbName = getField(circuitDescGrp, 0, 1);
+		QString destIedName = getField(circuitDescGrp, 1, 0);
 		QString id = circuitLineNode.attribute("font-weight").value();
 
 		//circuitLineNode.append_attribute("id");
@@ -1261,7 +1565,7 @@ void SvgTransformer::ReSignCircuitLine(pugi::xml_document& doc)
 		circuitLineNode.attribute("src-iedname").set_value(srcIedName.toStdString().c_str());
 		circuitLineNode.attribute("src-cbname").set_value(cbName.toStdString().c_str());
 		circuitLineNode.attribute("dest-iedname").set_value(destIedName.toStdString().c_str());
-		circuitLineNode.attribute("type").set_value("circuit");
+		circuitLineNode.attribute("type").set_value("logic");
 
 		// 重置不相关属性为默认值
 		circuitLineNode.attribute("font-family").set_value("SimSun");
@@ -1275,31 +1579,107 @@ void SvgTransformer::ReSignCircuitLine(pugi::xml_document& doc)
 	for (nodeSetConstIterator it = opticalLineNodeSet.begin(); it != opticalLineNodeSet.end(); ++it)
 	{
 		pugi::xml_node lineNode = it->node();
-		lineNode.append_attribute("srcIed");
-		lineNode.append_attribute("srcPort");
-		lineNode.append_attribute("destIed");
-		lineNode.append_attribute("destPort");
-		lineNode.append_attribute("lineCode");
-		lineNode.append_attribute("connStatus");
+		lineNode.append_attribute("src-ied");
+		lineNode.append_attribute("src-port");
+		lineNode.append_attribute("dest-ied");
+		lineNode.append_attribute("dest-port");
+		lineNode.append_attribute("code");
+		lineNode.append_attribute("status");
+		lineNode.append_attribute("remote-id");
 		lineNode.append_attribute("type");
 
 		QString attrStr = lineNode.attribute("font-family").value();
-		QStringList strList = attrStr.split("_");
-		QStringList srcInfoList = strList.at(0).split(":");	// PL2205LA:5-C
-		QStringList destInfoList = strList.at(1).split(":");	// IL2202ALM:1-A
-		QString connStatus = strList.at(2);	// true/false
-		QString lineCode = strList.at(3);	// code
+		QList<QStringList> strList = splitGroupAndFields(attrStr);
+		QString code = getField(strList, 0, 0);	// code
+		QString srcIedName = getField(strList, 1, 0);	// srcIedName
+		QString srcPort = getField(strList, 1, 1);	// srcPort
+		QString destIedName = getField(strList, 2, 0);	// destIedName
+		QString destPort = getField(strList, 2, 1);	// destPort
+		QString connStatus = getField(strList, 3, 0);	// connStatus
+		QString remoteId = getField(strList, 4, 0);	// remoteId
+
 		lineNode.attribute("type").set_value("optical");
-		lineNode.attribute("srcIed").set_value(srcInfoList.at(0).toStdString().c_str());
-		lineNode.attribute("srcPort").set_value(srcInfoList.at(1).toStdString().c_str());
-		lineNode.attribute("destIed").set_value(destInfoList.at(0).toStdString().c_str());
-		lineNode.attribute("destPort").set_value(destInfoList.at(1).toStdString().c_str());
-		lineNode.attribute("lineCode").set_value(lineCode.toStdString().c_str());
-		lineNode.attribute("connStatus").set_value(connStatus.toStdString().c_str());
+		lineNode.attribute("src-ied").set_value(srcIedName.toStdString().c_str());
+		lineNode.attribute("src-port").set_value(srcPort.toStdString().c_str());
+		lineNode.attribute("dest-ied").set_value(destIedName.toStdString().c_str());
+		lineNode.attribute("dest-port").set_value(destPort.toStdString().c_str());
+		lineNode.attribute("code").set_value(code.toStdString().c_str());
+		lineNode.attribute("status").set_value(connStatus.toStdString().c_str());
+		lineNode.attribute("remote-id").set_value(remoteId.toStdString().c_str());
 		// 重置不相关属性为默认值
 		lineNode.attribute("font-family").set_value("SimSun");
 		lineNode.attribute("font-size").set_value("15");
 		lineNode.attribute("font-weight").set_value("400");
+	}
+	
+	// 虚回路
+	pugi::xpath_node_set virtualLineNodeSet = doc.select_nodes(QString("//g[@font-size='%1']").arg(TYPE_VirtualCircuit).toLocal8Bit());
+	for (nodeSetConstIterator it = virtualLineNodeSet.begin(); it != virtualLineNodeSet.end(); ++it)
+	{
+		pugi::xml_node lineNode = it->node();
+		lineNode.append_attribute("srcIedName");
+		lineNode.append_attribute("destIedName");
+		lineNode.append_attribute("srcSoftPlateDesc");
+		lineNode.append_attribute("destSoftPlateDesc");
+		lineNode.append_attribute("srcSoftPlateRef");
+		lineNode.append_attribute("destSoftPlateRef");
+		lineNode.append_attribute("remoteId");
+		lineNode.append_attribute("remoteSigId_A");
+		lineNode.append_attribute("remoteSigId_B");
+		lineNode.append_attribute("type");
+		QString attrStr = lineNode.attribute("font-family").value();
+		QList<QStringList> strList = splitGroupAndFields(attrStr);
+		QString srcIedName = getField(strList, 0, 0);
+		QString destIedName = getField(strList, 0, 1);
+		QString srcSoftPlateDesc = getField(strList, 1, 0);
+		QString destSoftPlateDesc = getField(strList, 1, 1);
+		QString srcSoftPlateRef = getField(strList, 2, 0);
+		QString destSoftPlateRef = getField(strList, 2, 1);
+		QString srcRef = getField(strList, 3, 0);	// srcRef
+		QString destRef = getField(strList, 3, 1);	// destRef
+		QString srcName = getField(strList, 4, 0);	// srcName
+		QString destName = getField(strList, 4, 1);	// destName
+		QString remoteId = getField(strList, 5, 0);	// remoteId
+		QString remoteSigId_A = getField(strList, 5, 1);	// remoteSigId_A
+		QString remoteSigId_B = getField(strList, 5, 2);	// remoteSigId_B
+		QString vType = getField(strList, 6, 0);	// vType (gse/sv)
+
+		lineNode.attribute("srcIedName").set_value(srcIedName.toStdString().c_str());
+		lineNode.attribute("destIedName").set_value(destIedName.toStdString().c_str());
+		lineNode.attribute("srcSoftPlateDesc").set_value(srcSoftPlateDesc.toStdString().c_str());
+		lineNode.attribute("destSoftPlateDesc").set_value(destSoftPlateDesc.toStdString().c_str());
+		lineNode.attribute("srcSoftPlateRef").set_value(srcSoftPlateRef.toStdString().c_str());
+		lineNode.attribute("destSoftPlateRef").set_value(destSoftPlateRef.toStdString().c_str());
+		lineNode.attribute("remoteId").set_value(remoteId.toStdString().c_str());
+		lineNode.attribute("remoteSigId_A").set_value(remoteSigId_A.toStdString().c_str());
+		lineNode.attribute("remoteSigId_B").set_value(remoteSigId_B.toStdString().c_str());
+		lineNode.attribute("type").set_value("virtual");
+		lineNode.attribute("virtual-type").set_value(vType.toStdString().c_str());
+		// 重置不相关属性
+		lineNode.attribute("font-family").set_value("SimSun");
+		lineNode.attribute("font-size").set_value("15");
+	}
+}
+
+void SvgTransformer::ReSignPlate(pugi::xml_document& doc)
+{
+	pugi::xpath_node_set plateNodeSet = doc.select_nodes(QString("//g[@font-size='%1']").arg(TYPE_Plate).toLocal8Bit());
+	for (nodeSetConstIterator it = plateNodeSet.begin(); it != plateNodeSet.end(); ++it)
+	{
+		pugi::xml_node plateNode = it->node();
+		plateNode.append_attribute("plate-desc");
+		plateNode.append_attribute("plate-ref");
+		plateNode.append_attribute("type");
+		QString plateDesc = plateNode.attribute("font-family").value();
+		QList<QStringList> plateDescGrp = splitGroupAndFields(plateDesc);
+		QString desc = getField(plateDescGrp, 0, 0);	// plate-desc
+		QString ref = getField(plateDescGrp, 0, 1);	// plate-ref
+		plateNode.attribute("plate-desc").set_value(desc.toStdString().c_str());
+		plateNode.attribute("plate-ref").set_value(ref.toStdString().c_str());
+		plateNode.attribute("type").set_value("plate");
+		// 重置不相关属性
+		plateNode.attribute("font-family").set_value("SimSun");
+		plateNode.attribute("font-size").set_value("15");
 	}
 }
 

@@ -161,25 +161,25 @@ struct SMVControl : public BaseControl
 	quint16 nofASDU;
 	quint32 smpRate;
 };
-
-// 链路单端信息
-struct CircuitEnd
-{
-	//QString name;
-	QString addr;	// 数据路径
-	QString port;
-	QString desc;
-	// 若连接交换机，则记录交换机信息
-	QString switcherName;
-	QString switcherPort;
-	Data data;
-};
-struct Circuit
-{
-	CircuitEnd srcEnd;
-	CircuitEnd destEnd;
-	LogicCircuit* parent;
-};
+//
+//// 链路单端信息
+//struct CircuitEnd
+//{
+//	//QString name;
+//	QString addr;	// 数据路径
+//	QString port;
+//	QString desc;
+//	// 若连接交换机，则记录交换机信息
+//	QString switcherName;
+//	QString switcherPort;
+//	Data data;
+//};
+//struct Circuit
+//{
+//	CircuitEnd srcEnd;
+//	CircuitEnd destEnd;
+//	LogicCircuit* parent;
+//};
 
 //// 光纤链路，包含两IED下全部逻辑链路
 //struct OpticalCircuit
@@ -223,10 +223,10 @@ struct VirtualCircuit
 		remoteSigId_A = -1;
 		remoteSigId_B = -1;
 		remoteId = -1;
-		val = -1;
+		val = _type == GOOSE ? 0.00 : 57.73;
 		connStatus = false;
 	}
-	VirtualType type;				// 链路类型
+	VirtualType type;			// 链路类型
 	QString srcIedName;			// 源设备别名
 	QString destIedName;		// 目标设备别名
 	QString srcIedDesc;			// 源设备描述
@@ -247,7 +247,7 @@ struct VirtualCircuit
 	qint16 remoteId;			// 当type为Goose时，代表Goose端子遥信ID；
 								// 当type为SV时，代表SV端子遥测ID
 	LogicCircuit* pLogicCircuit;	// 所属逻辑链路
-	qint16 val;					// 原始值
+	float val;					// 原始值
 	bool connStatus;			// 通断状态
 };
 
@@ -269,7 +269,7 @@ struct LogicCircuit
 {
 	IED* pSrcIed;
 	IED* pDestIed;
-	VirtualType type;
+	VirtualType type;					
 	QString cbName;						// 输出控制块名称
 	QList<VirtualCircuit*> circuitList;	// 通道列表
 };

@@ -1,6 +1,7 @@
 #pragma once
 #include "basemodel.h"
 #include <QPoint>
+#include <QRect>
 #ifndef SVG_DEFAULT_VALUE
 #define SVG_DEFAULT_VALUE
 // 默认IED矩形宽高
@@ -8,19 +9,27 @@
 #define RECT_DEFAULT_HEIGHT 100
 
 // IED矩形 水平间距
-#define IED_HORIZONTAL_DISTANCE 300
+#define IED_HORIZONTAL_DISTANCE 400
 // 垂直间距
 #define IED_VERTICAL_DISTANCE 15
 // 虚链路垂直间距
-#define CIRCUIT_VERTICAL_DISTANCE 10
+#define CIRCUIT_VERTICAL_DISTANCE 15
 // 图标高/宽度
 #define ICON_LENGTH 20
 
+#define SVG_VIEWBOX_WIDTH	2200
+#define SVG_VIEWBOX_HEIGHT	4000
+#define ARROW_LEN			10	// 箭头长度
+#define CONN_R				3	// 连接点半径
+#define PLATE_GAP			5	// 压板矩形内部间距
+#define PLATE_WIDTH			70	// 压板图形宽度，圆间距40，圆半径均为5
+#define PLATE_HEIGHT		15	// 压板图形高度
+#define PLATE_CIRCLE_RADIUS	5	// 压板图形圆半径
 #endif
 
 struct CircuitLine;
 struct LogicCircuitLine;
-class OpticalCircuitLine_old;
+class VirtualCircuitLine;
 struct SvgRect
 {
 	SvgRect()
@@ -29,6 +38,7 @@ struct SvgRect
 		height = RECT_DEFAULT_HEIGHT;
 		horizontal_margin = 40;
 		vertical_margin = 20;
+		inner_gap = 15;
 		padding = 10;
 		text_color = 0x000000;	// white
 		left_connect_index = 0;
@@ -39,8 +49,24 @@ struct SvgRect
 	}
 	~SvgRect()
 	{
-		qDeleteAll(logic_circuit_line_list);
-		logic_circuit_line_list.clear();
+		qDeleteAll(logic_line_list);
+		logic_line_list.clear();
+	}
+
+	//************************************
+	// 函数名称:	GetY
+	// 函数全名:	SvgRect::GetY
+	// 访问权限:	public 
+	// 函数说明:	获取底部Y坐标
+	// 返回值:		quint16
+	//************************************
+	quint16 GetExtendBottomY() const
+	{
+		return y + extend_height - inner_gap;
+	}
+	quint16 GetInnerBottomY() const
+	{
+		return y + height;
 	}
 	//LogicCircuitLine* GetLogicCircuitLineById(quint8 id) const;
 
@@ -51,7 +77,8 @@ struct SvgRect
 	quint16 vertical_margin;		// 矩形上下边距
 	quint16 horizontal_margin;		// 矩形外边距（外部虚线框边距）
 	quint16 extend_height;			// 外部虚线框矩形的高度, IED矩形底边到外部虚线框底边的距离（由回路数量决定）
-	quint16 padding;	// 矩形内边距（文本与外部虚线框距离）
+	quint16 inner_gap;				// 内部矩形与外部虚线框之间的间隔
+	quint16 padding;				// 矩形内边距（文本与外部虚线框距离）
 
 	quint32 border_color;		// hex
 	quint32 border_style;		// Qt::PenStyle
@@ -65,7 +92,7 @@ struct SvgRect
 	quint8 bottom_connect_index;
 	quint8 top_connect_index;
 
-	QList<LogicCircuitLine*> logic_circuit_line_list;
+	QList<LogicCircuitLine*> logic_line_list;
 };
 
 struct IedRect : public SvgRect
@@ -75,28 +102,16 @@ struct IedRect : public SvgRect
 	QString iedDesc;	// 设备描述
 };
 
-struct SwitcherRect : public SvgRect
-{
-	QString switcher_name;
-	QMap<IedRect*, OpticalCircuitLine_old*> ied_circuit_map;	// IED矩形指针 - 光纤链路
-};
-
 struct BaseCircuitLine
 {
 	//quint8 id;		// 标识在IED中的链路编号，从0开始，仅在SVG内使用
-	QPoint startPoint;
-	QPoint midPoint;
-	QPoint endPoint;
+	QPoint startPoint;	// 起点坐标，方向有关，在srcIedRect侧
+	QPoint midPoint;	// 折线点坐标，仅用于逻辑链路中
+	QPoint endPoint;	// 终点坐标，方向有关，在destIedRect侧
 
 	IedRect* pSrcIedRect;
 	IedRect* pDestIedRect;
 	//Circuit* pCircuit;
-};
-
-// 虚实回路
-struct CircuitLine : public BaseCircuitLine
-{
-	const Circuit* pCircuit;
 };
 
 // 逻辑链路
@@ -107,34 +122,7 @@ struct LogicCircuitLine : public BaseCircuitLine
 		pLogicCircuit = NULL;
 	}
 	LogicCircuit* pLogicCircuit;
-};
-
-// 光纤链路，对于指定IED及交换机，链路唯一
-struct OpticalCircuitLine_old
-{
-	OpticalCircuitLine_old()
-	{
-		isStartArrowExist = false;
-		isEndArrowExist = false;
-	}
-	QString iedName;
-	QString switcherName;
-	QPoint startPoint;
-	QPoint endPoint;
-	QString iedPort;
-	QString switcherPort;
-	bool isStartArrowExist;
-	bool isEndArrowExist;
-
-	bool isPortEmpty() const
-	{
-		return iedPort.isEmpty() || switcherPort.isEmpty();
-	}
-	void SetPort(const QString& iedPort, const QString& switcherPort)
-	{
-		this->iedPort = iedPort;
-		this->switcherPort = switcherPort;
-	}
+	QList<VirtualCircuitLine*> virtual_line_list;	// 逻辑链路对应的虚链路列表
 };
 // 连接点箭头状态：入、出、出入
 enum ArrowState
@@ -144,20 +132,6 @@ enum ArrowState
 	Arrow_Out = 0x10,
 	Arrow_InOut = Arrow_In | Arrow_Out
 };
-//struct OpticalCircuitLine
-//{
-//	QPoint startPoint;
-//	QPoint endPoint;
-//	QList<QPoint> midPoints;	// 可能有多个折线点
-//	//QPoint midPoint;	// 仅用于直连IED，作折线
-//	QPoint src2swPoint;	// 仅用于过交换机的IED，源IED对应的交换机的连接点
-//	QPoint sw2destPoint;// 仅用于过交换机的IED，交换机对应目标IED的连接点
-//	quint8 arrowState;
-//	IedRect* pSrcRect;
-//	IedRect* pDestRect;
-//	SwitcherRect* pSwRect;
-//	OpticalCircuit* pOpticalCircuit;
-//};
 
 // 不存在跨交换机线路，交换机本身作为设备存储，连交换机的光纤视为单独光纤
 struct OpticalCircuitLine
@@ -185,8 +159,11 @@ struct BaseSvg
 	BaseSvg() {}
 	~BaseSvg() 
 	{
-		delete mainIedRect;
-		mainIedRect = NULL;
+		if(mainIedRect)
+		{
+			delete mainIedRect;
+			mainIedRect = NULL;
+		}
 	}
 	IedRect* mainIedRect;
 };
@@ -241,7 +218,7 @@ private:
 		size_t ret = 0;
 		foreach(IedRect * rect, rectList)
 		{
-			ret += rect->logic_circuit_line_list.size();
+			ret += rect->logic_line_list.size();
 		}
 		return ret;
 	}
@@ -250,7 +227,7 @@ private:
 		size_t ret = 0;
 		foreach(IedRect * rect, rectList)
 		{
-			foreach(LogicCircuitLine * pLine, rect->logic_circuit_line_list)
+			foreach(LogicCircuitLine * pLine, rect->logic_line_list)
 			{
 				ret += pLine->pLogicCircuit->circuitList.size();
 			}
@@ -313,12 +290,36 @@ struct OpticalSvg : public BaseSvg
 };
 struct VirtualCircuitLine : public BaseCircuitLine
 {
-	
+	VirtualCircuitLine(VirtualCircuit* _circuit) :
+		pVirtualCircuit(_circuit) 
+	{
+		valStr = QString::number(pVirtualCircuit->val);
+	}
+	QPoint startIconPt;					// 起点图标位置，图标矩形的左上角点位
+	QPoint endIconPt;					// 终点图标位置，图标矩形的左上角点位
+	QRect startValRect;					// 起点值矩形，显示当前值
+	QRect endValRect;					// 终点值矩形，显示当前值
+	QRect circuitDescRect;				// 描述矩形，显示回路描述
+	QString valStr;						// 当前值字符串
+	QString circuitDesc;				// 回路描述
+	VirtualCircuit* pVirtualCircuit;	// 虚回路
+};
+
+struct PlateRect
+{
+	QRect rect;			// 软压板矩形
+	QString ref;		// 软压板路径引用，PL2205NAPROT/PTRC1.TrStrp
+	QString desc;		// 软压板名称
 };
 
 struct VirtualSvg : public LogicSvg
 {
-	QMap<IedRect*, VirtualCircuitLine*> vtLineMap;	// 
+	VirtualSvg() {}
+	~VirtualSvg()
+	{
+	}
+	//QList<QRect> plateRectList;			// 软压板矩形列表
+	QHash<QString, PlateRect> plateRectHash;	// 软压板矩形列表，key为软压板路径
 };
 
 // 完整虚实回路svg图

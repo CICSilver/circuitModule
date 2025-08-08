@@ -18,7 +18,7 @@
 #define ICON_LENGTH 20
 
 #define SVG_VIEWBOX_WIDTH	2200
-#define SVG_VIEWBOX_HEIGHT	4000
+#define SVG_VIEWBOX_HEIGHT	1500
 #define ARROW_LEN			10	// 箭头长度
 #define CONN_R				3	// 连接点半径
 #define PLATE_GAP			5	// 压板矩形内部间距
@@ -67,6 +67,10 @@ struct SvgRect
 	quint16 GetInnerBottomY() const
 	{
 		return y + height;
+	}
+	quint16 GetExtendHeight() const
+	{
+		return 2 * inner_gap + height + extend_height;
 	}
 	//LogicCircuitLine* GetLogicCircuitLineById(quint8 id) const;
 
@@ -156,7 +160,11 @@ struct OpticalCircuitLine
 //// SVG描述结构，管理内存释放
 struct BaseSvg
 {
-	BaseSvg() {}
+	BaseSvg() 
+	{
+		viewBoxWidth = SVG_VIEWBOX_WIDTH;
+		viewBoxHeight = SVG_VIEWBOX_HEIGHT;
+	}
 	~BaseSvg() 
 	{
 		if(mainIedRect)
@@ -166,6 +174,8 @@ struct BaseSvg
 		}
 	}
 	IedRect* mainIedRect;
+	int viewBoxWidth;
+	int viewBoxHeight;
 };
 // 逻辑链路SVG
 struct LogicSvg : public BaseSvg

@@ -5,6 +5,7 @@
 #include "SvgTransformer.h"
 #include "customsvgitem.h"
 #include "basemodel.h"
+#include "InteractiveSvgItem.h"
 
 #include <QApplication>
 #include <QDir>
@@ -103,7 +104,7 @@ void scd_xpath_test()
 
 int main(int argc, char* argv[]) {
 	QApplication app(argc, argv);
-	QString iedName = "IMM2201L1";
+	QString iedName = "PM2201C";
 	// 解析SCD文件
 	//QString scdPath = QCoreApplication::applicationDirPath() + "/scd_test.scd";
 	//QString configPath = QCoreApplication::applicationDirPath() + "/circuit_config.csv";
@@ -114,9 +115,9 @@ int main(int argc, char* argv[]) {
 	pCircuitConfig->LoadCimeFile();
 	SvgTransformer transformer;
 	// 单设备文件生成测试
-	transformer.GenerateSvgByIedName(iedName);
+	//transformer.GenerateSvgByIedName(iedName);
 
-	//// 生成SVG文件
+	// 生成SVG文件
 	//QList<QString> pathList;
 	//pathList
 	//	<< QCoreApplication::applicationDirPath() + "/logic"		// 逻辑链路
@@ -150,23 +151,35 @@ int main(int argc, char* argv[]) {
 
 
 	// 显示SVG文件
-	//QGraphicsScene scene;
-	//scene.setSceneRect(0, 0, 2160, 1440);
-	//QString path = pathList.at(0) + "/" + iedName + "_logic_circuit.svg";
-	//CustomSvgItem* svgItem = new CustomSvgItem();
-	//svgItem->setSharedRenderer(new QSvgRenderer(path));
-	//svgItem->LoadSvg(path);
-	//scene.addItem(svgItem);
-	//scene.update();
+	QGraphicsScene* scene = new QGraphicsScene();
+	scene->setSceneRect(0, 0, 2325, 1910);
 
-	//QGraphicsView view(&scene);
-	//view.setRenderHint(QPainter::Antialiasing);
-	//view.setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
-	//view.setBackgroundBrush(Qt::black);
-	//view.resize(1920, 1080);
-	//view.setDragMode(QGraphicsView::ScrollHandDrag);
-	//view.scene()->setItemIndexMethod(QGraphicsScene::NoIndex);
-	//view.show();
+	QString svgPath = QCoreApplication::applicationDirPath() + "/PT2202A_virtual_circuit.svg";
+
+	// 转换svg为底图
+	//QSvgRenderer renderer(svgPath);
+	//QSize imageSize(2325, 1910); // 根据你的 SVG viewBox 设置
+	//QPixmap pixmap(imageSize);
+	//pixmap.fill(Qt::black); // 可选，底色
+
+	//QPainter painter(&pixmap);
+	//renderer.render(&painter); // 一次性全部渲染为底图
+	//painter.end();
+
+	//QGraphicsPixmapItem* bgItem = new QGraphicsPixmapItem(pixmap);
+	//bgItem->setZValue(0); // 保证始终在底层
+	//scene->addItem(bgItem);
+
+	InteractiveSvgMapItem* item = new InteractiveSvgMapItem(svgPath);
+	scene->addItem(item);
+
+	QGraphicsView* view = new QGraphicsView(scene);
+	view->setDragMode(QGraphicsView::NoDrag);
+	view->setRenderHint(QPainter::Antialiasing);
+	view->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
+	view->setBackgroundBrush(Qt::black);
+	view->resize(1600, 900);
+	view->show();
 
 
 	//MainWindow mainWindow;

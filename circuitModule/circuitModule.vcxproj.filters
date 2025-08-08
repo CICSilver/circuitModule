@@ -37,6 +37,9 @@
     <ClCompile Include="GeneratedFiles\Debug\moc_viewwindow.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
+    <ClCompile Include="InteractiveSvgItem.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="circuitconfig.h">
@@ -65,6 +68,9 @@
     </ClInclude>
     <ClInclude Include="include\cime\cime.h">
       <Filter>thirdparty\cime</Filter>
+    </ClInclude>
+    <ClInclude Include="InteractiveSvgItem.h">
+      <Filter>header</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

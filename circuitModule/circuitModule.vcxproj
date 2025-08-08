@@ -92,6 +92,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="include\pugixml\pugixml.cpp" />
+    <ClCompile Include="InteractiveSvgItem.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="mainwindow.cpp" />
     <ClCompile Include="circuitconfig.cpp" />
@@ -131,6 +132,7 @@
     <ClInclude Include="include\pugixml\pugiconfig.hpp" />
     <ClInclude Include="include\pugixml\pugixml.hpp" />
     <ClInclude Include="circuitconfig.h" />
+    <ClInclude Include="InteractiveSvgItem.h" />
     <ClInclude Include="svgmodel.h" />
     <ClInclude Include="SvgTransformer.h" />
     <CustomBuild Include="viewwindow.h">

@@ -17,14 +17,14 @@
 CustomSvgItem::CustomSvgItem(const QString& fileName, QGraphicsItem* parent /*= nullptr*/)
 	: QGraphicsSvgItem(fileName, parent)
 {
-	setAcceptHoverEvents(true);
-	LoadSvg(fileName);
+	//setAcceptHoverEvents(true);
+	//LoadSvg(fileName);
 }
 
 CustomSvgItem::CustomSvgItem(QGraphicsItem* parent)
 	:QGraphicsSvgItem(parent)
 {
-	setAcceptHoverEvents(true);
+	//setAcceptHoverEvents(true);
 }
 
 void CustomSvgItem::LoadSvg(const QString& fileName)
@@ -36,18 +36,19 @@ void CustomSvgItem::LoadSvg(const QString& fileName)
 		qDebug() << QString::fromLocal8Bit("svg 导入错误");
 	}
 
+	m_originalSvgData = xmlDocumentToByteArray();
 	// 更新QSvgRenderer
-	QSvgRenderer* renderer = this->renderer();
-	if (!renderer)
-	{
-		this->setSharedRenderer(new QSvgRenderer());
-		renderer = this->renderer();
-	}
+	//QSvgRenderer* renderer = this->renderer();
+	//if (!renderer)
+	//{
+	//	this->setSharedRenderer(new QSvgRenderer());
+	//	renderer = this->renderer();
+	//}
 
-	if (!renderer->load(m_originalSvgData))
-	{
-		qDebug() << QString::fromLocal8Bit("svg 渲染错误");
-	}
+	//if (!renderer->load(m_originalSvgData))
+	//{
+	//	qDebug() << QString::fromLocal8Bit("svg 渲染错误");
+	//}
 
 	this->update();
 }
@@ -62,42 +63,6 @@ QByteArray CustomSvgItem::LoadSvgData(const QString& fileName)
 	QByteArray data = file.readAll();
 	file.close();
 	return data;
-}
-
-void CustomSvgItem::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
-{
-	QPointF pos = event->pos();
-	QString tipText;
-	QSvgRenderer* renderer = this->renderer();
-	if (renderer)
-	{
-		pugi::xml_node svgNode = GetSvgNodeByPos(pos);
-		QByteArray data = m_originalSvgData;
-		if (svgNode)
-		{
-			QString type = svgNode.attribute("type").as_string();
-			if (type.compare("circuit", Qt::CaseInsensitive) == 0)
-			{
-				// 鼠标悬停在链路上
-				qDebug() << "hovered on circuit";
-				svgNode.attribute("stroke-width").set_value("3");
-			}
-			else if (type.compare("ied", Qt::CaseInsensitive) == 0)
-			{
-				// 鼠标悬停在IED框图上
-				qDebug() << "hovered on ied";
-			}
-			data = xmlDocumentToByteArray();
-		}
-		else
-		{
-			// 重新导入原始svg数据
-			m_doc.load(data.data());
-		}
-		renderer->load(data);
-		this->update();
-	}
-	QGraphicsSvgItem::hoverMoveEvent(event);
 }
 
 void CustomSvgItem::wheelEvent(QGraphicsSceneWheelEvent* event)
@@ -214,4 +179,89 @@ QLineF CustomSvgItem::GetLineFromStr(const QString& str)
 qreal CustomSvgItem::DegreeToRadians(qreal degree)
 {
 	return degree * M_PI / 180.0;
+}
+
+QPainterPath CustomSvgItem::ParseSvgPath(const QString& d)
+{
+	QPainterPath path;
+	QRegExp cmdExp("([MLZmlz])([^MLZmlz]*)");
+	int pos = 0;
+	QPointF lastPoint;
+	while ((pos = cmdExp.indexIn(d, pos)) != -1) {
+		QString cmd = cmdExp.cap(1);
+		QStringList params = cmdExp.cap(2).split(QRegExp("[ ,]"));
+		params.removeAll("");
+		if (cmd == "M" || cmd == "m") {
+			float x = params[0].toFloat(), y = params[1].toFloat();
+			path.moveTo(x, y);
+			lastPoint = QPointF(x, y);
+		}
+		else if (cmd == "L" || cmd == "l") {
+			float x = params[0].toFloat(), y = params[1].toFloat();
+			path.lineTo(x, y);
+			lastPoint = QPointF(x, y);
+		}
+		else if (cmd == "Z" || cmd == "z") {
+			path.closeSubpath();
+		}
+		pos += cmdExp.matchedLength();
+	}
+	return path;
+}
+
+QPainterPath CustomSvgItem::ParseSvgPolyLine(const QString& points) {
+	QPainterPath path;
+	QStringList pointList = points.split(' ', QString::SkipEmptyParts);
+	if (pointList.size() < 2) return path;
+	for (int i = 0; i < pointList.size(); ++i) {
+		QStringList xy = pointList[i].split(',');
+		if (xy.size() != 2) continue;
+		float x = xy[0].toFloat(), y = xy[1].toFloat();
+		if (i == 0)
+			path.moveTo(x, y);
+		else
+			path.lineTo(x, y);
+	}
+	return path;
+}
+
+// 批量加载交互线
+void CustomSvgItem::LoadInteractiveLines(const QString& fileName, QGraphicsScene* scene)
+{
+	pugi::xml_document doc;
+	doc.load_file(fileName.toLocal8Bit());
+
+	// 支持三种类型
+	struct TypeInfo {
+		const char* type;
+		InteractiveLineItem::LineType ltype;
+		QColor color;
+	};
+	TypeInfo g_types[] = {
+		{ "virtual", InteractiveLineItem::Virtual, QColor(0, 200, 0) },
+		{ "logic",   InteractiveLineItem::Logic,   QColor(60, 90, 200) },
+		{ "optical", InteractiveLineItem::Optical, QColor(200, 80, 180) }
+	};
+	const int g_types_count = sizeof(g_types) / sizeof(g_types[0]);
+	for (int i = 0; i < g_types_count; ++i) {
+		QString xpath = QString("//g[@type='%1']//path | //g[@type='%1']//polyline").arg(g_types[i].type);
+		QByteArray xpathBytes = xpath.toLocal8Bit();
+		pugi::xpath_node_set paths = doc.select_nodes(xpathBytes.constData());
+		for (pugi::xpath_node_set::const_iterator it = paths.begin(); it != paths.end(); ++it) {
+			pugi::xml_node n = it->node();
+			QPainterPath path;
+			if (QString(n.name()) == "path") {
+				QString d = n.attribute("d").as_string();
+				path = ParseSvgPath(d);
+			}
+			else if (QString(n.name()) == "polyline") {
+				QString points = n.attribute("points").as_string();
+				path = ParseSvgPolyLine(points);
+			}
+			InteractiveLineItem* item = new InteractiveLineItem(path, g_types[i].ltype, g_types[i].color);
+			item->setZValue(1);
+			scene->addItem(item);
+			m_interactiveLines.append(item);
+		}
+	}
 }

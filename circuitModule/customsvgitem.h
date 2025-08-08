@@ -38,6 +38,30 @@ public:
 	}
 };
 
+class InteractiveLineItem : public QGraphicsPathItem
+{
+public:
+	enum LineType { Virtual, Logic, Optical };
+	InteractiveLineItem(const QPainterPath& path, LineType t, const QColor& color, QGraphicsItem* parent = nullptr)
+		: QGraphicsPathItem(path, parent), m_type(t), m_baseColor(color)
+	{
+		setAcceptHoverEvents(true);
+		setPen(QPen(m_baseColor, 6));
+	}
+protected:
+	void hoverEnterEvent(QGraphicsSceneHoverEvent*) override {
+		setPen(QPen(m_baseColor.darker(150), 10)); // 悬停变粗变深
+		update();
+	}
+	void hoverLeaveEvent(QGraphicsSceneHoverEvent*) override {
+		setPen(QPen(m_baseColor, 6));
+		update();
+	}
+private:
+	LineType m_type;
+	QColor m_baseColor;
+};
+
 class CustomSvgItem  : public QGraphicsSvgItem
 {
 public:
@@ -47,6 +71,7 @@ public:
 	~CustomSvgItem() {}
 
 	void LoadSvg(const QString& fileName);
+	void LoadInteractiveLines(const QString& fileName, QGraphicsScene* scene);
 
 protected:
 
@@ -81,9 +106,8 @@ protected:
 	// 返回值:		bool
 	//************************************
 	bool isPointOnPath(const QPointF& pos, QLineF& line, quint8 width = 8);
-	// 重写鼠标事件
 protected:
-	void hoverMoveEvent(QGraphicsSceneHoverEvent* event) override;
+	//void hoverMoveEvent(QGraphicsSceneHoverEvent* event) override;
 	void wheelEvent(QGraphicsSceneWheelEvent* event) override;
 private:
 	QList<QLineF> GetLinesFromGNode(pugi::xml_node& gNode);
@@ -91,7 +115,13 @@ private:
 	QLineF GetLineFromStr(const QString& str);
 	qreal DegreeToRadians(qreal degree);
 
+
 private:
+	// 解析svg图元位置辅助
+	// 简易svg path解析器，只支持M/L/Z
+	QPainterPath ParseSvgPath(const QString& d);
+	// svg polyline解析器
+	QPainterPath ParseSvgPolyLine(const QString& points);
 	// xml_document转QByteArray辅助类
 	struct ByteWriter : pugi::xml_writer
 	{
@@ -118,4 +148,5 @@ private:
 	QPointF m_lastMousePos;
 	QByteArray m_originalSvgData;
 	pugi::xml_document m_doc;
+	QList<InteractiveLineItem*> m_interactiveLines;
 };

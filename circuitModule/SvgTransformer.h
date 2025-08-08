@@ -144,8 +144,8 @@ protected:
 		QSvgGenerator svgGenerator;
 
 		svgGenerator.setFileName(filePath);
-		svgGenerator.setViewBox(QRect(0, 0, 1920, 1080));
-		//svgGenerator.setSize(QSize(SVG_VIEWBOX_WIDTH, SVG_VIEWBOX_HEIGHT));
+		//svgGenerator.setViewBox(QRect(0, 0, svg.viewBoxWidth, svg.viewBoxHeight));
+		svgGenerator.setViewBox(QRect(0, 0, SVG_VIEWBOX_WIDTH, SVG_VIEWBOX_HEIGHT));
 
 		m_painter->begin(&svgGenerator);
 		QPainter painter;
@@ -155,7 +155,7 @@ protected:
 
 		m_painter->end();
 		svgGenerator.setFileName(QString());
-		ReSignSvg(filePath);
+		ReSignSvg(filePath, svg);
 	}
 	//************************************
 	// 函数名称:	GenerateLogicSvgByIed
@@ -354,6 +354,7 @@ private:
 	// 函数说明:	
 	// 函数参数:	QHash<QString
 	// 函数参数:	PlateRect> & hash			svg描述中的软压板矩形索引
+	// 函数参数:	QString iedName				压板对侧IED名称
 	// 函数参数:	const QPoint & linePt		回路起点/终点位置，作为软压板矩形位置参考
 	// 函数参数:	const QString & plateName
 	// 函数参数:	const QString & plateRef
@@ -362,7 +363,7 @@ private:
 	// 函数参数:	bool isLeft
 	// 返回值:		void
 	//************************************
-	void AdjustVirtualCircuitPlatePosition(QHash<QString, PlateRect>& hash, const QPoint& linePt, const QString& plateName, const QString& plateRef, bool isSrcPlate, bool isSideSrc, bool isLeft);
+	void AdjustVirtualCircuitPlatePosition(QHash<QString, PlateRect>& hash, const QString& iedName, const QPoint& linePt, const QString& plateName, const QString& plateRef, bool isSrcPlate, bool isSideSrc, bool isLeft);
 
 	// 绘制单个IED矩形
 	void DrawIedRect(IedRect* rect);
@@ -379,8 +380,6 @@ private:
 	void DrawExternalRect(IedRect* rect, QString title, bool hasDescIedRect = false);
 	// 绘制带链路图标的矩形
 	void DrawWholeRect(IedRect* rect);
-	// 绘制压板矩形，绘制于回路之后，虚线框，内部绘制压板图标
-	void DrawPlateRect(QPoint lt, QPoint rb);
 
 	// 绘制链路
 	void DrawLogicCircuitLine(QList<IedRect*>& rectList);
@@ -437,13 +436,15 @@ private:
 	void DrawPlateIcon(const QPoint& pt, bool status);
 
 	// 对SVG文件进行解析重标识
-	void ReSignSvg(const QString&filename);
+	void ReSignSvg(const QString&filename, BaseSvg& svg);
 	// 重标识IED属性
 	void ReSignIedRect(pugi::xml_document& doc);
 	// 重标识链路属性
 	void ReSignCircuitLine(pugi::xml_document& doc);
 	// 重标识压板信息
 	void ReSignPlate(pugi::xml_document& doc);
+	// 调整SVG视图框大小
+	void ReSignSvgViewBox(pugi::xml_document& doc, int width, int height);
 	void GetSwitcherFromLogicCircuits(QList<LogicCircuit*> logicCircuitList, OpticalSvg& svg);
 private:
 	CircuitConfig* m_circuitConfig;
@@ -454,7 +455,9 @@ private:
 	{
 		TYPE_IED = 90,
 		TYPE_Switcher = 100,
-		TYPE_Plate = 110,
+		TYPE_Plate_HITBOX = 110,
+		TYPE_Plate_ICON,
+		//TYPE_Plate_RECT,
 		TYPE_LogicCircuit = 120,
 		TYPE_OpticalCircuit = 130,
 		TYPE_VirtualCircuit = 140,

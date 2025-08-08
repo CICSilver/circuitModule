@@ -8,11 +8,17 @@
 #include <QString>
 #include <QSvgRenderer>
 
-// ÏßÂ·½á¹¹Ìå
+// Â·á¹¹
 struct MapLine
 {
 	QVector<QPointF> points;
-	QString type; // ¿ÉÓÃÀ´Çø·Ö"virtual"/"logic"/"optical"µÈ
+	QString type; // "virtual"/"logic"/"optical"
+};
+
+struct Plate
+{
+        QRectF rect;
+        QPointF iconCenter;
 };
 
 class InteractiveSvgMapItem : public QGraphicsItem
@@ -23,7 +29,7 @@ public:
 	QRectF boundingRect() const;
 	void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget);
 
-	// ½»»¥½Ó¿Ú
+	// Ó¿
 	void setHighlightedLine(int idx);
 
 protected:
@@ -32,12 +38,14 @@ protected:
 private:
 	void parseSvgAndInit(const QString& svgPath);
 	double pointToSegmentDistance(const QPointF& pt, const QPointF& a, const QPointF& b);
-	// ½âÎö polyline µÄ points ÊôÐÔÎªµã¼¯ºÏ
+	//  polyline  points Îªã¼¯
 	QVector<QPointF> parsePointsAttr(const QString& pointsStr);
+        void drawPlateIcon(QPainter* painter, const QPointF& center) const;
 	
 
 	QPixmap m_bgPixmap;
 	QVector<MapLine> m_allLines;
+        QVector<Plate> m_allPlates;
 	int m_highlightedLineIdx;
 };
 

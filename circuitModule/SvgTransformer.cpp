@@ -1387,22 +1387,22 @@ void SvgTransformer::DrawPlate(const QHash<QString, PlateRect>& hash)
 		pen.setDashPattern(dashPattern);
 		m_painter->setPen(pen);
 		m_painter->setBrush(brush);
-		m_painter->fillRect(plateRect.rect, brush);
-		m_painter->drawRect(plateRect.rect);
+                QString plateInfo = joinGroups() <<
+                        (QString)(joinFields() << plateRect.desc << plateRect.ref);
+                font.setPointSize(TYPE_Plate_RECT);
+                font.setFamily(plateInfo);
+                m_painter->setFont(font);
+                m_painter->drawRect(plateRect.rect);
 		// 绘制压板图标
 		QPoint centerPt(plateRect.rect.x() + plateRect.rect.width() / 2 - PLATE_WIDTH / 2 + PLATE_CIRCLE_RADIUS + PLATE_GAP, plateRect.rect.y() + plateRect.rect.height() / 2);
-		DrawPlateIcon(centerPt, true);	// 根据压板描述判断闭合状态
+		DrawPlateIcon(centerPt, true, plateInfo);	// 根据压板描述判断闭合状态
 		// 绘制hitbox
-		m_painter->setPen(Qt::NoPen);
-		m_painter->setBrush(Qt::NoBrush);
-		// 记录压板信息
-		QString plateInfo = joinGroups() <<
-			(QString)(joinFields() << plateRect.desc << plateRect.ref);
-		font.setPointSize(TYPE_Plate_HITBOX);
-		font.setFamily(plateInfo);
-		m_painter->setFont(font);
-		m_painter->drawRect(QRect(QPoint(centerPt.x() - PLATE_CIRCLE_RADIUS, centerPt.y() - PLATE_CIRCLE_RADIUS), QSize(PLATE_WIDTH, PLATE_HEIGHT)));
-		m_painter->restore();
+                m_painter->setPen(Qt::NoPen);
+                m_painter->setBrush(Qt::NoBrush);
+                font.setPointSize(TYPE_Plate_HITBOX);
+                m_painter->setFont(font);
+                m_painter->drawRect(QRect(QPoint(centerPt.x() - PLATE_CIRCLE_RADIUS, centerPt.y() - PLATE_CIRCLE_RADIUS), QSize(PLATE_WIDTH, PLATE_HEIGHT)));
+                m_painter->restore();
 	}
 }
 
@@ -1468,18 +1468,19 @@ void SvgTransformer::DrawSvIcon(const QPoint& pt, const quint32 color)
 	m_painter->restore();
 }
 
-void SvgTransformer::DrawPlateIcon(const QPoint& centerPt, bool status)
+void SvgTransformer::DrawPlateIcon(const QPoint& centerPt, bool status, const QString& info)
 {
-	m_painter->save();
-	quint32 color = status ? ColorHelper::pure_green : ColorHelper::pure_red; // 根据闭合状态使用默认颜色
-	QPen pen;
-	QFont font;
-	pen.setWidth(2);
-	pen.setColor(ColorHelper::Color(color));
-	font.setPointSize(TYPE_Plate_ICON);
+        m_painter->save();
+        quint32 color = status ? ColorHelper::pure_green : ColorHelper::pure_red; // 根据闭合状态使用默认颜色
+        QPen pen;
+        QFont font;
+        pen.setWidth(2);
+        pen.setColor(ColorHelper::Color(color));
+        font.setPointSize(TYPE_Plate_ICON);
+        font.setFamily(info);
 
-	m_painter->setFont(font);
-	m_painter->setPen(pen);
+        m_painter->setFont(font);
+        m_painter->setPen(pen);
 	int distance = PLATE_WIDTH - PLATE_CIRCLE_RADIUS * 4;	// 两个圆之间的距离 = 压板图形总宽度 - 两个圆的直径
 	// 直径20的圆
 	m_painter->drawEllipse(centerPt, PLATE_CIRCLE_RADIUS, PLATE_CIRCLE_RADIUS);
@@ -1689,12 +1690,40 @@ void SvgTransformer::ReSignPlate(pugi::xml_document& doc)
 		plateNode.attribute("font-family").set_value("SimSun");
 		plateNode.attribute("font-size").set_value("15");
 	}
-	pugi::xpath_node_set plateIconNodeSet = doc.select_nodes(QString("//g[@font-size='%1']").arg(TYPE_Plate_ICON).toLocal8Bit());
-	for (nodeSetConstIterator it = plateIconNodeSet.begin(); it != plateIconNodeSet.end(); ++it)
-	{
-		pugi::xml_node plateIconNode = it->node();
-
-	}
+        pugi::xpath_node_set plateRectNodeSet = doc.select_nodes(QString("//g[@font-size='%1']").arg(TYPE_Plate_RECT).toLocal8Bit());
+        for (nodeSetConstIterator it = plateRectNodeSet.begin(); it != plateRectNodeSet.end(); ++it)
+        {
+                pugi::xml_node plateRectNode = it->node();
+                plateRectNode.append_attribute("plate-desc");
+                plateRectNode.append_attribute("plate-ref");
+                plateRectNode.append_attribute("type");
+                QString attrStr = plateRectNode.attribute("font-family").value();
+                QList<QStringList> strList = splitGroupAndFields(attrStr);
+                QString desc = getField(strList, 0, 0);
+                QString ref = getField(strList, 0, 1);
+                plateRectNode.attribute("plate-desc").set_value(desc.toStdString().c_str());
+                plateRectNode.attribute("plate-ref").set_value(ref.toStdString().c_str());
+                plateRectNode.attribute("type").set_value("plate-rect");
+                plateRectNode.attribute("font-family").set_value("SimSun");
+                plateRectNode.attribute("font-size").set_value("15");
+        }
+        pugi::xpath_node_set plateIconNodeSet = doc.select_nodes(QString("//g[@font-size='%1']").arg(TYPE_Plate_ICON).toLocal8Bit());
+        for (nodeSetConstIterator it = plateIconNodeSet.begin(); it != plateIconNodeSet.end(); ++it)
+        {
+                pugi::xml_node plateIconNode = it->node();
+                plateIconNode.append_attribute("plate-desc");
+                plateIconNode.append_attribute("plate-ref");
+                plateIconNode.append_attribute("type");
+                QString attrStr = plateIconNode.attribute("font-family").value();
+                QList<QStringList> strList = splitGroupAndFields(attrStr);
+                QString desc = getField(strList, 0, 0);
+                QString ref = getField(strList, 0, 1);
+                plateIconNode.attribute("plate-desc").set_value(desc.toStdString().c_str());
+                plateIconNode.attribute("plate-ref").set_value(ref.toStdString().c_str());
+                plateIconNode.attribute("type").set_value("plate-icon");
+                plateIconNode.attribute("font-family").set_value("SimSun");
+                plateIconNode.attribute("font-size").set_value("15");
+        }
 }
 
 void SvgTransformer::ReSignSvgViewBox(pugi::xml_document& doc, int width, int height)

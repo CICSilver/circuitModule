@@ -115,7 +115,7 @@ int main(int argc, char* argv[]) {
 	pCircuitConfig->LoadCimeFile();
 	SvgTransformer transformer;
 	// 单设备文件生成测试
-	//transformer.GenerateSvgByIedName(iedName);
+	transformer.GenerateSvgByIedName(iedName);
 
 	// 生成SVG文件
 	//QList<QString> pathList;
@@ -150,24 +150,24 @@ int main(int argc, char* argv[]) {
 	qDebug() << "SVG files generated successfully.";
 
 
-	// 显示SVG文件
-	QGraphicsScene* scene = new QGraphicsScene();
-	scene->setSceneRect(0, 0, 2325, 1910);
+	//// 显示SVG文件
+	//QGraphicsScene* scene = new QGraphicsScene();
+	//scene->setSceneRect(0, 0, 2325, 1910);
 
-	QString svgPath = QCoreApplication::applicationDirPath() + "/PT2202A_virtual_circuit.svg";
+	//QString svgPath = QCoreApplication::applicationDirPath() + "/PT2202A_virtual_circuit.svg";
 
-	// 转换svg为底图
+	//// 转换svg为底图
 
-	InteractiveSvgMapItem* item = new InteractiveSvgMapItem(svgPath);
-	scene->addItem(item);
+	//InteractiveSvgMapItem* item = new InteractiveSvgMapItem(svgPath);
+	//scene->addItem(item);
 
-	QGraphicsView* view = new QGraphicsView(scene);
-	view->setDragMode(QGraphicsView::NoDrag);
-	view->setRenderHint(QPainter::Antialiasing);
-	view->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
-	view->setBackgroundBrush(Qt::black);
-	view->resize(1600, 900);
-	view->show();
+	//QGraphicsView* view = new QGraphicsView(scene);
+	//view->setDragMode(QGraphicsView::NoDrag);
+	//view->setRenderHint(QPainter::Antialiasing);
+	//view->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
+	//view->setBackgroundBrush(Qt::black);
+	//view->resize(1600, 900);
+	//view->show();
 
 
 	//MainWindow mainWindow;

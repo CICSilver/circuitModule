@@ -12,6 +12,9 @@
 // 子串分隔符 field = str 0x1E str
 #define FIELD_SEPARATE_CHAR QChar(0x1E)
 
+#define DEFAULT_FONT_FAMILY "SimSun"
+#define DEFAULT_FONT_WEIGHT 400
+
 namespace utils {
 	inline QString toQString(const QString& str) { return str; }
 	inline QString toQString(const QStringRef& str) { return str.toString(); }
@@ -452,6 +455,8 @@ private:
 	QSvgGenerator* m_svgGenerator;
 	QPainter* m_painter;
 	QString m_errStr;
+	// 用于SVG中图形组标识
+	int m_element_id;		// 组成同一部分的图形元素的标识，例如一个压板图形的两个○和矩形
 	enum svgType
 	{
 		TYPE_IED = 90,
@@ -461,7 +466,10 @@ private:
 		TYPE_Plate_RECT,
 		TYPE_LogicCircuit = 120,
 		TYPE_OpticalCircuit = 130,
+		TYPE_Optical_ConnCircle,		// 光纤连接点圆圈
 		TYPE_VirtualCircuit = 140,
+		TYPE_Circuit_Arrow,				// 回路箭头
+
 	};
 };
 

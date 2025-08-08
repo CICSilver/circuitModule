@@ -4,8 +4,10 @@
 #include <QFile>
 #include <QDebug>
 #include "pugixml.hpp"
+#include "svgmodel.h"
+#include <QMap>
 
-// ¹¹Ôìº¯Êý
+// ìº¯
 InteractiveSvgMapItem::InteractiveSvgMapItem(const QString& svgPath)
 	: m_highlightedLineIdx(-1)
 {
@@ -13,13 +15,13 @@ InteractiveSvgMapItem::InteractiveSvgMapItem(const QString& svgPath)
 	parseSvgAndInit(svgPath);
 }
 
-// ·µ»Ø»­²¼±ß½ç
+// Ø»ß½
 QRectF InteractiveSvgMapItem::boundingRect() const
 {
 	return QRectF(0, 0, m_bgPixmap.width(), m_bgPixmap.height());
 }
 
-// Ö÷»æÖÆº¯Êý
+// Æº
 void InteractiveSvgMapItem::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget*)
 {
 	painter->drawPixmap(0, 0, m_bgPixmap);
@@ -38,9 +40,21 @@ void InteractiveSvgMapItem::paint(QPainter* painter, const QStyleOptionGraphicsI
 		for (int j = 1; j < line.points.size(); ++j)
 			painter->drawLine(line.points[j - 1], line.points[j]);
 	}
+        for (const Plate& plate : m_allPlates) {
+                QPen pen(Qt::white);
+                pen.setWidth(2);
+                pen.setStyle(Qt::DashDotLine);
+                QVector<qreal> dashPattern; dashPattern << 3 << 3;
+                pen.setDashPattern(dashPattern);
+                painter->setPen(pen);
+                painter->setBrush(QColor(0x23,0x3f,0x4f));
+                painter->drawRect(plate.rect);
+                painter->setBrush(Qt::NoBrush);
+                drawPlateIcon(painter, plate.iconCenter);
+        }
 }
 
-// ÉèÖÃ¸ßÁÁµÄÏßÂ·
+// Ã¸Â·
 void InteractiveSvgMapItem::setHighlightedLine(int idx)
 {
 	if (m_highlightedLineIdx != idx) {
@@ -49,7 +63,7 @@ void InteractiveSvgMapItem::setHighlightedLine(int idx)
 	}
 }
 
-// Êó±êÐüÍ£ÊÂ¼þ£º×Ô¶¯¸ßÁÁ×î½üÏßÂ·£¨Äã¿ÉÒÔ×Ô¼º¶¨ÖÆ¸ü¸´ÔÓµÄÂß¼­£©
+// Í£Â¼Ô¶Â·Ô¼Æ¸Óµß¼
 void InteractiveSvgMapItem::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
 {
 	QPointF pos = event->pos();
@@ -66,16 +80,16 @@ void InteractiveSvgMapItem::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
 			}
 		}
 	}
-	if (minDist < 15.0)  // Ö»ÓÐ¿¿½üÏß²Å¸ßÁÁ
+	if (minDist < 15.0)  // Ö»Ð¿ß²Å¸
 		setHighlightedLine(closest);
 	else
 		setHighlightedLine(-1);
 }
 
-// ½âÎöSVG²¢³õÊ¼»¯µ×Í¼Óë½á¹¹Ìå
+// SVGÊ¼Í¼á¹¹
 void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
 {
-	// 1. ÏÈÓÃ QSvgRenderer äÖÈ¾µ×Í¼ÎªPixmap
+	// 1.  QSvgRenderer È¾Í¼ÎªPixmap
 	QSvgRenderer renderer(svgPath);
 	QRectF viewBox = renderer.viewBoxF();
 	QSize imageSize = viewBox.isValid() ?
@@ -88,20 +102,20 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
 	painter.end();
 	m_bgPixmap = pixmap;
 
-	// 2. ÓÃ pugixml ½âÎöpolyline
+	// 2.  pugixml polyline
 	QFile file(svgPath);
 	if (!file.open(QIODevice::ReadOnly)) {
-		qWarning("SVGÎÄ¼þÎÞ·¨´ò¿ª£¡");
+		qWarning("SVGÄ¼Þ·ò¿ª£");
 		return;
 	}
 	QByteArray svgData = file.readAll();
 	pugi::xml_document doc;
 	if (!doc.load_buffer(svgData.data(), svgData.size())) {
-		qWarning("SVG½âÎöÊ§°Ü£¡");
+		qWarning("SVGÊ§Ü£");
 		return;
 	}
 
-	// »æÖÆÁ´Â·²¿·Ö
+	// Â·
 	static const char* types[] = { "virtual", "logic", "optical" };
 	for (int t = 0; t < 3; ++t) {
 		QString xPath = QString("//g[@type='%1']/polyline").arg(types[t]);
@@ -115,7 +129,32 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
 			m_allLines.append(line);
 		}
 	}
-	// ÄãÒ²¿ÉÒÔÌí¼Ó¶Ô path¡¢textµÈµÄÖ§³Ö
+	// Ò²Ó¶ pathtextÈµÖ§
+        QMap<QString, Plate> plateMap;
+        pugi::xpath_node_set rectNodes = doc.select_nodes("//g[@type='plate-rect']/rect");
+        for (int i = 0; i < rectNodes.size(); ++i) {
+                pugi::xml_node rect = rectNodes[i].node();
+                pugi::xml_node parent = rect.parent();
+                QString key = QString(parent.attribute("plate-desc").as_string()) + "|" + parent.attribute("plate-ref").as_string();
+                double x = rect.attribute("x").as_double();
+                double y = rect.attribute("y").as_double();
+                double w = rect.attribute("width").as_double();
+                double h = rect.attribute("height").as_double();
+                Plate &p = plateMap[key];
+                p.rect = QRectF(x, y, w, h);
+        }
+        pugi::xpath_node_set iconNodes = doc.select_nodes("//g[@type='plate-icon']");
+        for (int i = 0; i < iconNodes.size(); ++i) {
+                pugi::xml_node g = iconNodes[i].node();
+                QString key = QString(g.attribute("plate-desc").as_string()) + "|" + g.attribute("plate-ref").as_string();
+                pugi::xml_node circle = g.child("circle");
+                if (circle) {
+                        double cx = circle.attribute("cx").as_double();
+                        double cy = circle.attribute("cy").as_double();
+                        plateMap[key].iconCenter = QPointF(cx, cy);
+                }
+        }
+        m_allPlates = plateMap.values().toVector();
 }
 
 double InteractiveSvgMapItem::pointToSegmentDistance(const QPointF& pt, const QPointF& a, const QPointF& b)
@@ -149,4 +188,24 @@ QVector<QPointF> InteractiveSvgMapItem::parsePointsAttr(const QString& pointsStr
 			pts.append(QPointF(xy[0].toDouble(), xy[1].toDouble()));
 	}
 	return pts;
+}
+
+void InteractiveSvgMapItem::drawPlateIcon(QPainter* painter, const QPointF& center) const
+{
+        painter->save();
+        QPen pen(QColor(0x00ff00));
+        pen.setWidth(2);
+        painter->setPen(pen);
+        int distance = PLATE_WIDTH - PLATE_CIRCLE_RADIUS * 4;
+        painter->drawEllipse(center, PLATE_CIRCLE_RADIUS, PLATE_CIRCLE_RADIUS);
+        painter->drawEllipse(center + QPointF(distance, 0), PLATE_CIRCLE_RADIUS, PLATE_CIRCLE_RADIUS);
+        painter->save();
+        painter->translate(center);
+        int rectHeight = PLATE_CIRCLE_RADIUS * 2;
+        QPointF p1(0, -rectHeight / 2), p2(distance, -rectHeight / 2);
+        QPointF p3(distance, rectHeight / 2), p4(0, rectHeight / 2);
+        painter->drawLine(p1, p2);
+        painter->drawLine(p3, p4);
+        painter->restore();
+        painter->restore();
 }

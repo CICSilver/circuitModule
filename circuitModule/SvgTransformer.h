@@ -430,10 +430,11 @@ private:
 	// 访问权限:	private 
 	// 函数说明:	绘制检修压板图标，输入点为左侧圆的圆心位置。
 	// 函数参数:	const QPoint & pt
-	// 函数参数:	bool status 通断状态
+	// 函数参数:    bool status 通断状态
+	// 函数参数:    const QString & info 压板描述和引用信息
 	// 返回值:		void
 	//************************************
-	void DrawPlateIcon(const QPoint& pt, bool status);
+        void DrawPlateIcon(const QPoint& pt, bool status, const QString& info);
 
 	// 对SVG文件进行解析重标识
 	void ReSignSvg(const QString&filename, BaseSvg& svg);
@@ -457,7 +458,7 @@ private:
 		TYPE_Switcher = 100,
 		TYPE_Plate_HITBOX = 110,
 		TYPE_Plate_ICON,
-		//TYPE_Plate_RECT,
+		TYPE_Plate_RECT,
 		TYPE_LogicCircuit = 120,
 		TYPE_OpticalCircuit = 130,
 		TYPE_VirtualCircuit = 140,

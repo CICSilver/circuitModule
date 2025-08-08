@@ -29,7 +29,6 @@ public:
 	QRectF boundingRect() const;
 	void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget);
 
-	// ӿ
 	void setHighlightedLine(int idx);
 
 protected:
@@ -38,7 +37,6 @@ protected:
 private:
 	void parseSvgAndInit(const QString& svgPath);
 	double pointToSegmentDistance(const QPointF& pt, const QPointF& a, const QPointF& b);
-	//  polyline  points Ϊ㼯
 	QVector<QPointF> parsePointsAttr(const QString& pointsStr);
         void drawPlateIcon(QPainter* painter, const QPointF& center) const;
 	

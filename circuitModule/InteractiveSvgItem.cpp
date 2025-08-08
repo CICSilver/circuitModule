@@ -7,7 +7,6 @@
 #include "svgmodel.h"
 #include <QMap>
 
-// 캯
 InteractiveSvgMapItem::InteractiveSvgMapItem(const QString& svgPath)
 	: m_highlightedLineIdx(-1)
 {
@@ -15,13 +14,11 @@ InteractiveSvgMapItem::InteractiveSvgMapItem(const QString& svgPath)
 	parseSvgAndInit(svgPath);
 }
 
-// ػ߽
 QRectF InteractiveSvgMapItem::boundingRect() const
 {
 	return QRectF(0, 0, m_bgPixmap.width(), m_bgPixmap.height());
 }
 
-// ƺ
 void InteractiveSvgMapItem::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget*)
 {
 	painter->drawPixmap(0, 0, m_bgPixmap);
@@ -40,7 +37,7 @@ void InteractiveSvgMapItem::paint(QPainter* painter, const QStyleOptionGraphicsI
 		for (int j = 1; j < line.points.size(); ++j)
 			painter->drawLine(line.points[j - 1], line.points[j]);
 	}
-        for (const Plate& plate : m_allPlates) {
+        foreach (const Plate& plate, m_allPlates) {
                 QPen pen(Qt::white);
                 pen.setWidth(2);
                 pen.setStyle(Qt::DashDotLine);
@@ -63,7 +60,6 @@ void InteractiveSvgMapItem::setHighlightedLine(int idx)
 	}
 }
 
-// ͣ¼Զ·ԼƸӵ߼
 void InteractiveSvgMapItem::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
 {
 	QPointF pos = event->pos();
@@ -80,16 +76,14 @@ void InteractiveSvgMapItem::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
 			}
 		}
 	}
-	if (minDist < 15.0)  // ֻп߲Ÿ
+	if (minDist < 15.0) 
 		setHighlightedLine(closest);
 	else
 		setHighlightedLine(-1);
 }
 
-// SVGʼͼṹ
 void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
 {
-	// 1.  QSvgRenderer ȾͼΪPixmap
 	QSvgRenderer renderer(svgPath);
 	QRectF viewBox = renderer.viewBoxF();
 	QSize imageSize = viewBox.isValid() ?
@@ -102,20 +96,18 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
 	painter.end();
 	m_bgPixmap = pixmap;
 
-	// 2.  pugixml polyline
 	QFile file(svgPath);
 	if (!file.open(QIODevice::ReadOnly)) {
-		qWarning("SVGļ޷򿪣");
+		qWarning("SVG文件打开失败");
 		return;
 	}
 	QByteArray svgData = file.readAll();
 	pugi::xml_document doc;
 	if (!doc.load_buffer(svgData.data(), svgData.size())) {
-		qWarning("SVGʧܣ");
+		qWarning("SVG加载失败");
 		return;
 	}
 
-	// ·
 	static const char* types[] = { "virtual", "logic", "optical" };
 	for (int t = 0; t < 3; ++t) {
 		QString xPath = QString("//g[@type='%1']/polyline").arg(types[t]);
@@ -129,32 +121,31 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
 			m_allLines.append(line);
 		}
 	}
-	// ҲӶ pathtextȵ֧
-        QMap<QString, Plate> plateMap;
-        pugi::xpath_node_set rectNodes = doc.select_nodes("//g[@type='plate-rect']/rect");
-        for (int i = 0; i < rectNodes.size(); ++i) {
-                pugi::xml_node rect = rectNodes[i].node();
-                pugi::xml_node parent = rect.parent();
-                QString key = QString(parent.attribute("plate-desc").as_string()) + "|" + parent.attribute("plate-ref").as_string();
-                double x = rect.attribute("x").as_double();
-                double y = rect.attribute("y").as_double();
-                double w = rect.attribute("width").as_double();
-                double h = rect.attribute("height").as_double();
-                Plate &p = plateMap[key];
-                p.rect = QRectF(x, y, w, h);
-        }
-        pugi::xpath_node_set iconNodes = doc.select_nodes("//g[@type='plate-icon']");
-        for (int i = 0; i < iconNodes.size(); ++i) {
-                pugi::xml_node g = iconNodes[i].node();
-                QString key = QString(g.attribute("plate-desc").as_string()) + "|" + g.attribute("plate-ref").as_string();
-                pugi::xml_node circle = g.child("circle");
-                if (circle) {
-                        double cx = circle.attribute("cx").as_double();
-                        double cy = circle.attribute("cy").as_double();
-                        plateMap[key].iconCenter = QPointF(cx, cy);
-                }
-        }
-        m_allPlates = plateMap.values().toVector();
+    QMap<QString, Plate> plateMap;
+    pugi::xpath_node_set rectNodes = doc.select_nodes("//g[@type='plate-rect']/path");
+    for (int i = 0; i < rectNodes.size(); ++i) {
+            pugi::xml_node rect = rectNodes[i].node();
+            pugi::xml_node parent = rect.parent();
+            QString key = QString(parent.attribute("plate-desc").as_string()) + "|" + parent.attribute("plate-ref").as_string();
+            double x = rect.attribute("x").as_double();
+            double y = rect.attribute("y").as_double();
+            double w = rect.attribute("width").as_double();
+            double h = rect.attribute("height").as_double();
+            Plate &p = plateMap[key];
+            p.rect = QRectF(x, y, w, h);
+    }
+    pugi::xpath_node_set iconNodes = doc.select_nodes("//g[@type='plate-icon']");
+    for (int i = 0; i < iconNodes.size(); ++i) {
+            pugi::xml_node g = iconNodes[i].node();
+            QString key = QString(g.attribute("plate-desc").as_string()) + "|" + g.attribute("plate-ref").as_string();
+            pugi::xml_node circle = g.child("circle");
+            if (circle) {
+                    double cx = circle.attribute("cx").as_double();
+                    double cy = circle.attribute("cy").as_double();
+                    plateMap[key].iconCenter = QPointF(cx, cy);
+            }
+    }
+	m_allPlates = plateMap.values().toVector();
 }
 
 double InteractiveSvgMapItem::pointToSegmentDistance(const QPointF& pt, const QPointF& a, const QPointF& b)

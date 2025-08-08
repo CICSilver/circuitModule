@@ -104,7 +104,7 @@ void scd_xpath_test()
 
 int main(int argc, char* argv[]) {
 	QApplication app(argc, argv);
-	QString iedName = "PM2201C";
+	QString iedName = "PT2202A";
 	// 解析SCD文件
 	//QString scdPath = QCoreApplication::applicationDirPath() + "/scd_test.scd";
 	//QString configPath = QCoreApplication::applicationDirPath() + "/circuit_config.csv";
@@ -157,18 +157,6 @@ int main(int argc, char* argv[]) {
 	QString svgPath = QCoreApplication::applicationDirPath() + "/PT2202A_virtual_circuit.svg";
 
 	// 转换svg为底图
-	//QSvgRenderer renderer(svgPath);
-	//QSize imageSize(2325, 1910); // 根据你的 SVG viewBox 设置
-	//QPixmap pixmap(imageSize);
-	//pixmap.fill(Qt::black); // 可选，底色
-
-	//QPainter painter(&pixmap);
-	//renderer.render(&painter); // 一次性全部渲染为底图
-	//painter.end();
-
-	//QGraphicsPixmapItem* bgItem = new QGraphicsPixmapItem(pixmap);
-	//bgItem->setZValue(0); // 保证始终在底层
-	//scene->addItem(bgItem);
 
 	InteractiveSvgMapItem* item = new InteractiveSvgMapItem(svgPath);
 	scene->addItem(item);

@@ -1769,8 +1769,3 @@ void SvgTransformer::ReSignSvgViewBox(pugi::xml_document& doc, int width, int he
 	pugi::xml_node svgNode = doc.child("svg");
 	svgNode.attribute("viewBox").set_value(QString("0 0 %1 %2").arg(width).arg(height).toStdString().c_str());
 }
-
-void SvgTransformer::GetSwitcherFromLogicCircuits(QList<LogicCircuit*> logicCircuitList, OpticalSvg& svg)
-{
-
-}

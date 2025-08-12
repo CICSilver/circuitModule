@@ -449,7 +449,6 @@ private:
 	void ReSignPlate(pugi::xml_document& doc);
 	// 调整SVG视图框大小
 	void ReSignSvgViewBox(pugi::xml_document& doc, int width, int height);
-	void GetSwitcherFromLogicCircuits(QList<LogicCircuit*> logicCircuitList, OpticalSvg& svg);
 private:
 	CircuitConfig* m_circuitConfig;
 	QSvgGenerator* m_svgGenerator;

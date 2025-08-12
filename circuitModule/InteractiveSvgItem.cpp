@@ -121,10 +121,31 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
 		}
 	}
     QMap<QString, Plate> plateMap;
-    pugi::xpath_node_set plateNodeSet = doc.select_nodes("//g[@type='plate-rect' or @type='plate-component']");
+    pugi::xpath_node_set plateNodeSet = doc.select_nodes("//g[@type='plate-component' or @type='plate']");
+	// type="plate-component"的为压板图形部分，type="plate"的为压板信息部分（透明矩形）
     for (int i = 0; i < plateNodeSet.size(); ++i) {
         pugi::xml_node plateNode = plateNodeSet[i].node();
 		QString plate_id = plateNode.attribute("id").as_string();
+		Plate& p = plateMap[plate_id];
+		if (plateNode.attribute("type").as_string() == "plate")
+		{
+			// 压板信息部分
+			//Plate
+		}
+		else if (plateNode.attribute("stroke").as_string() == "#00ff00")
+		{
+			// 压板节点为stroke="#00ff00"
+			if (plateNode.child("path"))
+			{
+				// 有path子节点的是圆部分
+				p.circles = parsePlateCircles(plateNode);
+			}
+			else if (plateNode.child("polyline"))
+			{
+				// 有polyline子节点的是压板已连接状态的部分
+				//p.lines = parseP
+			}
+		}
 		// 有path和polyline，分开解析
 
 		//double x = rect.attribute("x").as_double();
@@ -193,62 +214,64 @@ void InteractiveSvgMapItem::drawPlateIcon(QPainter* painter, const QPointF& cent
 QVector<PlateCircle> InteractiveSvgMapItem::parsePlateCircles(const pugi::xml_node& plateCircleNode)
 {
 	QVector<PlateCircle> circles;
+	// 处理压板组件组
+	const char* type = plateCircleNode.attribute("type").value();
 
-	for (pugi::xml_node g = doc.child("svg").child("g"); g; g = g.next_sibling("g")) {
-		// 处理压板组件组
-		const char* type = g.attribute("type").value();
-		if (!type || QString::fromLatin1(type) != "plate-component") continue;
+	// 组级样式（给每个子path继承）
+	const char* strokeAttr = plateCircleNode.attribute("stroke").value();
+	int strokeWidth = plateCircleNode.attribute("stroke-width").as_int(1);
+	double strokeOpacity = plateCircleNode.attribute("stroke-opacity").as_double(1.0);
+	const char* fillAttr = plateCircleNode.attribute("fill").value();
+	double fillOpacity = plateCircleNode.attribute("fill-opacity").as_double(1.0);
 
-		// 组级样式（给每个子path继承）
-		const char* strokeAttr = g.attribute("stroke").value();
-		int strokeWidth = g.attribute("stroke-width").as_int(1);
-		double strokeOpacity = g.attribute("stroke-opacity").as_double(1.0);
-		const char* fillAttr = g.attribute("fill").value();
-		double fillOpacity = g.attribute("fill-opacity").as_double(1.0);
+	QColor stroke = parseColor(strokeAttr, strokeOpacity);
+	QColor fill = parseColor(fillAttr, fillOpacity);
 
-		QColor stroke = parseColor(strokeAttr, strokeOpacity);
-		QColor fill = parseColor(fillAttr, fillOpacity);
+	// d="
+	// M980,375 C980,377.761 977.761,380 975,380 
+	// C972.239,380 970,377.761 970,375 
+	// C970,372.239 972.239,370 975,370 
+	// C977.761,370 980,372.239 980,375 "
+	for (pugi::xml_node path = plateCircleNode.child("path"); path; path = path.next_sibling("path")) {
+		const char* d = path.attribute("d").value();
+		if (!d || !*d) continue;
 
-		// d="
-		// M980,375 C980,377.761 977.761,380 975,380 
-		// C972.239,380 970,377.761 970,375 
-		// C970,372.239 972.239,370 975,370 
-		// C977.761,370 980,372.239 980,375 "
-		for (pugi::xml_node path = g.child("path"); path; path = path.next_sibling("path")) {
-			const char* d = path.attribute("d").value();
-			if (!d || !*d) continue;
+		// 把 d 里所有数字提出来（按顺序 x y x y ...）
+		QVector<double> nums = extractNumbers(QString::fromLatin1(d));
+		if (nums.size() < 4) continue;
 
-			// 把 d 里所有数字提出来（按顺序 x y x y ...）
-			QVector<double> nums = extractNumbers(QString::fromLatin1(d));
-			if (nums.size() < 4) continue;
-
-			// 计算包围盒（这里把控制点也统计进来没关系：圆的极值一定落在端点上）
-			double minX = 1e100, minY = 1e100;
-			double maxX = -1e100, maxY = -1e100;
-			for (int i = 0; i + 1 < nums.size(); i += 2) {
-				double x = nums[i], y = nums[i + 1];
-				if (x < minX) minX = x; if (x > maxX) maxX = x;
-				if (y < minY) minY = y; if (y > maxY) maxY = y;
-			}
-
-			// 圆心/半径 (cx, cy, rx, ry)
-			double cx = (minX + maxX) * 0.5;
-			double cy = (minY + maxY) * 0.5;
-			double rx = (maxX - minX) * 0.5;
-			double ry = (maxY - minY) * 0.5;
-
-			PlateCircle c;
-			c.center = QPointF(cx, cy);
-			c.radius = (rx + ry) * 0.5; // 你这类是正圆，直接取平均
-			c.stroke = stroke;
-			c.strokeWidth = strokeWidth;
-			c.fill = fill;
-			c.fillOpacity = fillOpacity;
-
-			circles.push_back(c);
+		// 计算包围盒（这里把控制点也统计进来没关系：圆的极值一定落在端点上）
+		double minX = 1e100, minY = 1e100;
+		double maxX = -1e100, maxY = -1e100;
+		for (int i = 0; i + 1 < nums.size(); i += 2) {
+			double x = nums[i], y = nums[i + 1];
+			if (x < minX) minX = x; if (x > maxX) maxX = x;
+			if (y < minY) minY = y; if (y > maxY) maxY = y;
 		}
+
+		// 圆心/半径 (cx, cy, rx, ry)
+		double cx = (minX + maxX) * 0.5;
+		double cy = (minY + maxY) * 0.5;
+		double rx = (maxX - minX) * 0.5;
+		double ry = (maxY - minY) * 0.5;
+
+		PlateCircle c;
+		c.center = QPointF(cx, cy);
+		c.radius = (rx + ry) * 0.5; // 正圆，直接取平均
+		c.stroke = stroke;
+		c.strokeWidth = strokeWidth;
+		c.fill = fill;
+		c.fillOpacity = fillOpacity;
+
+		circles.push_back(c);
 	}
 	return circles;
+}
+
+QVector<QLine> InteractiveSvgMapItem::parsePlateLines(const pugi::xml_node& plateLineNode)
+{
+
+	return QVector<QLine>();
 }
 
 void InteractiveSvgMapItem::drawPlateCircles(QPainter* p, const QVector<PlateCircle>& cs)
@@ -267,4 +290,22 @@ void InteractiveSvgMapItem::drawPlateCircles(QPainter* p, const QVector<PlateCir
 		p->drawEllipse(c.center, c.radius, c.radius);
 		p->restore();
 	}
+}
+
+SvgNodeStyle InteractiveSvgMapItem::parseNodeStyle(const pugi::xml_node& node)
+{
+    SvgNodeStyle style;
+    
+    // 解析样式属性
+    const char* strokeAttr = node.attribute("stroke").value();
+    style.strokeWidth = node.attribute("stroke-width").as_int(1);
+    style.strokeOpacity = node.attribute("stroke-opacity").as_double(1.0);
+    const char* fillAttr = node.attribute("fill").value();
+    style.fillOpacity = node.attribute("fill-opacity").as_double(1.0);
+    
+    // 解析颜色
+    style.stroke = parseColor(strokeAttr, style.strokeOpacity);
+    style.fill = parseColor(fillAttr, style.fillOpacity);
+    
+    return style;
 }

@@ -15,19 +15,43 @@ struct MapLine
 	QString type; // "virtual"/"logic"/"optical"
 };
 
-struct Plate
+struct svgElement
 {
-	QRectF rect;
-	QList<PlateCircle> circles;	// 压板的两个圆
-};
-
-struct PlateCircle {
-	QPointF center;
-	qreal   radius;
 	QColor  stroke;
 	int     strokeWidth;
 	QColor  fill;
 	qreal   fillOpacity; // 0~1
+};
+
+struct SvgNodeStyle
+{
+    QColor stroke;
+    int strokeWidth;
+    double strokeOpacity;
+    QColor fill;
+    double fillOpacity;
+    
+    SvgNodeStyle() : strokeWidth(1), strokeOpacity(1.0), fillOpacity(1.0) {}
+};
+
+struct PlateCircle : public svgElement
+{
+	QPointF center;
+	qreal   radius;
+};
+
+struct PlateLine : public svgElement
+{
+	QPointF start;
+	QPointF end;
+	qreal   length() const { return QLineF(start, end).length(); }
+};
+
+struct Plate
+{
+	QRectF rect;
+	QVector<PlateCircle> circles;	// 压板的两个圆
+	QVector<PlateLine> lines;			// 压板的两条线
 };
 
 static QVector<double> extractNumbers(const QString& d) {
@@ -73,8 +97,11 @@ private:
 	double pointToSegmentDistance(const QPointF& pt, const QPointF& a, const QPointF& b);
 	QVector<QPointF> parsePointsAttr(const QString& pointsStr);
     void drawPlateIcon(QPainter* painter, const QPointF& center) const;
+
+	//// 解析压板相关信息
 	// 解析svg中圆的贝塞尔近似描述
 	QVector<PlateCircle> parsePlateCircles(const pugi::xml_node& plateCircleNode);
+	QVector<QLine> parsePlateLines(const pugi::xml_node& plateLineNode);
 	// 绘制压板的圆
 	void drawPlateCircles(QPainter* p, const QVector<PlateCircle>& cs);
 
@@ -84,6 +111,9 @@ private:
 	QVector<MapLine> m_allLines;
     QVector<Plate> m_allPlates;
 	int m_highlightedLineIdx;
+
+    // 解析节点的通用样式属性
+    SvgNodeStyle parseNodeStyle(const pugi::xml_node& node);
 };
 
 #endif // INTERACTIVESVGMAPITEM_H

@@ -86,5 +86,5 @@
         "D:/Qt-4.8.7/include/**",
         "${workspaceFolder}/include/**"
     ],
-    "files.encoding": "gb2312"
+    "files.encoding": "utf8"
 }

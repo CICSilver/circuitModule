@@ -447,8 +447,10 @@ private:
 	void ReSignCircuitLine(pugi::xml_document& doc);
 	// 重标识压板信息
 	void ReSignPlate(pugi::xml_document& doc);
+	// 重标识虚回路数值占位，便于交互层识别
+	void ReSignVirtualValuePlaceholders(pugi::xml_document& doc);
 	// 调整SVG视图框大小
-	void ReSignSvgViewBox(pugi::xml_document& doc, int width, int height);
+	void ReSignSvgViewBox(pugi::xml_document& doc, int x, int y, int width, int height);
 private:
 	CircuitConfig* m_circuitConfig;
 	QSvgGenerator* m_svgGenerator;
@@ -468,6 +470,7 @@ private:
 		TYPE_Optical_ConnCircle,		// 光纤连接点圆圈
 		TYPE_VirtualCircuit = 140,
 		TYPE_Circuit_Arrow,				// 回路箭头
+			TYPE_Virtual_Value				// 虚回路数值占位标签
 
 	};
 };

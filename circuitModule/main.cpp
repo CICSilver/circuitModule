@@ -1,4 +1,4 @@
-#include "pugixml/pugixml.hpp"
+ï»¿#include "pugixml/pugixml.hpp"
 #include "circuitconfig.h"
 #include "mainwindow.h"
 #include "math.h"
@@ -22,108 +22,72 @@
 #include <QGraphicsSvgItem>
 #include <QSvgRenderer>
 #include <QMouseEvent>
+#include "RtdbClient.h"
 
 using std::string;
-void printMemoryUsage() {
-	MEMORYSTATUSEX statex;
 
-	statex.dwLength = sizeof(statex);
-	GlobalMemoryStatusEx(&statex);
+// ç®€å•çš„ RTDB è¯»å–æµ‹è¯•ï¼šæ¼”ç¤ºå¦‚ä½•æ‰“å¼€å®æ—¶åº“å¹¶è¯»å–ä¸€ä¸ªæ¨¡æ‹Ÿé‡é€šé“
+static void RunRtdbReadTest()
+{
+	RtdbClient client;
+	// ä»¥åªè¯»æ–¹å¼æ‰“å¼€å®æ—¶åº“ï¼ˆæšä¸¾å®šä¹‰è§ include/rtdb/YsdRtdbInclude.hï¼‰
+	if (!client.open(RTDB_OPEN_RO)) {
+		qWarning() << "RTDB open failed";
+		return;
+	}
 
-    DWORDLONG totalMemoryUsed = statex.ullTotalPhys - statex.ullAvailPhys;
+	UINT64 code = 0x1060b0001; // ç¤ºä¾‹ç¼–ç 
+	const qulonglong kDemoAnalogCode = code;
 
-    qDebug() << "Total memory used: " << totalMemoryUsed / 1024 / 1024 << " MB.";
+	double val = 0.0;
+	if (client.getAnalog(code, val, false)) {
+		qDebug() << QString::fromLocal8Bit("RTDB æ¨¡æ‹Ÿé‡è¯»å–æˆåŠŸ code=") << QString::number(code) << ", value=" << val;
+	} else {
+		qWarning() << QString::fromLocal8Bit("RTDB æ¨¡æ‹Ÿé‡è¯»å–å¤±è´¥ code=") << QString::number(code);
+	}
 }
 
-QColor get_color_by_hex(uint hex)
-{
-	return QColor((hex >> 16) & 0xFF, (hex >> 8) & 0xFF, hex & 0xFF);
-}
-
-void drawArrowHeader(QPainter& painter, const QPoint& endPoint, double arrowAngle);
-void svg_generator_test()
-{
-	QSvgGenerator generator;
-	generator.setViewBox(QRect(0, 0, 800, 600));
-	generator.setFileName("test.svg");
-	generator.setSize(QSize(800, 600));
-	QPainter painter;
-	painter.begin(&generator);
-
-	const uint red = 0xff0000;
-	const uint grey = 0x233f4f;
-	const uint gseColor = 0xd3603d;
-	const uint smvColor = 0x00b0f0;
-
-	QPen pen;
-	pen.setStyle(Qt::SolidLine);
-	pen.setColor(get_color_by_hex(gseColor));
-	painter.setPen(pen);
-
-	QPoint pt1(50, 50);
-	QPoint pt2(200, 200);
-
-	double vec_x = pt2.x() - pt1.x();
-	double vec_y = pt2.y() - pt1.y();
-	double direction = atan2(-vec_y, vec_x);
-	double angle = direction * (180 / M_PI);
-	painter.drawLine(pt1, pt2);
-	drawArrowHeader(painter, pt2, angle);
-
-
-	painter.end();                 
-}
-double AngleToRadians(double angle)
-{
-	return angle * M_PI / 180.0;
-}
-void drawArrowHeader(QPainter& painter, const QPoint& endPoint, double arrowAngle)
-{
-	double arrowHeadLineAngle = 150;
-	int arrowHeadLength = 10;
-	QPointF leftArrowPoint = endPoint + QPointF(
-		arrowHeadLength * cos(AngleToRadians(arrowAngle + arrowHeadLineAngle)),
-		-arrowHeadLength * sin(AngleToRadians(arrowAngle + arrowHeadLineAngle)));
-	QPointF rightArrowPoint = endPoint + QPointF(
-		arrowHeadLength * cos(AngleToRadians(arrowAngle - arrowHeadLineAngle)),
-		-arrowHeadLength * sin(AngleToRadians(arrowAngle - arrowHeadLineAngle)));
-	painter.drawLine(endPoint, leftArrowPoint);
-	painter.drawLine(endPoint, rightArrowPoint);
-}
-
-void scd_xpath_test()
-{
-	QString scdPath = QCoreApplication::applicationDirPath() + "/big_scd.scd";
-	QElapsedTimer timer;
-	timer.start();
-	pugi::xml_document doc;
-	pugi::xml_parse_result result = doc.load_file(scdPath.toLocal8Bit());
-	qDebug() << QString::fromLocal8Bit("pugi ¶ÁÈ¡ÎÄ¼şºÄÊ±£º%1").arg(timer.elapsed());
-
+void showSingleSvg(const QString& svgPath) {
+	QGraphicsScene* scene = new QGraphicsScene();
+	InteractiveSvgMapItem* item = new InteractiveSvgMapItem(svgPath);
+	scene->addItem(item);
+	QRectF itemRect = item->boundingRect();
+	scene->setSceneRect(itemRect);
+	QGraphicsView* view = new QGraphicsView(scene);
+	view->setDragMode(QGraphicsView::NoDrag);
+	view->setRenderHint(QPainter::Antialiasing);
+	view->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
+	view->setBackgroundBrush(Qt::black);
+	
+	QSizeF sz = itemRect.size();
+	int w = int(std::min<double>(sz.width() + 20, 1800));
+	int h = int(std::min<double>(sz.height() + 20, 1000));
+	if (w < 800) w = 800; if (h < 600) h = 600;
+	view->resize(w, h);
+	view->show();
 }
 
 int main(int argc, char* argv[]) {
 	QApplication app(argc, argv);
-	QString iedName = "PT2202A";
-	// ½âÎöSCDÎÄ¼ş
+	QString iedName = "IMT2201L1";
 	//QString scdPath = QCoreApplication::applicationDirPath() + "/scd_test.scd";
 	//QString configPath = QCoreApplication::applicationDirPath() + "/circuit_config.csv";
 
 
-	// ¶ÁÈ¡ÅäÖÃÎÄ¼ş
 	CircuitConfig* pCircuitConfig = CircuitConfig::Instance();
 	pCircuitConfig->LoadCimeFile();
 	SvgTransformer transformer;
-	// µ¥Éè±¸ÎÄ¼şÉú³É²âÊÔ
-	transformer.GenerateSvgByIedName(iedName);
+	//transformer.GenerateSvgByIedName(iedName);
 
-	// Éú³ÉSVGÎÄ¼ş
+	// å®æ—¶åº“æµ‹è¯•
+	RunRtdbReadTest();
+
 	//QList<QString> pathList;
 	//pathList
-	//	<< QCoreApplication::applicationDirPath() + "/logic"		// Âß¼­Á´Â·
-	//	<< QCoreApplication::applicationDirPath() + "/optical"		// ¹âÏËÁ´Â·
-	//	<< QCoreApplication::applicationDirPath() + "/virtual"		// ĞéÁ´Â·
-	//	<< QCoreApplication::applicationDirPath() + "/whole";		// ÕûÌåÁ´Â·
+	//	<< QCoreApplication::applicationDirPath() + "/logic"		
+	//	<< QCoreApplication::applicationDirPath() + "/optical"		
+	//	<< QCoreApplication::applicationDirPath() + "/virtual"		
+	//	<< QCoreApplication::applicationDirPath() + "/whole";		
 	//foreach(QString path, pathList)
 	//{
 	//	QDir dir(path);
@@ -138,39 +102,29 @@ int main(int argc, char* argv[]) {
 	//	QString path;
 	//	if (pIed->name.contains("SW"))
 	//		continue;
-	//	// Âß¼­Á´Â·
 	//	transformer.GenerateLogicSvg(pIed, pathList.at(0) + "/" + pIed->name + "_logic_circuit.svg");
-	//	// ¹âÏËÁ´Â·
 	//	transformer.GenerateOpticalSvg(pIed, pathList.at(1) + "/" + pIed->name + "_optical_circuit.svg");
-	//	// Ğé»ØÂ·
 	//	transformer.GenerateVirtualSvg(pIed, pathList.at(2) + "/" + pIed->name + "_virtual_circuit.svg");
-	//	// ÕûÌåÁ´Â·
 	//	//transformer.GenerateWholeCircuitSvg(pIed, pathList.at(3) + "/" + pIed->name + "_whole_circuit.svg");
 	//}
-	qDebug() << "SVG files generated successfully.";
+	//qDebug() << "SVG files generated successfully.";
 
 
-	//// ÏÔÊ¾SVGÎÄ¼ş
-	//QGraphicsScene* scene = new QGraphicsScene();
-	//scene->setSceneRect(0, 0, 2325, 1910);
 
 	//QString svgPath = QCoreApplication::applicationDirPath() + "/PT2202A_virtual_circuit.svg";
-
-	//// ×ª»»svgÎªµ×Í¼
-
-	//InteractiveSvgMapItem* item = new InteractiveSvgMapItem(svgPath);
-	//scene->addItem(item);
-
-	//QGraphicsView* view = new QGraphicsView(scene);
-	//view->setDragMode(QGraphicsView::NoDrag);
-	//view->setRenderHint(QPainter::Antialiasing);
-	//view->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
-	//view->setBackgroundBrush(Qt::black);
-	//view->resize(1600, 900);
-	//view->show();
+	//showSingleSvg(svgPath);
 
 
+	//QGraphicsScene* scene = new QGraphicsScene();
 	//MainWindow mainWindow;
+	//// å°†åœºæ™¯æ¥å…¥åˆ° UI ä¸­çš„ opticalViewï¼ˆé€šè¿‡å¯¹è±¡åï¼‰
+	//if (QGraphicsView* opticalView = mainWindow.findChild<QGraphicsView*>("opticalView")) {
+	//	opticalView->setScene(scene);
+	//	opticalView->setDragMode(QGraphicsView::NoDrag);
+	//	opticalView->setRenderHint(QPainter::Antialiasing);
+	//	opticalView->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
+	//	opticalView->setBackgroundBrush(Qt::black);
+	//}
 	//mainWindow.show();
 
 	

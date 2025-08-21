@@ -164,6 +164,8 @@ struct BaseSvg
 	{
 		viewBoxWidth = SVG_VIEWBOX_WIDTH;
 		viewBoxHeight = SVG_VIEWBOX_HEIGHT;
+		viewBoxX = 0;
+		viewBoxY = 0;
 	}
 	~BaseSvg() 
 	{
@@ -174,8 +176,10 @@ struct BaseSvg
 		}
 	}
 	IedRect* mainIedRect;
-	int viewBoxWidth;
-	int viewBoxHeight;
+	quint16 viewBoxX;		// SVG视图左上角X坐标
+	quint16 viewBoxY;		// SVG视图左上角Y坐标
+	quint16 viewBoxWidth;
+	quint16 viewBoxHeight;
 };
 // 逻辑链路SVG
 struct LogicSvg : public BaseSvg

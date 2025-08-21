@@ -13,13 +13,13 @@
 #include <QtGui/QAction>
 #include <QtGui/QApplication>
 #include <QtGui/QButtonGroup>
+#include <QtGui/QGraphicsView>
 #include <QtGui/QGridLayout>
 #include <QtGui/QHBoxLayout>
 #include <QtGui/QHeaderView>
 #include <QtGui/QListView>
 #include <QtGui/QTabWidget>
 #include <QtGui/QWidget>
-#include "customsvgitem.h"
 
 QT_BEGIN_NAMESPACE
 
@@ -31,13 +31,13 @@ public:
     QTabWidget *tabWidget;
     QWidget *tab;
     QGridLayout *gridLayout;
-    CustomView *logicView;
+    QGraphicsView *logicView;
     QWidget *tab_2;
     QGridLayout *gridLayout_2;
-    CustomView *opticalView;
+    QGraphicsView *opticalView;
     QWidget *tab_3;
     QGridLayout *gridLayout_3;
-    CustomView *wholeView;
+    QGraphicsView *wholeView;
 
     void setupUi(QWidget *MainWindowClass)
     {
@@ -61,7 +61,7 @@ public:
         gridLayout->setSpacing(6);
         gridLayout->setContentsMargins(11, 11, 11, 11);
         gridLayout->setObjectName(QString::fromUtf8("gridLayout"));
-        logicView = new CustomView(tab);
+        logicView = new QGraphicsView(tab);
         logicView->setObjectName(QString::fromUtf8("logicView"));
 
         gridLayout->addWidget(logicView, 0, 0, 1, 1);
@@ -73,7 +73,7 @@ public:
         gridLayout_2->setSpacing(6);
         gridLayout_2->setContentsMargins(11, 11, 11, 11);
         gridLayout_2->setObjectName(QString::fromUtf8("gridLayout_2"));
-        opticalView = new CustomView(tab_2);
+        opticalView = new QGraphicsView(tab_2);
         opticalView->setObjectName(QString::fromUtf8("opticalView"));
 
         gridLayout_2->addWidget(opticalView, 0, 0, 1, 1);
@@ -85,7 +85,7 @@ public:
         gridLayout_3->setSpacing(6);
         gridLayout_3->setContentsMargins(11, 11, 11, 11);
         gridLayout_3->setObjectName(QString::fromUtf8("gridLayout_3"));
-        wholeView = new CustomView(tab_3);
+        wholeView = new QGraphicsView(tab_3);
         wholeView->setObjectName(QString::fromUtf8("wholeView"));
 
         gridLayout_3->addWidget(wholeView, 0, 0, 1, 1);
@@ -99,7 +99,7 @@ public:
 
         retranslateUi(MainWindowClass);
 
-        tabWidget->setCurrentIndex(2);
+        tabWidget->setCurrentIndex(0);
 
 
         QMetaObject::connectSlotsByName(MainWindowClass);

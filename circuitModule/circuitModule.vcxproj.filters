@@ -31,13 +31,16 @@
     <ClCompile Include="include\pugixml\pugixml.cpp">
       <Filter>thirdparty\pugixml</Filter>
     </ClCompile>
-    <ClCompile Include="viewwindow.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="GeneratedFiles\Debug\moc_viewwindow.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
     <ClCompile Include="InteractiveSvgItem.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="SvgUtils.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="RtdbClient.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
@@ -72,6 +75,27 @@
     <ClInclude Include="InteractiveSvgItem.h">
       <Filter>header</Filter>
     </ClInclude>
+    <ClInclude Include="SvgUtils.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="RtdbClient.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="include\rtdb\rtdb_dll.h">
+      <Filter>thirdparty\rtdb</Filter>
+    </ClInclude>
+    <ClInclude Include="include\rtdb\rtdb_dll_def.h">
+      <Filter>thirdparty\rtdb</Filter>
+    </ClInclude>
+    <ClInclude Include="include\rtdb\YsdRtdbDefine.h">
+      <Filter>thirdparty\rtdb</Filter>
+    </ClInclude>
+    <ClInclude Include="include\rtdb\YsdRtdbEle.h">
+      <Filter>thirdparty\rtdb</Filter>
+    </ClInclude>
+    <ClInclude Include="include\rtdb\YsdRtdbInclude.h">
+      <Filter>thirdparty\rtdb</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="mainwindow.h">
@@ -82,12 +106,6 @@
     </CustomBuild>
     <CustomBuild Include="mainwindow.qrc">
       <Filter>resources</Filter>
-    </CustomBuild>
-    <CustomBuild Include="viewwindow.ui">
-      <Filter>forms</Filter>
-    </CustomBuild>
-    <CustomBuild Include="viewwindow.h">
-      <Filter>header</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
@@ -114,6 +132,9 @@
     </Filter>
     <Filter Include="thirdparty\cime">
       <UniqueIdentifier>{01085d42-215b-4231-9c49-9af4c480455e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\rtdb">
+      <UniqueIdentifier>{c35a6567-4b18-407f-aed4-2c0cd10a848e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

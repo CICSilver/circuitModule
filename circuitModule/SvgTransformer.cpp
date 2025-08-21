@@ -118,6 +118,104 @@ void SvgTransformer::GenerateLogicSvgByIed(const IED* pIed, LogicSvg& svg)
 	AdjustOtherIedRectPosition(svg.rightIedRectList, svg.mainIedRect);
 	// 调整链路位置
 	AdjustLogicCircuitLinePosition(svg);
+
+	//if (svg.mainIedRect) {
+	//	QFont font; font.setPointSize(15);
+	//	QFontMetrics fm(font);
+	//	int titleWidthMain = fm.width(QString::fromLocal8Bit("检修域"));
+	//	int titleWidthSide = fm.width(QString::fromLocal8Bit("影响域"));
+	//	int descHeight = fm.height() * 2 + 10;
+	//	const int descGap = 20;
+
+	//	int minX = svg.mainIedRect->x - svg.mainIedRect->horizontal_margin - titleWidthMain;
+	//	int maxX = svg.mainIedRect->x + svg.mainIedRect->width + svg.mainIedRect->horizontal_margin;
+	//	int minY = svg.mainIedRect->y - svg.mainIedRect->vertical_margin;
+	//	int maxY = svg.mainIedRect->GetExtendBottomY() + svg.mainIedRect->vertical_margin;
+
+	//	// 左列（含标题和说明框）
+	//	if (!svg.leftIedRectList.isEmpty()) {
+	//		IedRect* first = svg.leftIedRectList.first();
+	//		IedRect* last = svg.leftIedRectList.last();
+	//		int extLeftX = first->x - first->horizontal_margin - titleWidthSide;
+	//		if (extLeftX < minX) minX = extLeftX;
+	//		int extTopY = first->y - first->vertical_margin;
+	//		int descTopY = extTopY - (descHeight + descGap);
+	//		if (descTopY < minY) minY = descTopY;
+	//		int extRightX = first->x + first->width + first->horizontal_margin;
+	//		if (extRightX > maxX) maxX = extRightX;
+	//		int extBottomY = last->y + last->height + last->vertical_margin;
+	//		if (extBottomY > maxY) maxY = extBottomY;
+	//		foreach (IedRect* r, svg.leftIedRectList) {
+	//			if (!r) continue;
+	//			int l = r->x - r->horizontal_margin;
+	//			int rgt = r->x + r->width + r->horizontal_margin;
+	//			int top = r->y - r->vertical_margin;
+	//			int bot = r->GetExtendBottomY() + r->vertical_margin;
+	//			if (l < minX) minX = l;
+	//			if (rgt > maxX) maxX = rgt;
+	//			if (top < minY) minY = top;
+	//			if (bot > maxY) maxY = bot;
+	//		}
+	//	}
+	//	// 右列（含标题，不含说明框）
+	//	if (!svg.rightIedRectList.isEmpty()) {
+	//		IedRect* first = svg.rightIedRectList.first();
+	//		IedRect* last = svg.rightIedRectList.last();
+	//		int extLeftX = first->x - first->horizontal_margin - titleWidthSide;
+	//		if (extLeftX < minX) minX = extLeftX;
+	//		int extTopY = first->y - first->vertical_margin;
+	//		if (extTopY < minY) minY = extTopY;
+	//		int extRightX = first->x + first->width + first->horizontal_margin;
+	//		if (extRightX > maxX) maxX = extRightX;
+	//		int extBottomY = last->y + last->height + last->vertical_margin;
+	//		if (extBottomY > maxY) maxY = extBottomY;
+	//		foreach (IedRect* r, svg.rightIedRectList) {
+	//			if (!r) continue;
+	//			int l = r->x - r->horizontal_margin;
+	//			int rgt = r->x + r->width + r->horizontal_margin;
+	//			int top = r->y - r->vertical_margin;
+	//			int bot = r->GetExtendBottomY() + r->vertical_margin;
+	//			if (l < minX) minX = l;
+	//			if (rgt > maxX) maxX = rgt;
+	//			if (top < minY) minY = top;
+	//			if (bot > maxY) maxY = bot;
+	//		}
+	//	}
+	//	int w = maxX - minX;
+	//	int h = maxY - minY;
+	//	if (w > 0) svg.viewBoxWidth = w;
+	//	if (h > 0) svg.viewBoxHeight = h;
+	//}
+
+	// 计算逻辑图 viewBox 尺寸（内容边界 + 边距），以保证导出后视图自适应
+	//if (svg.mainIedRect) {
+	//	int minX = svg.mainIedRect->x - svg.mainIedRect->horizontal_margin;
+	//	int maxX = svg.mainIedRect->x + svg.mainIedRect->width + svg.mainIedRect->horizontal_margin;
+	//	int minY = svg.mainIedRect->y - svg.mainIedRect->vertical_margin;
+	//	int maxY = svg.mainIedRect->GetExtendBottomY() + svg.mainIedRect->vertical_margin;
+	//	// 左侧 IED
+	//	foreach(IedRect* r, svg.leftIedRectList) {
+	//		if (!r) continue;
+	//		if (r->x - r->horizontal_margin < minX) minX = r->x - r->horizontal_margin;
+	//		if (r->x + r->width + r->horizontal_margin > maxX) maxX = r->x + r->width + r->horizontal_margin;
+	//		if (r->y - r->vertical_margin < minY) minY = r->y - r->vertical_margin;
+	//		int by = r->GetExtendBottomY() + r->vertical_margin;
+	//		if (by > maxY) maxY = by;
+	//	}
+	//	// 右侧 IED
+	//	foreach(IedRect* r, svg.rightIedRectList) {
+	//		if (!r) continue;
+	//		if (r->x - r->horizontal_margin < minX) minX = r->x - r->horizontal_margin;
+	//		if (r->x + r->width + r->horizontal_margin > maxX) maxX = r->x + r->width + r->horizontal_margin;
+	//		if (r->y - r->vertical_margin < minY) minY = r->y - r->vertical_margin;
+	//		int by = r->GetExtendBottomY() + r->vertical_margin;
+	//		if (by > maxY) maxY = by;
+	//	}
+	//	if (minX < 0) minX = 0; if (minY < 0) minY = 0;
+	//	int w = maxX - minX;
+	//	int h = maxY - minY;
+	//	if (w > 0) svg.viewBoxWidth = w; if (h > 0) svg.viewBoxHeight = h;
+	//}
 }
 
 void SvgTransformer::ParseCircuitFromIed(LogicSvg& svg, const IED* pIed)
@@ -311,7 +409,7 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 	// 直连IED全部靠左排列
 	int x = 0;
 	
-	int belowIedY = svg.switcherRectList.isEmpty() ? 3 * IED_VERTICAL_DISTANCE + vertical_distance : svg.switcherRectList.last()->y + svg.switcherRectList.last()->height + vertical_distance;	// 交换机下方的IED y
+	int belowIedY = svg.switcherRectList.isEmpty() ? 3 * IED_VERTICAL_DISTANCE + vertical_distance + svg.mainIedRect->GetInnerBottomY() : svg.switcherRectList.last()->GetInnerBottomY() + vertical_distance;	// 交换机下方的IED y
 	for (size_t i = 0; i < directRectList.size(); ++i)
 	{
 		IedRect* rect = directRectList.at(i);
@@ -417,6 +515,29 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 			optLine->endPoint = QPoint(endPt_X, endPt_Y);
 			(*midPtCnt)++;
 		}
+	}
+
+	// 重新计算光纤图 viewBox：考虑主 IED、下方 IED 及交换机
+	if (svg.mainIedRect) {
+		int minX = directRectList.isEmpty() ?			// 直连IED在左侧，若为空则最左侧是主IED
+			svg.mainIedRect->x : directRectList.first()->x;
+		int minY = svg.mainIedRect->y - svg.mainIedRect->vertical_margin;	// 主IED上侧边距
+		int maxX = svg.switcherRectList.isEmpty() ? // 交换机在右侧，若为空则最右侧是主IED
+			svg.mainIedRect->x + svg.mainIedRect->width + svg.mainIedRect->horizontal_margin * 2 :
+			svg.switcherRectList.last()->x + svg.switcherRectList.last()->width + svg.switcherRectList.last()->horizontal_margin * 2;
+		int maxY = 
+			directRectList.isEmpty() ?	// 下方IED在主IED下方，若为空则最下侧是主IED
+				svg.switcherRectList.isEmpty() ?	
+				svg.mainIedRect->GetInnerBottomY() + svg.mainIedRect->vertical_margin * 2 :	// 若交换机也为空，则下方为主IED
+				svg.switcherRectList.last()->GetInnerBottomY() + svg.switcherRectList.last()->vertical_margin * 2 :	// 若直连IED为空，则下方为交换机;
+			directRectList.last()->GetInnerBottomY() + svg.mainIedRect->vertical_margin * 2;
+		if (minX < 0) minX = 0; if (minY < 0) minY = 0;
+		int w = maxX - minX;
+		int h = maxY - minY;
+		svg.viewBoxX = minX - svg.mainIedRect->horizontal_margin;
+		svg.viewBoxY = minY - svg.mainIedRect->vertical_margin;
+		if (w > 0) svg.viewBoxWidth = w;
+		if (h > 0) svg.viewBoxHeight = h;
 	}
 }
 
@@ -660,11 +781,11 @@ void SvgTransformer::drawArrowHeader(const QPoint& endPoint, double arrowAngle, 
 		endPoint.x() + offset * cos(AngleToRadians(arrowAngle)), 
 		endPoint.y() - offset * sin(AngleToRadians(arrowAngle)));
 	QBrush brush(color, Qt::SolidPattern);
+	QPen pen(Qt::NoPen);
+	m_painter->setPen(pen);
 	m_painter->setBrush(brush);
 	QVector<QPointF> points;
 	points << leftArrowPoint << offsetPoint << rightArrowPoint << endPoint;
-	//m_painter->drawLine(endPoint, leftArrowPoint);
-	//m_painter->drawLine(endPoint, rightArrowPoint);
 	m_painter->drawPolygon(points.data(), 4);
 	m_painter->restore();
 }
@@ -917,9 +1038,10 @@ void SvgTransformer::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QList<Ied
                 pLogicLine->virtual_line_list.append(pVtLine);
 				// 生成并调整当前通道的压板矩形位置
 				// 开入软压板，图形位于回路终点
-				AdjustVirtualCircuitPlatePosition(svg.plateRectHash, srcRect->iedName, pVtLine->endPoint, pCircuit->destSoftPlateDesc, pCircuit->destSoftPlateRef, false, isSideSource, isLeft);
+				QString key = QString("%1_%2").arg(srcRect->iedName).arg(destRect->iedName);
+				AdjustVirtualCircuitPlatePosition(svg.plateRectHash, key, pVtLine->endPoint, pCircuit->destSoftPlateDesc, pCircuit->destSoftPlateRef, false, isSideSource, isLeft);
 				// 开出软压板，图形位于回路起点
-				AdjustVirtualCircuitPlatePosition(svg.plateRectHash, destRect->iedName, pVtLine->startPoint, pCircuit->srcSoftPlateDesc, pCircuit->srcSoftPlateRef, true, isSideSource, isLeft);
+				AdjustVirtualCircuitPlatePosition(svg.plateRectHash, key, pVtLine->startPoint, pCircuit->srcSoftPlateDesc, pCircuit->srcSoftPlateRef, true, isSideSource, isLeft);
                 // 增加连接点索引
                 ++(*pConnectPtIndex);
             }
@@ -1221,6 +1343,8 @@ void SvgTransformer::DrawVirtualCircuitLine(QList<IedRect*>& rectList)
 				DrawVirtualIcon(pVtLine->startIconPt, pLogicLine->pLogicCircuit->type, ColorHelper::pure_green);
 				DrawVirtualIcon(pVtLine->endIconPt, pLogicLine->pLogicCircuit->type, ColorHelper::pure_green);
 				// 绘制值
+				pVtLine->startValRect.setHeight(0);
+				pVtLine->endValRect.setHeight(0);
 				DrawVirtualText(pVtLine->startValRect, pVtLine->valStr);
 				DrawVirtualText(pVtLine->endValRect, pVtLine->valStr);
 				// 绘制描述信息
@@ -1378,6 +1502,33 @@ void SvgTransformer::DrawVirtualIcon(const QPoint& pt, VirtualType _type, const 
 void SvgTransformer::DrawVirtualText(const QRect& rect, QString val)
 {
 	m_painter->save();
+
+	// 约定：当传入的 rect 高度为 0 时，表示这是“数值占位标签”，不直接绘制数字，
+	// 仅在 SVG 中留下一个不可见的占位元素，由交互层 InteractiveSvgItem 动态绘制。
+	if (rect.height() == 0) {
+		// 使用 font-family 携带占位信息：id 以及矩形位置尺寸
+		// group0: id，仅用流水 m_element_id
+		// group1: x y w h（这里 h==0 只是标记用途，仍按数值写入）
+		QString payload = joinGroups()
+			<< (QString)(joinFields() << m_element_id)
+			<< (QString)(joinFields() << rect.x() << rect.y() << rect.width() << rect.height());
+
+		QFont font;
+		font.setFamily(payload);
+		font.setPointSize(TYPE_Virtual_Value); // 用特殊字号标注节点类型
+		m_painter->setFont(font);
+
+		// 画一个 1px 的透明矩形作为占位（既能落到 SVG，又不会可见）
+		QPen pen(Qt::NoPen);
+		QBrush brush(Qt::NoBrush);
+		m_painter->setPen(pen);
+		m_painter->setBrush(brush);
+		m_painter->drawRect(rect);
+		m_painter->restore();
+		return;
+	}
+
+	// 其他文本（如描述）仍保持原有绘制
 	QPen pen;
 	pen.setColor(Qt::white);
 	QFont font;
@@ -1397,6 +1548,7 @@ void SvgTransformer::DrawPlate(const QHash<QString, PlateRect>& hash)
 		QPen pen;
 		QFont font;
 		pen.setColor(ColorHelper::Color(ColorHelper::pure_white));
+		//pen.setColor(Qt::transparent);
 		QBrush brush(ColorHelper::Color(ColorHelper::ied_underground));
 		pen.setWidth(2);
 		pen.setStyle(Qt::DashDotLine);
@@ -1523,6 +1675,8 @@ void SvgTransformer::DrawPlateIcon(const QPoint& centerPt, bool status, const QS
 	else
 	{
 		// 闭合状态矩形
+		pen.setColor(Qt::transparent);
+		m_painter->setPen(pen);
 		m_painter->drawLine(ptList[0], ptList[1]);
 		m_painter->drawLine(ptList[2], ptList[3]);
 	}
@@ -1559,7 +1713,8 @@ void SvgTransformer::ReSignSvg(const QString& filename, BaseSvg& svg)
 	ReSignIedRect(doc);
 	ReSignCircuitLine(doc);
 	ReSignPlate(doc);
-	ReSignSvgViewBox(doc, svg.viewBoxWidth, svg.viewBoxHeight);
+	ReSignVirtualValuePlaceholders(doc);
+	ReSignSvgViewBox(doc, svg.viewBoxX, svg.viewBoxY, svg.viewBoxWidth, svg.viewBoxHeight);
 
 	if (!doc.save_file(filename.toLocal8Bit()))
 	{
@@ -1715,7 +1870,9 @@ void SvgTransformer::ReSignCircuitLine(pugi::xml_document& doc)
 		QString arrowDesc = arrowNode.attribute("font-family").value();
 		QString id = getField(splitGroupAndFields(arrowDesc), 0, 0);
 		arrowNode.append_attribute("id");
+		arrowNode.append_attribute("type");
 		arrowNode.attribute("id").set_value(id.toStdString().c_str());
+		arrowNode.attribute("type").set_value("arrow");
 		
 		// 重置不相关属性
 		arrowNode.attribute("font-family").set_value("SimSun");
@@ -1761,11 +1918,40 @@ void SvgTransformer::ReSignPlate(pugi::xml_document& doc)
 
             plateRectNode.attribute("font-family").set_value("SimSun");
             plateRectNode.attribute("font-size").set_value("15");
-    }
+	}
 }
 
-void SvgTransformer::ReSignSvgViewBox(pugi::xml_document& doc, int width, int height)
+void SvgTransformer::ReSignVirtualValuePlaceholders(pugi::xml_document& doc)
+{
+	// 查找所有以 TYPE_Virtual_Value 标注的占位元素，将其转换为具名属性
+	pugi::xpath_node_set nodeSet = doc.select_nodes(QString("//g[@font-size='%1']").arg(TYPE_Virtual_Value).toLocal8Bit());
+	for (nodeSetConstIterator it = nodeSet.begin(); it != nodeSet.end(); ++it)
+	{
+		pugi::xml_node node = it->node();
+		QString packed = node.attribute("font-family").value();
+		QList<QStringList> groups = splitGroupAndFields(packed);
+		QString id = getField(groups, 0, 0);
+		QString x = getField(groups, 1, 0);
+		QString y = getField(groups, 1, 1);
+		QString w = getField(groups, 1, 2);
+		QString h = getField(groups, 1, 3);
+
+		node.append_attribute("type").set_value("virtual-value");
+		node.append_attribute("id").set_value(id.toStdString().c_str());
+		node.append_attribute("x").set_value(x.toStdString().c_str());
+		node.append_attribute("y").set_value(y.toStdString().c_str());
+		node.append_attribute("w").set_value(w.toStdString().c_str());
+		node.append_attribute("h").set_value(h.toStdString().c_str());
+
+		// 重置不相关属性
+		node.attribute("font-family").set_value("SimSun");
+		node.attribute("font-size").set_value("15");
+		node.attribute("font-weight").set_value("400");
+	}
+}
+
+void SvgTransformer::ReSignSvgViewBox(pugi::xml_document& doc, int x, int y, int width, int height)
 {
 	pugi::xml_node svgNode = doc.child("svg");
-	svgNode.attribute("viewBox").set_value(QString("0 0 %1 %2").arg(width).arg(height).toStdString().c_str());
+	svgNode.attribute("viewBox").set_value(QString("%1 %2 %3 %4").arg(x).arg(y).arg(width).arg(height).toStdString().c_str());
 }

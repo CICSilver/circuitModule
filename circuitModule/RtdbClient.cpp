@@ -1,4 +1,4 @@
-#include "RtdbClient.h"
+﻿#include "RtdbClient.h"
 
 #include <cstdlib>   // std::atof
 #include <cstring>   // std::memset
@@ -13,6 +13,11 @@ RtdbClient::~RtdbClient() {}
 bool RtdbClient::open(RtdbOpenType eType) {
     m_opened = RTDB_Open(eType);
     return m_opened;
+}
+
+bool RtdbClient::getIedList(std::list<CRtdbEleModelIed*>& listIed) const
+{
+    return false;
 }
 
 // 读取模拟量：RTDB_GetEle -> 解析 stuRtdbAnalog
@@ -41,7 +46,6 @@ bool RtdbClient::getAnalog(qulonglong code, double& outValue, bool applyScale,
 // 读取状态量：RTDB_GetEle -> 解析 stuRtdbStatus
 bool RtdbClient::getStatus(qulonglong code, QString& outValue) const {
     void* p = NULL;
-    std::memset(p, 0, sizeof(p));
 
     eCodeType et = CODE_TYPE_IED;
     if (!RTDB_GetEle((UINT64)code, &p, et) || et != CODE_TYPE_STATUS) {
@@ -74,13 +78,3 @@ bool RtdbClient::getSetting(qulonglong code, double& outValue, int sectorIndex, 
     return true;
 }
 
-// 判别 code 类型：RTDB_GetEle 只取类型
-bool RtdbClient::getCodeType(qulonglong code, eCodeType& outType) const {
-    // 使用最大缓冲，SDK 会设置 outType，缓冲大小足以容纳任意类型
-    void* p = NULL;
-
-    if (!RTDB_GetEle((UINT64)code, &p, outType)) {
-        return false;
-    }
-    return true;
-}

@@ -80,52 +80,58 @@ int main(int argc, char* argv[]) {
 	//transformer.GenerateSvgByIedName(iedName);
 
 	// 实时库测试
-	RunRtdbReadTest();
+	//RunRtdbReadTest();
 
-	//QList<QString> pathList;
-	//pathList
-	//	<< QCoreApplication::applicationDirPath() + "/logic"		
-	//	<< QCoreApplication::applicationDirPath() + "/optical"		
-	//	<< QCoreApplication::applicationDirPath() + "/virtual"		
-	//	<< QCoreApplication::applicationDirPath() + "/whole";		
-	//foreach(QString path, pathList)
-	//{
-	//	QDir dir(path);
-	//	if (!dir.exists())
-	//	{
-	//		dir.mkpath(path);
-	//	}
-	//}
-	//
-	//foreach(IED * pIed, pCircuitConfig->GetIedList())
-	//{
-	//	QString path;
-	//	if (pIed->name.contains("SW"))
-	//		continue;
-	//	transformer.GenerateLogicSvg(pIed, pathList.at(0) + "/" + pIed->name + "_logic_circuit.svg");
-	//	transformer.GenerateOpticalSvg(pIed, pathList.at(1) + "/" + pIed->name + "_optical_circuit.svg");
-	//	transformer.GenerateVirtualSvg(pIed, pathList.at(2) + "/" + pIed->name + "_virtual_circuit.svg");
-	//	//transformer.GenerateWholeCircuitSvg(pIed, pathList.at(3) + "/" + pIed->name + "_whole_circuit.svg");
-	//}
-	//qDebug() << "SVG files generated successfully.";
+	QList<QString> pathList;
+	pathList
+		<< QCoreApplication::applicationDirPath() + "/logic"		
+		<< QCoreApplication::applicationDirPath() + "/optical"		
+		<< QCoreApplication::applicationDirPath() + "/virtual"		
+		<< QCoreApplication::applicationDirPath() + "/whole";		
+	foreach(QString path, pathList)
+	{
+		QDir dir(path);
+		if (!dir.exists())
+		{
+			dir.mkpath(path);
+		}
+	}
+	
+	foreach(IED * pIed, pCircuitConfig->GetIedList())
+	{
+		QString path;
+		if (pIed->name.contains("SW"))
+			continue;
+		// 一次性生成三类 SVG（顺序执行，兼容 Qt4/C++03）
+		transformer.GenerateAllSvgParallel(
+			pIed,
+			pathList.at(0) + "/" + pIed->name + "_logic_circuit.svg",
+			pathList.at(1) + "/" + pIed->name + "_optical_circuit.svg",
+			pathList.at(2) + "/" + pIed->name + "_virtual_circuit.svg"
+			// , pathList.at(3) + "/" + pIed->name + "_whole_circuit.svg" // 如需整图可打开
+		);
+		//transformer.GenerateWholeCircuitSvg(pIed, pathList.at(3) + "/" + pIed->name + "_whole_circuit.svg");
+	}
+	qDebug() << "SVG files generated successfully.";
 
 
-
+	// 生成后释放内存
+	//pCircuitConfig->Clear();
 	//QString svgPath = QCoreApplication::applicationDirPath() + "/PT2202A_virtual_circuit.svg";
 	//showSingleSvg(svgPath);
 
 
-	//QGraphicsScene* scene = new QGraphicsScene();
-	//MainWindow mainWindow;
-	//// 将场景接入到 UI 中的 opticalView（通过对象名）
-	//if (QGraphicsView* opticalView = mainWindow.findChild<QGraphicsView*>("opticalView")) {
-	//	opticalView->setScene(scene);
-	//	opticalView->setDragMode(QGraphicsView::NoDrag);
-	//	opticalView->setRenderHint(QPainter::Antialiasing);
-	//	opticalView->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
-	//	opticalView->setBackgroundBrush(Qt::black);
-	//}
-	//mainWindow.show();
+	QGraphicsScene* scene = new QGraphicsScene();
+	MainWindow mainWindow;
+	// 将场景接入到 UI 中的 opticalView（通过对象名）
+	if (QGraphicsView* opticalView = mainWindow.findChild<QGraphicsView*>("opticalView")) {
+		opticalView->setScene(scene);
+		opticalView->setDragMode(QGraphicsView::NoDrag);
+		opticalView->setRenderHint(QPainter::Antialiasing);
+		opticalView->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
+		opticalView->setBackgroundBrush(Qt::black);
+	}
+	mainWindow.show();
 
 	
 	return app.exec();

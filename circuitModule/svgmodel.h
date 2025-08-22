@@ -149,12 +149,12 @@ struct OpticalCircuitLine
 		pOpticalCircuit = NULL;
 	}
 	quint16 lineCode;		// 光纤编号
+	quint8 arrowState;
 	QPoint startPoint;			// 光纤起点，位于图像上方，与光纤方向无关
 	QPoint endPoint;			// 光纤终点，位于图像下方，与光纤方向无关
 	QList<QPoint> midPoints;	// 可能有多个折线点
 	IedRect* pSrcRect;			// 输出设备
 	IedRect* pDestRect;			// 输入设备
-	quint8 arrowState;
 	OpticalCircuit* pOpticalCircuit;
 };
 //// SVG描述结构，管理内存释放

@@ -1,4 +1,4 @@
-#ifndef RTDB_CLIENT_H
+﻿#ifndef RTDB_CLIENT_H
 #define RTDB_CLIENT_H
 
 /**
@@ -95,6 +95,8 @@ public:
     //************************************
     bool isOpen() const { return m_opened; }
 
+    bool getIedList(std::list<CRtdbEleModelIed*>& listIed) const;
+
     //************************************
     // 函数名称:  getAnalog
     // 函数全名:  bool RtdbClient::getAnalog(qulonglong, double&, bool, double*, double*, QString*) const
@@ -135,19 +137,73 @@ public:
     //************************************
     bool getSetting(qulonglong code, double& outValue, int sectorIndex = 1, bool applyScale = false) const;
 
-    //************************************
-    // 函数名称:  getCodeType
-    // 函数全名:  bool RtdbClient::getCodeType(qulonglong, eCodeType&) const
-    // 访问权限:  public
-    // 函数说明:  仅判别给定 code 的类型（模拟量/定值/状态量等），便于调用前做分支。
-    // 函数参数:  qulonglong code       [in ] 通道编码。
-    // 函数参数:  eCodeType& outType    [out] 返回类型。
-    // 返回值:    bool                   true 成功；false code 不存在。
-    //************************************
-    bool getCodeType(qulonglong code, eCodeType& outType) const;
+
+	// ************************************
+    // code 读写操作
+    // code 的二进制布局（小端，对应 SDK 的 stuItemCode/ItemCode）：
+    // bits  0..15  : chl  (unsigned short)
+    // bits 16..23  : ds   (unsigned char)
+    // bits 24..31  : type (unsigned char) -> eCodeType
+    // bits 32..47  : ied  (unsigned short)
+    // bits 48..63  : res  (unsigned short)
+    // 提供纯位运算解码/编码，避免依赖内存布局和对齐差异。
+    struct itemCode {
+        unsigned short chl;   // 通道编码
+        unsigned char  ds;    // 数据集编码
+        unsigned char  type;  // 类型（eCodeType）
+        unsigned short ied;   // IED 编码
+        unsigned short res;   // 预留/项类型
+        itemCode() : chl(0), ds(0), type(0), ied(0), res(0) {}
+
+        // 从 64 位整型解析
+        static itemCode fromU64(qulonglong c) {
+            itemCode p; 
+            p.chl  = static_cast<unsigned short>( c        & 0xFFFFULL);
+            p.ds   = static_cast<unsigned char >( (c >> 16) & 0xFFULL );
+            p.type = static_cast<unsigned char >( (c >> 24) & 0xFFULL );
+            p.ied  = static_cast<unsigned short>( (c >> 32) & 0xFFFFULL );
+            p.res  = static_cast<unsigned short>( (c >> 48) & 0xFFFFULL );
+            return p;
+        }
+        // 打包为 64 位整型
+        qulonglong toU64() const {
+            qulonglong c = 0;
+            c |= static_cast<qulonglong>(chl  & 0xFFFFu);
+            c |= static_cast<qulonglong>(ds   & 0xFFu)   << 16;
+            c |= static_cast<qulonglong>(type & 0xFFu)   << 24;
+            c |= static_cast<qulonglong>(ied  & 0xFFFFu) << 32;
+            c |= static_cast<qulonglong>(res  & 0xFFFFu) << 48;
+            return c;
+        }
+
+    // 直接修改字段即可：code.ied=..; code.ds=..; code.chl=..; code.type=..; code.res=..
+
+        // 调试输出
+        QString toString() const {
+            const char* typeName = "";
+            switch (static_cast<eCodeType>(type)) {
+            case CODE_TYPE_IED:     typeName = "IED"; break;
+            case CODE_TYPE_LEDGER:  typeName = "LEDGER"; break;
+            case CODE_TYPE_CPU:     typeName = "CPU"; break;
+            case CODE_TYPE_GROUP:   typeName = "GROUP"; break;
+            case CODE_TYPE_SECTOR:  typeName = "SECTOR"; break;
+            case CODE_TYPE_SETTING: typeName = "SETTING"; break;
+            case CODE_TYPE_ANALOG:  typeName = "ANALOG"; break;
+            case CODE_TYPE_STATUS:  typeName = "STATUS"; break;
+            case CODE_TYPE_RCB:     typeName = "RCB"; break;
+            case CODE_TYPE_CTL:     typeName = "CTL"; break;
+            default:                typeName = "UNKNOWN"; break;
+            }
+            return QString("ied=%1 ds=%2 type=%3(%4) chl=%5 res=%6")
+                .arg(ied).arg(ds).arg(type).arg(typeName).arg(chl).arg(res);
+        }
+    };
+
+    // 以上 code 操作均已内聚至 itemCode，请优先使用 itemCode 的成员函数
 
 private:
     bool m_opened;
+	std::list<CRtdbEleModelIed*> m_iedList; // 缓存 IED 列表，避免重复查询
 };
 
 #endif // RTDB_CLIENT_H

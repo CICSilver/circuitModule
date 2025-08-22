@@ -214,11 +214,6 @@ private:
 	QColor colorForLine(const MapLine& line) const;
 	// 命中测试：返回点击命中的压板索引，未命中返回 -1
 	int hitTestPlate(const QPointF& pos) const;
-
-	double pointToSegmentDistance(const QPointF& pt, const QPointF& a, const QPointF& b);
-	QVector<QPointF> parsePointsAttr(const QString& pointsStr);
-	// 已迁移到 utils::parseSvgPathToPolyline
-	// QVector<QPointF> parsePathPoints(const QString& d);
     void drawPlateIcon(QPainter* painter, const QPointF& center) const;
 
 	//// 解析压板相关信息
@@ -238,10 +233,6 @@ private:
 	void paintSinglePlate(QPainter* painter, const PlateItem& plate);
 	void paintVirtualValues(QPainter* painter);
 
-	// 计算某个组节点内 path 的包围盒（应用节点变换与文档坐标变换）
-	bool computePathBoundingRect(const pugi::xml_node& node, QRectF& outRect) const;
-
-	QTransform parseTransformMatrix(const pugi::xml_node& node) const;
 	void fitToViewIfPossible();
 
 

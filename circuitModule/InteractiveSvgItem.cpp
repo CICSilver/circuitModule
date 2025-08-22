@@ -18,6 +18,46 @@
 #include <string>
 #include <sstream>
 
+// 简单折线简化：去除近似共线或与前后点共线且距离阈值内的中间点
+static void simplifyPolyline(QVector<QPointF>& pts, qreal tol)
+{
+	if (pts.size() < 3) return;
+	QVector<QPointF> out;
+	out.reserve(pts.size());
+	out.append(pts[0]);
+	int lastKeep = 0;
+	for (int i = 1; i < pts.size() - 1; ++i) {
+		const QPointF& A = pts[lastKeep];
+		const QPointF& B = pts[i];
+		const QPointF& C = pts[i + 1];
+		// 点到线段 AC 的距离
+		QLineF ac(A, C);
+		qreal dist;
+		if (ac.length() == 0) dist = QLineF(A, B).length();
+		else {
+			// 投影参数 t
+			QPointF ap = B - A; QPointF ab = C - A;
+			qreal ab2 = ab.x()*ab.x() + ab.y()*ab.y();
+			qreal t = (ap.x()*ab.x() + ap.y()*ab.y()) / (ab2 > 0 ? ab2 : 1);
+			if (t < 0) dist = QLineF(B, A).length();
+			else if (t > 1) dist = QLineF(B, C).length();
+			else {
+				QPointF proj = A + t * (C - A);
+				dist = QLineF(B, proj).length();
+			}
+		}
+		if (dist > tol) {
+			out.append(B);
+			lastKeep = i;
+		} else {
+			// 丢弃 B
+		}
+	}
+	out.append(pts.last());
+	out.squeeze();
+	pts.swap(out);
+}
+
 InteractiveSvgMapItem::InteractiveSvgMapItem(const QString& svgPath)
 	: m_highlightedLineIdx(-1)
 	, m_dragging(false)
@@ -191,7 +231,7 @@ void InteractiveSvgMapItem::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
 		const QVector<QPointF>& pts = m_allLines[i].points;
 		for (int j = 1; j < pts.size(); ++j) {
 			QLineF seg(pts[j - 1], pts[j]);
-			double dist = seg.p1() == seg.p2() ? QLineF(pos, seg.p1()).length() : pointToSegmentDistance(pos, seg.p1(), seg.p2());
+			double dist = seg.p1() == seg.p2() ? QLineF(pos, seg.p1()).length() : utils::pointToSegmentDistance(pos, seg.p1(), seg.p2());
 			if (dist < minDist) {
 				minDist = dist;
 				closest = i;
@@ -293,7 +333,42 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
     if (!file.open(QIODevice::ReadOnly)) { qWarning("SVG文件打开失败"); return; }
     QByteArray svgData = file.readAll();
     pugi::xml_document doc;
-    if (!doc.load_buffer(svgData.data(), svgData.size())) { qWarning("SVG加载失败"); return; }
+	if (!doc.load_buffer(svgData.data(), svgData.size())) { qWarning("SVG加载失败"); return; }
+	// 释放原始 SVG 字节以降低峰值内存
+	svgData.clear(); svgData.squeeze();
+
+	// 先根据 root svg 的 viewBox 计算文档坐标到像素坐标的基础变换：
+	// 若 viewBox = [minX, minY, width, height]，我们可以限制背景 pixmap 的最大边，
+	// 并把相同的缩放合入 m_docToPix，保证叠加图元与底图一致。
+	double vbMinX = 0.0, vbMinY = 0.0, vbW = 0.0, vbH = 0.0;
+	double viewScale = 1.0;
+	{
+		pugi::xml_node root = doc.child("svg");
+		if (!root) root = doc.document_element();
+		const char* vb = root.attribute("viewBox").value();
+		if (vb && *vb) {
+			// 解析 viewBox: "minX minY width height"
+			QStringList parts = QString::fromLatin1(vb).simplified().split(' ');
+			if (parts.size() >= 4) {
+				vbMinX = parts[0].toDouble();
+				vbMinY = parts[1].toDouble();
+				vbW    = parts[2].toDouble();
+				vbH    = parts[3].toDouble();
+			} else if (parts.size() >= 2) {
+				vbMinX = parts[0].toDouble();
+				vbMinY = parts[1].toDouble();
+			}
+		}
+		// 背景最大边限制，防止占用过多内存
+		const int kMaxBgDim = 4096; // 可按需要调整，例如 3072/4096
+		if (vbW > 0.0 && vbH > 0.0) {
+			if (vbW > kMaxBgDim || vbH > kMaxBgDim) {
+				viewScale = qMin(double(kMaxBgDim) / vbW, double(kMaxBgDim) / vbH);
+			}
+		}
+		m_docToPix = QTransform::fromTranslate(-vbMinX, -vbMinY);
+		if (viewScale != 1.0) m_docToPix.scale(viewScale, viewScale);
+	}
 
 	// 解析时隐藏链路及箭头的底图显示
 	m_lineIdByCode.clear();
@@ -308,23 +383,32 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
         m_svgType = LineType_Optical;
     }
 
-    std::ostringstream oss;
-    doc.save(oss, "", pugi::format_raw, pugi::encoding_utf8);
-	doc.save_file("debug.svg");
-    const std::string s = oss.str();
-    QByteArray modifiedSvg(s.data(), int(s.size()));
+	std::ostringstream oss;
+	doc.save(oss, "", pugi::format_raw, pugi::encoding_utf8);
+	const std::string s = oss.str();
+	QByteArray modifiedSvg(s.data(), int(s.size()));
 
    // 修改后的内存 SVG 渲染到底图
-    QSvgRenderer renderer;
-    if (!renderer.load(modifiedSvg)) {
+	QSvgRenderer renderer;
+	if (!renderer.load(modifiedSvg)) {
         // 如果内存加载失败，回退到原文件
         renderer.load(svgPath);
-    }
+	}
+	// 释放中间缓冲
+	modifiedSvg.clear(); modifiedSvg.squeeze();
 
-    QRectF viewBox = renderer.viewBoxF();
-    QSize imageSize = viewBox.isValid()
-        ? QSize(int(viewBox.width()), int(viewBox.height()))
-        : QSize(2000, 2000);
+	// 基于 viewBox 与缩放计算背景图尺寸
+	QRectF viewBox = renderer.viewBoxF();
+	QSize imageSize;
+	if (viewBox.isValid()) {
+		if (vbW <= 0.0 || vbH <= 0.0) { vbW = viewBox.width(); vbH = viewBox.height(); }
+		imageSize = QSize(int(vbW * viewScale), int(vbH * viewScale));
+		if (imageSize.width() <= 0 || imageSize.height() <= 0) {
+			imageSize = QSize(int(viewBox.width()), int(viewBox.height()));
+		}
+	} else {
+		imageSize = QSize(2000, 2000);
+	}
 
     QPixmap pixmap(imageSize);
     pixmap.fill(Qt::black);
@@ -340,6 +424,7 @@ void InteractiveSvgMapItem::parseVirtualSvg(const pugi::xml_document& doc)
 {
 	// 先解析回路
 	m_allLines += parseCircuitLines(doc, "virtual");
+	m_allLines.squeeze();
 
 	// 解析压板（仅 virtual 存在）
 	QMap<QString, PlateItem> plateMap;
@@ -361,7 +446,7 @@ void InteractiveSvgMapItem::parseVirtualSvg(const pugi::xml_document& doc)
 			if (descAttr && *descAttr) p.attrs.desc = QString::fromUtf8(descAttr);
 			if (idAttr && *idAttr)  p.attrs.id  = idAttr;
 			QRectF bbox;
-			if (computePathBoundingRect(plateNode, bbox)) {
+			if (utils::computePathBoundingRect(plateNode, m_docToPix, bbox)) {
 				p.rect = bbox;
 			}
 		} else if (strcmp(plateNode.attribute("type").value(), "plate-component") == 0) {
@@ -372,7 +457,7 @@ void InteractiveSvgMapItem::parseVirtualSvg(const pugi::xml_document& doc)
 				// 1) 外部矩形（覆盖回路）：fill="#233f4f" + stroke="#ffffff"
 				if (fillAttr && qstrcmp(fillAttr, "#233f4f") == 0 && strokeAttr && qstrcmp(strokeAttr, "#ffffff") == 0) {
 					QRectF bbox;
-					if (computePathBoundingRect(plateNode, bbox)) p.outerRect = bbox;
+					if (utils::computePathBoundingRect(plateNode, m_docToPix, bbox)) p.outerRect = bbox;
 				}
 				// 2) 内部矩形组件：黑色描边
 				else if (strokeAttr && qstrcmp(strokeAttr, "#000000") == 0) {
@@ -390,6 +475,13 @@ void InteractiveSvgMapItem::parseVirtualSvg(const pugi::xml_document& doc)
 
 	// 收集压板
 	m_allPlates = plateMap.values().toVector();
+	// 压缩内部容器容量以节省内存
+	for (int i = 0; i < m_allPlates.size(); ++i) {
+		m_allPlates[i].circles.squeeze();
+		m_allPlates[i].lines.squeeze();
+		m_allPlates[i].rects.squeeze();
+	}
+	m_allPlates.squeeze();
 	// ref -> PlateItem* 映射
 	m_plateMap.clear();
 	for (int i = 0; i < m_allPlates.size(); ++i) {
@@ -405,45 +497,14 @@ void InteractiveSvgMapItem::parseVirtualSvg(const pugi::xml_document& doc)
 void InteractiveSvgMapItem::parseLogicSvg(const pugi::xml_document& doc)
 {
 	m_allLines += parseCircuitLines(doc, "logic");
+	m_allLines.squeeze();
 }
 
 void InteractiveSvgMapItem::parseOpticalSvg(const pugi::xml_document& doc)
 {
 	m_allLines += parseCircuitLines(doc, "optical");
+	m_allLines.squeeze();
 
-}
-
-double InteractiveSvgMapItem::pointToSegmentDistance(const QPointF& pt, const QPointF& a, const QPointF& b)
-{
-	double x = pt.x(), y = pt.y();
-	double x1 = a.x(), y1 = a.y();
-	double x2 = b.x(), y2 = b.y();
-	double dx = x2 - x1;
-	double dy = y2 - y1;
-
-	if (dx == 0 && dy == 0)
-		return std::sqrt((x - x1) * (x - x1) + (y - y1) * (y - y1));
-
-	double t = ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy);
-	if (t < 0)
-		return std::sqrt((x - x1) * (x - x1) + (y - y1) * (y - y1));
-	else if (t > 1)
-		return std::sqrt((x - x2) * (x - x2) + (y - y2) * (y - y2));
-	double projx = x1 + t * dx;
-	double projy = y1 + t * dy;
-	return std::sqrt((x - projx) * (x - projx) + (y - projy) * (y - projy));
-}
-
-QVector<QPointF> InteractiveSvgMapItem::parsePointsAttr(const QString& pointsStr)
-{
-	QVector<QPointF> pts;
-	QStringList ptList = pointsStr.split(' ', QString::SkipEmptyParts);
-	for (int i = 0; i < ptList.size(); ++i) {
-		QStringList xy = ptList[i].split(',');
-		if (xy.size() == 2)
-			pts.append(m_docToPix.map(QPointF(xy[0].toDouble(), xy[1].toDouble())));
-	}
-	return pts;
 }
 
 QVector<MapLine> InteractiveSvgMapItem::parseCircuitLines(const pugi::xml_document& doc, const char* type)
@@ -463,12 +524,13 @@ QVector<MapLine> InteractiveSvgMapItem::parseCircuitLines(const pugi::xml_docume
 			line.type = LineType_Virtual;
 		line.style = parseLineStyle(g);
 
-		QTransform tf = parseTransformMatrix(g);
+	// 统一应用：文档->像素 以及 节点自身 transform
+	QTransform tf = m_docToPix * utils::parseTransformMatrix(g);
 		bool hasAnyPolyline = false;
 		for (pugi::xml_node polyline = g.child("polyline"); polyline; polyline = polyline.next_sibling("polyline")) {
 			const char* ptsAttr = polyline.attribute("points").value();
 			if (!ptsAttr || !*ptsAttr) continue;
-			QVector<QPointF> pts = parsePointsAttr(QString::fromLatin1(ptsAttr));
+			QVector<QPointF> pts = utils::parsePointsAttr(QString::fromLatin1(ptsAttr));
 			for (int pi = 0; pi < pts.size(); ++pi) {
 				QPointF mapped = tf.map(pts[pi]);
 				if (!line.points.isEmpty() && line.points.last() == mapped) continue; // 去重相邻重复点
@@ -481,12 +543,19 @@ QVector<MapLine> InteractiveSvgMapItem::parseCircuitLines(const pugi::xml_docume
 		if (!hasAnyPolyline && QString::fromLatin1(g.name()) == "polyline") {
 			const char* ptsAttr = g.attribute("points").value();
 			if (ptsAttr && *ptsAttr) {
-				QVector<QPointF> pts = parsePointsAttr(QString::fromLatin1(ptsAttr));
-				for (int pi = 0; pi < pts.size(); ++pi) line.points.append(tf.map(pts[pi]));
+				QVector<QPointF> pts = utils::parsePointsAttr(QString::fromLatin1(ptsAttr));
+		for (int pi = 0; pi < pts.size(); ++pi) line.points.append(tf.map(pts[pi]));
 				hasAnyPolyline = !pts.isEmpty();
 			}
 		}
 		if (!hasAnyPolyline || line.points.size() < 2) continue;
+
+		// 简化并收缩点集，按像素容差（与线宽相关）
+		{
+			qreal tol = qMax<qreal>(0.5, 0.25 * qreal(line.style.strokeWidth));
+			simplifyPolyline(line.points, tol);
+			line.points.squeeze();
+		}
 
 		// 复制并标准化组上的元信息属性，复用 basemodel 键名
 		normalizeAttrsForBaseModel(line, g);
@@ -516,7 +585,7 @@ void InteractiveSvgMapItem::parseVirtualValueBoxes(const pugi::xml_document& doc
 		int lineId = g.attribute("id").as_int(-1);
 		if (lineId < 0) continue;
 
-		QTransform gtf = m_docToPix * parseTransformMatrix(g);
+	QTransform gtf = m_docToPix * utils::parseTransformMatrix(g);
 		QVector<QRectF> rects;
 
 		// 直接 rect 元素
@@ -527,7 +596,7 @@ void InteractiveSvgMapItem::parseVirtualValueBoxes(const pugi::xml_document& doc
 			double h = rn.attribute("height").as_double(0.0);
 			QRectF lr(x, y, w, h);
 			// 子节点可能也有 transform
-			QTransform rtf = gtf * parseTransformMatrix(rn);
+			QTransform rtf = gtf * utils::parseTransformMatrix(rn);
 			rects.append(rtf.mapRect(lr));
 		}
 		// 兼容 path 画矩形的情况：取 path 的包围盒，并应用父组与自身变换
@@ -544,7 +613,7 @@ void InteractiveSvgMapItem::parseVirtualValueBoxes(const pugi::xml_document& doc
 			}
 			if (minX <= maxX && minY <= maxY) {
 				QRectF lr(QPointF(minX, minY), QPointF(maxX, maxY));
-				QTransform ptf = gtf * parseTransformMatrix(pn);
+				QTransform ptf = gtf * utils::parseTransformMatrix(pn);
 				rects.append(ptf.mapRect(lr));
 			}
 		}
@@ -577,7 +646,7 @@ QVector<ArrowHead> InteractiveSvgMapItem::parseArrowHeadsForGroup(const pugi::xm
 	foreach(pugi::xpath_node arrowNode, arrowNodes)
 	{
 		pugi::xml_node gnode = arrowNode.node();
-		QTransform tf = m_docToPix * parseTransformMatrix(gnode);
+	QTransform tf = m_docToPix * utils::parseTransformMatrix(gnode);
 		for (pugi::xml_node path = gnode.child("path"); path; path = path.next_sibling("path")) {
 			const char* dAttr = path.attribute("d").value();
 			if (!dAttr || !*dAttr) continue;
@@ -585,6 +654,7 @@ QVector<ArrowHead> InteractiveSvgMapItem::parseArrowHeadsForGroup(const pugi::xm
 			if (local.size() >= 3) {
 				ArrowHead a;
 				for (int i = 0; i < local.size(); ++i) a.points.append(tf.map(local[i]));
+				a.points.squeeze();
 				arrows.append(a);
 			}
 		}
@@ -686,7 +756,7 @@ QVector<PlateCircleItem> InteractiveSvgMapItem::parsePlateCircles(const pugi::xm
 	// 处理压板组件组
 	SvgNodeStyle style = parseNodeStyle(plateCircleNode);
 	// 统一与 computePathBoundingRect 的顺序：先节点变换，再文档到像素
-	QTransform transform = m_docToPix * parseTransformMatrix(plateCircleNode);
+	QTransform transform = m_docToPix * utils::parseTransformMatrix(plateCircleNode);
 
 	// d="
 	// M980,375 C980,377.761 977.761,380 975,380 
@@ -729,7 +799,7 @@ QVector<PlateLineItem> InteractiveSvgMapItem::parsePlateLines(const pugi::xml_no
 	QVector<PlateLineItem> lines;
 	SvgNodeStyle style = parseNodeStyle(plateLineNode);
 	// 统一顺序：先节点变换，再文档到像素
-	QTransform transform = m_docToPix * parseTransformMatrix(plateLineNode);
+	QTransform transform = m_docToPix * utils::parseTransformMatrix(plateLineNode);
 
 	for (pugi::xml_node polyline = plateLineNode.child("polyline"); polyline; polyline = polyline.next_sibling("polyline"))
 	{
@@ -761,7 +831,7 @@ QVector<PlateRectItem> InteractiveSvgMapItem::parsePlateRects(const pugi::xml_no
 	SvgNodeStyle style = parseNodeStyle(plateRectNode);
 	//style.fill = 
 	// 统一与 computePathBoundingRect 的顺序：先节点变换，再文档到像素
-	QTransform transform = m_docToPix * parseTransformMatrix(plateRectNode);
+	QTransform transform = m_docToPix * utils::parseTransformMatrix(plateRectNode);
 
 	for (pugi::xml_node path = plateRectNode.child("path"); path; path = path.next_sibling("path"))
 	{
@@ -860,24 +930,6 @@ void InteractiveSvgMapItem::drawPlateRects(QPainter* p, const QVector<PlateRectI
 	}
 }
 
-QTransform InteractiveSvgMapItem::parseTransformMatrix(const pugi::xml_node& node) const
-{
-	const char* transformStr = node.attribute("transform").as_string();
-	if (transformStr && strncmp(transformStr, "matrix(", 7) == 0) {
-		QString s(transformStr + 7);
-		s.chop(1);
-		QStringList parts = s.split(QRegExp("[\\s,]+"), QString::SkipEmptyParts);
-		if (parts.size() == 6) {
-			return QTransform(
-				parts[0].toDouble(), parts[1].toDouble(),
-				parts[2].toDouble(), parts[3].toDouble(),
-				parts[4].toDouble(), parts[5].toDouble()
-			);
-		}
-	}
-	return QTransform(); // 返回单位矩阵
-}
-
 SvgNodeStyle InteractiveSvgMapItem::parseNodeStyle(const pugi::xml_node& node)
 {
     SvgNodeStyle style;
@@ -891,8 +943,8 @@ SvgNodeStyle InteractiveSvgMapItem::parseNodeStyle(const pugi::xml_node& node)
     style.dashArray = node.attribute("stroke-dasharray").as_string("");
     
     // 解析颜色
-    style.stroke = parseColor(strokeAttr, style.strokeOpacity);
-    style.fill = parseColor(fillAttr, style.fillOpacity);
+	style.stroke = utils::parseColor(strokeAttr, style.strokeOpacity);
+	style.fill = utils::parseColor(fillAttr, style.fillOpacity);
     
     return style;
 }
@@ -905,44 +957,6 @@ LineStyle InteractiveSvgMapItem::parseLineStyle(const pugi::xml_node& node)
 	ls.strokeRgb = stroke.rgba();
 	ls.strokeWidth = (unsigned short)node.attribute("stroke-width").as_int(1);
 	return ls;
-}
-
-bool InteractiveSvgMapItem::computePathBoundingRect(const pugi::xml_node& node, QRectF& outRect) const
-{
-	// 搜集该节点下的所有 <path> 的 d 的折线点，合并成一个包围盒
-	double minX = 1e100, minY = 1e100, maxX = -1e100, maxY = -1e100;
-	bool hasAny = false;
-	QTransform tf = m_docToPix * parseTransformMatrix(node);
-
-	if (qstrcmp(node.name(), "path") == 0) {
-		const char* d = node.attribute("d").value();
-		if (d && *d) {
-			QVector<QPointF> local = utils::parseSvgPathToPolyline(QString::fromLatin1(d));
-			for (int i = 0; i < local.size(); ++i) {
-				const QPointF& p = local[i];
-				if (p.x() < minX) minX = p.x(); if (p.x() > maxX) maxX = p.x();
-				if (p.y() < minY) minY = p.y(); if (p.y() > maxY) maxY = p.y();
-				hasAny = true;
-			}
-		}
-	}
-
-	for (pugi::xml_node path = node.child("path"); path; path = path.next_sibling("path")) {
-		const char* d = path.attribute("d").value();
-		if (!d || !*d) continue;
-		QVector<QPointF> local = utils::parseSvgPathToPolyline(QString::fromLatin1(d));
-		for (int i = 0; i < local.size(); ++i) {
-			const QPointF& p = local[i];
-			if (p.x() < minX) minX = p.x(); if (p.x() > maxX) maxX = p.x();
-			if (p.y() < minY) minY = p.y(); if (p.y() > maxY) maxY = p.y();
-			hasAny = true;
-		}
-	}
-
-	if (!hasAny) return false;
-	QRectF localRect(QPointF(minX, minY), QPointF(maxX, maxY));
-	outRect = tf.mapRect(localRect);
-	return true;
 }
 
 void InteractiveSvgMapItem::paintPlates(QPainter* painter)

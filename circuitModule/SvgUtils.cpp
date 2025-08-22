@@ -1,6 +1,8 @@
 ﻿#include "SvgUtils.h"
 #include <QtGlobal>
 #include <QStringList>
+#include <QRegExp>
+#include <cmath>
 
 namespace utils {
 
@@ -204,6 +206,100 @@ QVector<QPointF> parseSvgPathToPolyline(const QString& d, int curveSegments)
 
     pts.squeeze();
     return pts;
+}
+
+QTransform parseTransformMatrix(const pugi::xml_node& node)
+{
+    const char* transformStr = node.attribute("transform").as_string();
+    if (transformStr && strncmp(transformStr, "matrix(", 7) == 0) {
+        QString s(transformStr + 7);
+        s.chop(1); // 去掉尾部 ')'
+        QStringList parts = s.split(QRegExp("[\\s,]+"), QString::SkipEmptyParts);
+        if (parts.size() == 6) {
+            return QTransform(
+                parts[0].toDouble(), parts[1].toDouble(),
+                parts[2].toDouble(), parts[3].toDouble(),
+                parts[4].toDouble(), parts[5].toDouble()
+            );
+        }
+    }
+    return QTransform();
+}
+
+QVector<QPointF> parsePointsAttr(const QString& pointsStr)
+{
+    QVector<QPointF> pts;
+    QStringList ptList = pointsStr.split(' ', QString::SkipEmptyParts);
+    for (int i = 0; i < ptList.size(); ++i) {
+        const QString& token = ptList[i];
+        QStringList xy = token.split(',', QString::SkipEmptyParts);
+        if (xy.size() == 2)
+            pts.append(QPointF(xy[0].toDouble(), xy[1].toDouble()));
+    }
+    return pts;
+}
+
+double pointToSegmentDistance(const QPointF& pt, const QPointF& a, const QPointF& b)
+{
+    const double x = pt.x(), y = pt.y();
+    const double x1 = a.x(), y1 = a.y();
+    const double x2 = b.x(), y2 = b.y();
+    const double dx = x2 - x1;
+    const double dy = y2 - y1;
+    if (dx == 0.0 && dy == 0.0) return std::sqrt((x - x1)*(x - x1) + (y - y1)*(y - y1));
+    double t = ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy);
+    if (t < 0.0) return std::sqrt((x - x1)*(x - x1) + (y - y1)*(y - y1));
+    if (t > 1.0) return std::sqrt((x - x2)*(x - x2) + (y - y2)*(y - y2));
+    const double projx = x1 + t * dx;
+    const double projy = y1 + t * dy;
+    return std::sqrt((x - projx)*(x - projx) + (y - projy)*(y - projy));
+}
+
+QColor parseColor(const char* s, double opacity)
+{
+    if (!s || !*s) return Qt::transparent;
+    QColor c(QString::fromLatin1(s));
+    if (!c.isValid()) return Qt::transparent;
+    c.setAlphaF(qBound(0.0, opacity, 1.0));
+    return c;
+}
+
+bool computePathBoundingRect(const pugi::xml_node& node, const QTransform& extraTransform, QRectF& outRect)
+{
+    // 搜集该节点下的所有 <path> 的 d 的折线点，合并成一个包围盒
+    double minX = 1e100, minY = 1e100, maxX = -1e100, maxY = -1e100;
+    bool hasAny = false;
+    QTransform tf = extraTransform * parseTransformMatrix(node);
+
+    if (qstrcmp(node.name(), "path") == 0) {
+        const char* d = node.attribute("d").value();
+        if (d && *d) {
+            QVector<QPointF> local = parseSvgPathToPolyline(QString::fromLatin1(d));
+            for (int i = 0; i < local.size(); ++i) {
+                const QPointF& p = local[i];
+                if (p.x() < minX) minX = p.x(); if (p.x() > maxX) maxX = p.x();
+                if (p.y() < minY) minY = p.y(); if (p.y() > maxY) maxY = p.y();
+                hasAny = true;
+            }
+        }
+    }
+
+    for (pugi::xml_node path = node.child("path"); path; path = path.next_sibling("path")) {
+        const char* d = path.attribute("d").value();
+        if (!d || !*d) continue;
+        QVector<QPointF> local = parseSvgPathToPolyline(QString::fromLatin1(d));
+        for (int i = 0; i < local.size(); ++i) {
+            const QPointF& p = local[i];
+            if (p.x() < minX) minX = p.x(); if (p.x() > maxX) maxX = p.x();
+            if (p.y() < minY) minY = p.y(); if (p.y() > maxY) maxY = p.y();
+            hasAny = true;
+        }
+    }
+
+    if (!hasAny) return false;
+    QRectF localRect(QPointF(minX, minY), QPointF(maxX, maxY));
+    outRect = tf.mapRect(localRect);
+    return true;
 }
 
 } // namespace utils

@@ -67,6 +67,7 @@ public:
 		static CircuitConfig instance;
 		return &instance;
 	}
+	void Clear();
 	//************************************
 	// 函数名称:    LoadFile
 	// 函数全名:	CircuitConfig::LoadFile
@@ -200,7 +201,6 @@ public:
 protected:
 	//// 辅助函数组
 
-	void Clear();
 	// 解析SV、GSE的CIME文件
 	bool LoadVirtualCircuitFile(xcime::Cime& cime, VirtualType type);
 	//void SaveIedAsCime(xcime::Cime& cime, const IED* pIed);

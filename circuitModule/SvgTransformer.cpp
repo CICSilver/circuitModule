@@ -4,32 +4,20 @@
 #include <QDebug>
 #include <include/pugixml/pugixml.hpp>
 #include "svgmodel.h"
-#include <QThread>
-namespace {
-	class SvgGenThread : public QThread {
-	public:
-		typedef void (SvgTransformer::*GenFunc)(const IED*, const QString&);
-		SvgGenThread(const IED* ied, const QString& path, GenFunc fn)
-			: m_ied(ied), m_path(path), m_fn(fn) {}
-	protected:
-		void run() {
-			if (!m_ied || m_path.isEmpty() || !m_fn) return;
-			SvgTransformer t; // 线程内独立实例，避免共享状态
-			(t.*m_fn)(m_ied, m_path);
-		}
-	private:
-		const IED* m_ied;
-		QString m_path;
-		GenFunc m_fn;
-	};
-}
+#include <QElapsedTimer>
+
+QMutex g_fileWriteMutex;
 
 SvgTransformer::SvgTransformer()
 {
-	m_circuitConfig = CircuitConfig::Instance();
-	m_svgGenerator = new QSvgGenerator();
-	m_painter = new QPainter;
-	m_element_id = 0;
+        m_circuitConfig = CircuitConfig::Instance();
+        m_svgGenerator = new QSvgGenerator();
+        m_painter = new QPainter;
+        m_defaultFont.setFamily(DEFAULT_FONT_FAMILY);
+        m_defaultFont.setWeight(DEFAULT_FONT_WEIGHT);
+        m_defaultPen = QPen(Qt::black);
+        m_defaultBrush = QBrush(Qt::NoBrush);
+        m_element_id = 0;
 }
 
 SvgTransformer::~SvgTransformer()
@@ -96,17 +84,23 @@ void SvgTransformer::GenerateSvgByIedName(const QString& iedName)
 
 void SvgTransformer::GenerateLogicSvg(const IED* pIed, const QString& filePath)
 {
-	GenerateSvg<LogicSvg>(pIed, filePath, &SvgTransformer::GenerateLogicSvgByIed, &SvgTransformer::DrawLogicSvg);
+        QElapsedTimer timer; timer.start();
+        GenerateSvg<LogicSvg>(pIed, filePath, &SvgTransformer::GenerateLogicSvgByIed, &SvgTransformer::DrawLogicSvg);
+        qDebug() << "GenerateLogicSvg" << timer.elapsed() << "ms";
 }
 
 void SvgTransformer::GenerateOpticalSvg(const IED* pIed, const QString& filePath)
 {
-	GenerateSvg<OpticalSvg>(pIed, filePath, &SvgTransformer::GenerateOpticalSvgByIed, &SvgTransformer::DrawOpticalSvg);
+        QElapsedTimer timer; timer.start();
+        GenerateSvg<OpticalSvg>(pIed, filePath, &SvgTransformer::GenerateOpticalSvgByIed, &SvgTransformer::DrawOpticalSvg);
+        qDebug() << "GenerateOpticalSvg" << timer.elapsed() << "ms";
 }
 
 void SvgTransformer::GenerateVirtualSvg(const IED* pIed, const QString& filePath)
 {
-	GenerateSvg<VirtualSvg>(pIed, filePath, &SvgTransformer::GenerateVirtualSvgByIed, &SvgTransformer::DrawVirtualSvg);
+        QElapsedTimer timer; timer.start();
+        GenerateSvg<VirtualSvg>(pIed, filePath, &SvgTransformer::GenerateVirtualSvgByIed, &SvgTransformer::DrawVirtualSvg);
+        qDebug() << "GenerateVirtualSvg" << timer.elapsed() << "ms";
 }
 
 void SvgTransformer::GenerateWholeCircuitSvg(const IED* pIed, const QString& filePath)
@@ -128,34 +122,31 @@ void SvgTransformer::GenerateWholeCircuitSvg(const IED* pIed, const QString& fil
 //	}
 //}
 
-void SvgTransformer::GenerateAllSvgParallel(const IED* pIed,
-											const QString& logicFilePath,
-											const QString& opticalFilePath,
-											const QString& virtualFilePath,
-											const QString& wholeFilePath)
+void SvgTransformer::GenerateAllSvg(const IED* pIed,
+                                                                                const QString& logicFilePath,
+                                                                                const QString& opticalFilePath,
+                                                                                const QString& virtualFilePath,
+                                                                                const QString& wholeFilePath)
 {
-	if (!pIed) return;
-	QList<SvgGenThread*> threads;
-	if (!logicFilePath.isEmpty())   threads.append(new SvgGenThread(pIed, logicFilePath,   &SvgTransformer::GenerateLogicSvg));
-	if (!opticalFilePath.isEmpty()) threads.append(new SvgGenThread(pIed, opticalFilePath, &SvgTransformer::GenerateOpticalSvg));
-	if (!virtualFilePath.isEmpty()) threads.append(new SvgGenThread(pIed, virtualFilePath, &SvgTransformer::GenerateVirtualSvg));
-	if (!wholeFilePath.isEmpty())   threads.append(new SvgGenThread(pIed, wholeFilePath,   &SvgTransformer::GenerateWholeCircuitSvg));
-	for (int i = 0; i < threads.size(); ++i) threads[i]->start();
-	for (int i = 0; i < threads.size(); ++i) { threads[i]->wait(); delete threads[i]; }
+        if (!pIed) return;
+        if (!logicFilePath.isEmpty())   GenerateLogicSvg(pIed, logicFilePath);
+        if (!opticalFilePath.isEmpty()) GenerateOpticalSvg(pIed, opticalFilePath);
+        if (!virtualFilePath.isEmpty()) GenerateVirtualSvg(pIed, virtualFilePath);
+        if (!wholeFilePath.isEmpty())   GenerateWholeCircuitSvg(pIed, wholeFilePath);
 }
 
-void SvgTransformer::GenerateAllSvgByIedParallel(const QString& iedName, const QString& outputDir)
+void SvgTransformer::GenerateAllSvgByIed(const QString& iedName, const QString& outputDir)
 {
-	IED* pIed = m_circuitConfig->GetIedByName(iedName);
-	if (!pIed) return;
-	QString base = outputDir;
-	if (base.isEmpty()) base = QCoreApplication::applicationDirPath();
-	QString logic   = base + "/" + iedName + "_logic_circuit.svg";
-	QString optical = base + "/" + iedName + "_optical_circuit.svg";
-	QString virtualp= base + "/" + iedName + "_virtual_circuit.svg";
-	// 可选的整图
-	QString whole   = QString();
-	GenerateAllSvgParallel(pIed, logic, optical, virtualp, whole);
+        IED* pIed = m_circuitConfig->GetIedByName(iedName);
+        if (!pIed) return;
+        QString base = outputDir;
+        if (base.isEmpty()) base = QCoreApplication::applicationDirPath();
+        QString logic   = base + "/" + iedName + "_logic_circuit.svg";
+        QString optical = base + "/" + iedName + "_optical_circuit.svg";
+        QString virtualp= base + "/" + iedName + "_virtual_circuit.svg";
+        // 可选的整图
+        QString whole   = QString();
+        GenerateAllSvg(pIed, logic, optical, virtualp, whole);
 }
 
 

@@ -3,10 +3,17 @@
 #include "svgmodel.h"
 #include <qmath.h>
 #include <QPainter>
+#include <QFont>
+#include <QPen>
+#include <QBrush>
 #include <QSvgGenerator>
 #include <QTextStream>
 #include <QBuffer>
 #include <QByteArray>
+#include <QFile>
+#include <QMutex>
+#include <QMutexLocker>
+#include <sstream>
 #include <include/pugixml/pugixml.hpp>
 
 #define GET_RADIANS(angle) (angle * M_PI / 180)
@@ -136,15 +143,15 @@ public:
 
 	void GenerateSvgByIedName(const QString& iedName);
 
-	// 并行生成三种/多种 SVG（传入需要的输出路径，留空则跳过该类型）
-	void GenerateAllSvgParallel(const IED* pIed,
-								const QString& logicFilePath,
-								const QString& opticalFilePath,
-								const QString& virtualFilePath,
-								const QString& wholeFilePath = QString());
+        // 顺序生成多种 SVG（传入需要的输出路径，留空则跳过该类型）
+        void GenerateAllSvg(const IED* pIed,
+                                             const QString& logicFilePath,
+                                             const QString& opticalFilePath,
+                                             const QString& virtualFilePath,
+                                             const QString& wholeFilePath = QString());
 
-	// 便捷接口：按 IED 名称与输出目录生成（文件名约定：*_logic/_optical/_virtual/_whole）
-	void GenerateAllSvgByIedParallel(const QString& iedName, const QString& outputDir);
+        // 便捷接口：按 IED 名称与输出目录生成（文件名约定：*_logic/_optical/_virtual/_whole）
+        void GenerateAllSvgByIed(const QString& iedName, const QString& outputDir);
 
 	void GenerateLogicSvg(const IED* pIed, const QString& filePath);
 	void GenerateOpticalSvg(const IED* pIed, const QString& filePath);
@@ -164,21 +171,37 @@ protected:
 		//svgGenerator.setViewBox(QRect(0, 0, svg.viewBoxWidth, svg.viewBoxHeight));
 		svgGenerator.setViewBox(QRect(0, 0, SVG_VIEWBOX_WIDTH, SVG_VIEWBOX_HEIGHT));
 
-		m_painter->begin(&svgGenerator);
-		SvgType svg;
-		(this->*generateSvgFunc)(pIed, svg);
-		(this->*drawSvgFunc)(svg);
-		m_painter->end();
+                m_painter->begin(&svgGenerator);
+                m_painter->setFont(m_defaultFont);
+                m_painter->setPen(m_defaultPen);
+                m_painter->setBrush(m_defaultBrush);
+                SvgType svg;
+                (this->*generateSvgFunc)(pIed, svg);
+                (this->*drawSvgFunc)(svg);
+                m_painter->end();
 		buffer.close();
 
-		// 内存中解析与重标识，然后一次性落盘
-		pugi::xml_document doc;
-		if (buffer.data().size() > 0) {
-			doc.load_buffer(buffer.data().constData(), buffer.data().size());
-		}
-		ReSignSvg(doc, svg);
-		doc.save_file(filePath.toLocal8Bit());
-	}
+                // 内存中解析与重标识，然后一次性落盘
+                pugi::xml_document doc;
+                if (buffer.data().size() > 0) {
+                        doc.load_buffer(buffer.data().constData(), buffer.data().size());
+                }
+                ReSignSvg(doc, svg);
+
+                // 先保存到内存再串行写盘，减少文件系统竞争
+                std::ostringstream oss;
+                doc.save(oss);
+                QByteArray xmlData(oss.str().c_str(), oss.str().length());
+                extern QMutex g_fileWriteMutex;
+                {
+                        QMutexLocker locker(&g_fileWriteMutex);
+                        QFile out(filePath);
+                        if (out.open(QIODevice::WriteOnly)) {
+                                out.write(xmlData);
+                                out.close();
+                        }
+                }
+        }
 	//************************************
 	// 函数名称:	GenerateLogicSvgByIed
 	// 函数全名:	SvgTransformer::GenerateLogicSvgByIed
@@ -473,11 +496,14 @@ private:
 	// 调整SVG视图框大小
 	void ReSignSvgViewBox(pugi::xml_document& doc, int x, int y, int width, int height);
 private:
-	CircuitConfig* m_circuitConfig;
-	QSvgGenerator* m_svgGenerator;
-	QPainter* m_painter;
-	QString m_errStr;
-	// 用于SVG中图形组标识
+        CircuitConfig* m_circuitConfig;
+        QSvgGenerator* m_svgGenerator;
+        QPainter* m_painter;
+        QFont m_defaultFont;
+        QPen m_defaultPen;
+        QBrush m_defaultBrush;
+        QString m_errStr;
+        // 用于SVG中图形组标识
 	int m_element_id;		// 组成同一部分的图形元素的标识，例如一个压板图形的两个○和矩形
 	enum svgType
 	{

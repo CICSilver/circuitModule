@@ -23,6 +23,9 @@
 #include <QSvgRenderer>
 #include <QMouseEvent>
 #include "RtdbClient.h"
+#include <QThreadPool>
+#include <QRunnable>
+#include <QThread>
 
 using std::string;
 
@@ -74,10 +77,9 @@ int main(int argc, char* argv[]) {
 	//QString configPath = QCoreApplication::applicationDirPath() + "/circuit_config.csv";
 
 
-	CircuitConfig* pCircuitConfig = CircuitConfig::Instance();
-	pCircuitConfig->LoadCimeFile();
-	SvgTransformer transformer;
-	//transformer.GenerateSvgByIedName(iedName);
+        CircuitConfig* pCircuitConfig = CircuitConfig::Instance();
+        pCircuitConfig->LoadCimeFile();
+        //transformer.GenerateSvgByIedName(iedName);
 
 	// 实时库测试
 	//RunRtdbReadTest();
@@ -97,22 +99,38 @@ int main(int argc, char* argv[]) {
 		}
 	}
 	
-	foreach(IED * pIed, pCircuitConfig->GetIedList())
-	{
-		QString path;
-		if (pIed->name.contains("SW"))
-			continue;
-		// 一次性生成三类 SVG（顺序执行，兼容 Qt4/C++03）
-		transformer.GenerateAllSvgParallel(
-			pIed,
-			pathList.at(0) + "/" + pIed->name + "_logic_circuit.svg",
-			pathList.at(1) + "/" + pIed->name + "_optical_circuit.svg",
-			pathList.at(2) + "/" + pIed->name + "_virtual_circuit.svg"
-			// , pathList.at(3) + "/" + pIed->name + "_whole_circuit.svg" // 如需整图可打开
-		);
-		//transformer.GenerateWholeCircuitSvg(pIed, pathList.at(3) + "/" + pIed->name + "_whole_circuit.svg");
-	}
-	qDebug() << "SVG files generated successfully.";
+        class SvgTask : public QRunnable {
+        public:
+                SvgTask(IED* ied, const QString& logic, const QString& optical, const QString& virtualp)
+                        : m_ied(ied), m_logic(logic), m_optical(optical), m_virtual(virtualp) {}
+                void run() {
+                        SvgTransformer t;
+                        t.GenerateAllSvg(m_ied, m_logic, m_optical, m_virtual);
+                }
+        private:
+                IED* m_ied;
+                QString m_logic;
+                QString m_optical;
+                QString m_virtual;
+        };
+
+        QThreadPool pool;
+        int ideal = QThread::idealThreadCount();
+        if (ideal < 1) ideal = 1;
+        pool.setMaxThreadCount(qMin(ideal, 4));
+        foreach(IED * pIed, pCircuitConfig->GetIedList())
+        {
+                if (pIed->name.contains("SW"))
+                        continue;
+                SvgTask* task = new SvgTask(
+                        pIed,
+                        pathList.at(0) + "/" + pIed->name + "_logic_circuit.svg",
+                        pathList.at(1) + "/" + pIed->name + "_optical_circuit.svg",
+                        pathList.at(2) + "/" + pIed->name + "_virtual_circuit.svg");
+                pool.start(task);
+        }
+        pool.waitForDone();
+        qDebug() << "SVG files generated successfully.";
 
 
 	// 生成后释放内存

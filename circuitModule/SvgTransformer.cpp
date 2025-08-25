@@ -4,25 +4,7 @@
 #include <QDebug>
 #include <include/pugixml/pugixml.hpp>
 #include "svgmodel.h"
-#include <QThread>
-namespace {
-	class SvgGenThread : public QThread {
-	public:
-		typedef void (SvgTransformer::*GenFunc)(const IED*, const QString&);
-		SvgGenThread(const IED* ied, const QString& path, GenFunc fn)
-			: m_ied(ied), m_path(path), m_fn(fn) {}
-	protected:
-		void run() {
-			if (!m_ied || m_path.isEmpty() || !m_fn) return;
-			SvgTransformer t; // 线程内独立实例，避免共享状态
-			(t.*m_fn)(m_ied, m_path);
-		}
-	private:
-		const IED* m_ied;
-		QString m_path;
-		GenFunc m_fn;
-	};
-}
+#include "PainterStateGuard.h"
 
 SvgTransformer::SvgTransformer()
 {
@@ -112,50 +94,6 @@ void SvgTransformer::GenerateVirtualSvg(const IED* pIed, const QString& filePath
 void SvgTransformer::GenerateWholeCircuitSvg(const IED* pIed, const QString& filePath)
 {
 	GenerateSvg<WholeCircuitSvg>(pIed, filePath, &SvgTransformer::GenerateWholeCircuitSvgByIed, &SvgTransformer::DrawWholeSvg);
-}
-
-//namespace {
-//	// 独立执行单个类型的生成，避免共享成员带来的线程竞态
-//	template<typename SvgType>
-//	void runOne(const IED* pIed,
-//				const QString& filePath,
-//				void (SvgTransformer::* generate)(const IED*, SvgType&),
-//				void (SvgTransformer::* draw)(SvgType&))
-//	{
-//		if (filePath.isEmpty() || !pIed) return;
-//		SvgTransformer local; // 独立实例，拥有自己的 painter/generator
-//		local.GenerateSvg<SvgType>(pIed, filePath, generate, draw);
-//	}
-//}
-
-void SvgTransformer::GenerateAllSvgParallel(const IED* pIed,
-											const QString& logicFilePath,
-											const QString& opticalFilePath,
-											const QString& virtualFilePath,
-											const QString& wholeFilePath)
-{
-	if (!pIed) return;
-	QList<SvgGenThread*> threads;
-	if (!logicFilePath.isEmpty())   threads.append(new SvgGenThread(pIed, logicFilePath,   &SvgTransformer::GenerateLogicSvg));
-	if (!opticalFilePath.isEmpty()) threads.append(new SvgGenThread(pIed, opticalFilePath, &SvgTransformer::GenerateOpticalSvg));
-	if (!virtualFilePath.isEmpty()) threads.append(new SvgGenThread(pIed, virtualFilePath, &SvgTransformer::GenerateVirtualSvg));
-	if (!wholeFilePath.isEmpty())   threads.append(new SvgGenThread(pIed, wholeFilePath,   &SvgTransformer::GenerateWholeCircuitSvg));
-	for (int i = 0; i < threads.size(); ++i) threads[i]->start();
-	for (int i = 0; i < threads.size(); ++i) { threads[i]->wait(); delete threads[i]; }
-}
-
-void SvgTransformer::GenerateAllSvgByIedParallel(const QString& iedName, const QString& outputDir)
-{
-	IED* pIed = m_circuitConfig->GetIedByName(iedName);
-	if (!pIed) return;
-	QString base = outputDir;
-	if (base.isEmpty()) base = QCoreApplication::applicationDirPath();
-	QString logic   = base + "/" + iedName + "_logic_circuit.svg";
-	QString optical = base + "/" + iedName + "_optical_circuit.svg";
-	QString virtualp= base + "/" + iedName + "_virtual_circuit.svg";
-	// 可选的整图
-	QString whole   = QString();
-	GenerateAllSvgParallel(pIed, logic, optical, virtualp, whole);
 }
 
 
@@ -687,10 +625,8 @@ void SvgTransformer::DrawLogicSvg(LogicSvg& svg)
 	DrawExternalRect(svg.mainIedRect, QString::fromLocal8Bit("检修域"));	// 外部虚线框
 
 	// 关联IED
-	//m_painter->save();
 	DrawIedRect(svg.leftIedRectList);	// 左侧
 	DrawIedRect(svg.rightIedRectList);	// 右侧
-	//m_painter->restore();
 	DrawExternalRect(svg.leftIedRectList, QString::fromLocal8Bit("影响域"), true);	// 左侧外部虚线框，上方描述矩形
 	DrawExternalRect(svg.rightIedRectList, QString::fromLocal8Bit("影响域"));	// 右侧外部虚线框
 	
@@ -757,17 +693,17 @@ void SvgTransformer::DrawWholeSvg(WholeCircuitSvg& svg)
 		{
 		}
 	}
-	//svg.mainIedRect.pIed->
 }
 
 void SvgTransformer::DrawConnCircle(const QPoint& pt, int radius, bool isCircleUnderPt)
 {
-	m_painter->save();
+	//m_painter->save();
+	PAINTER_STATE_GUARD(m_painter);
 	QBrush brush(ColorHelper::Color(ColorHelper::pure_green));
 	m_painter->setBrush(brush);
 	int y = isCircleUnderPt ? pt.y() + radius : pt.y() - radius;
 	m_painter->drawEllipse(QPoint(pt.x(), y), radius, radius);
-	m_painter->restore();
+	// m_painter->restore();
 }
 
 
@@ -829,7 +765,8 @@ void SvgTransformer::AdjustExtendRectByCircuit(QList<IedRect*>& iedList, LogicSv
 
 void SvgTransformer::drawArrowHeader(const QPoint& endPoint, double arrowAngle, QColor color, int arrowLen)
 {
-	m_painter->save();
+	//m_painter->save();
+	PAINTER_STATE_GUARD(m_painter);
 	double arrowHeadLineAngle = 150;
 	QPointF leftArrowPoint = endPoint + QPointF(
 		arrowLen * cos(AngleToRadians(arrowAngle + arrowHeadLineAngle)),
@@ -850,7 +787,7 @@ void SvgTransformer::drawArrowHeader(const QPoint& endPoint, double arrowAngle, 
 	QVector<QPointF> points;
 	points << leftArrowPoint << offsetPoint << rightArrowPoint << endPoint;
 	m_painter->drawPolygon(points.data(), 4);
-	m_painter->restore();
+	// m_painter->restore();
 }
 
 double SvgTransformer::GetAngleByVec(const QPointF& vec) const
@@ -984,7 +921,7 @@ void SvgTransformer::AdjustMainSideCircuitLinePosition(const size_t circuitCnt, 
 
 void SvgTransformer::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QList<IedRect*>& rectList, IedRect* mainIed, bool isLeft)
 {
-	m_painter->save();
+	PAINTER_STATE_GUARD(m_painter);
     foreach(IedRect* rect, rectList)
     {
         foreach(LogicCircuitLine* pLogicLine, rect->logic_line_list)
@@ -1110,7 +1047,7 @@ void SvgTransformer::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QList<Ied
             }
         }
     }
-	m_painter->restore();
+	// m_painter->restore();
 }
 
 void SvgTransformer::AdjustVirtualCircuitPlatePosition(QHash<QString, PlateRect>& hash, const QString& iedName, const QPoint& linePt, const QString& plateDesc, const QString& plateRef, bool isSrcPlate, bool isSideSrc, bool isLeft)
@@ -1162,7 +1099,8 @@ void SvgTransformer::AdjustVirtualCircuitPlatePosition(QHash<QString, PlateRect>
 
 void SvgTransformer::DrawIedRect(IedRect* rect)
 {
-	m_painter->save();
+	//m_painter->save();
+	PAINTER_STATE_GUARD(m_painter);
 	QPen pen;
 	QBrush brush(rect->underground_color);
 
@@ -1197,7 +1135,7 @@ void SvgTransformer::DrawIedRect(IedRect* rect)
 	}
 
 
-	m_painter->restore();
+	// m_painter->restore();
 	DrawTextInRect(rect, rect->iedName, rect->iedDesc);
 }
 
@@ -1212,7 +1150,8 @@ void SvgTransformer::DrawIedRect(QList<IedRect*>& rectList)
 
 void SvgTransformer::DrawSwitcherRect(IedRect* rect)
 {
-	m_painter->save();
+	//m_painter->save();
+	PAINTER_STATE_GUARD(m_painter);
 	QPen pen;
 	pen.setColor(rect->border_color);
 	m_painter->setPen(pen);
@@ -1222,7 +1161,7 @@ void SvgTransformer::DrawSwitcherRect(IedRect* rect)
 	font.setPointSize(TYPE_Switcher);
 	m_painter->setFont(font);
 	m_painter->fillRect(rect->x, rect->y, rect->width, rect->height, brush);
-	m_painter->restore();
+	// m_painter->restore();
 	DrawTextInRect(rect, rect->iedName, rect->iedDesc, 18);
 }
 
@@ -1356,7 +1295,8 @@ void SvgTransformer::DrawLogicCircuitLine(QList<IedRect*>& rectList)
 	{
 		foreach(LogicCircuitLine* line, rect->logic_line_list)
 		{
-			m_painter->save();
+			//m_painter->save();
+			PAINTER_STATE_GUARD(m_painter);
 			QPen pen;
 			pen.setStyle(Qt::SolidLine);
 			QColor color = line->pLogicCircuit->type == SV ? ColorHelper::Color(ColorHelper::line_smv) : ColorHelper::Color(ColorHelper::line_gse);
@@ -1384,7 +1324,7 @@ void SvgTransformer::DrawLogicCircuitLine(QList<IedRect*>& rectList)
 			font.setPointSize(TYPE_Circuit_Arrow);
 			m_painter->setFont(font);
 			drawArrowHeader(GetArrowPt(line->endPoint, ARROW_LEN, 0, angle, false), angle, color);
-			m_painter->restore();
+			// m_painter->restore();
 		}
 	}
 }
@@ -1397,7 +1337,8 @@ void SvgTransformer::DrawVirtualCircuitLine(QList<IedRect*>& rectList)
 		{
 			foreach(VirtualCircuitLine * pVtLine, pLogicLine->virtual_line_list)
 			{
-				m_painter->save();
+				//m_painter->save();
+				PAINTER_STATE_GUARD(m_painter);
 				QPen pen;
 				QColor green = ColorHelper::Color(ColorHelper::pure_green);
 				pen.setColor(green);
@@ -1442,7 +1383,7 @@ void SvgTransformer::DrawVirtualCircuitLine(QList<IedRect*>& rectList)
 				m_painter->setFont(font);
 				drawArrowHeader(pVtLine->endPoint, GetAngleByVec(pVtLine->endPoint - pVtLine->startPoint));
 				
-				m_painter->restore();
+				// m_painter->restore();
 			}
 		}
 	}
@@ -1452,7 +1393,8 @@ void SvgTransformer::DrawOpticalLine(OpticalCircuitLine* optLine)
 {
     QPen pen;
     pen.setColor(ColorHelper::Color(ColorHelper::pure_green));
-    m_painter->save();
+    //m_painter->save();
+	PAINTER_STATE_GUARD(m_painter);
     m_painter->setPen(pen);
 	// 记录链路信息到SVG文件
 	QFont font;
@@ -1503,13 +1445,15 @@ void SvgTransformer::DrawOpticalLine(OpticalCircuitLine* optLine)
         drawArrowHeader(GetArrowPt(optLine->endPoint, ARROW_LEN, CONN_R, inAngle, optLine->endPoint.y() > underRectY), inAngle);
     }
 
-    m_painter->restore();
+    // m_painter->restore();
 }
 
 void SvgTransformer::DrawPortText(OpticalCircuitLine* line, int conn_r)
 {
 	// 端口号绘制在矩形和连接点直接
-	m_painter->save();
+	//PainterStateGuard __painter_guard(m_painter);
+	//m_painter->save();
+	PAINTER_STATE_GUARD(m_painter);
 	int offset = conn_r * 2 + 10;	// 端口号与连接点的偏移量
 	QPen pen;
 	pen.setColor(ColorHelper::Color(ColorHelper::pure_white));
@@ -1538,7 +1482,7 @@ void SvgTransformer::DrawPortText(OpticalCircuitLine* line, int conn_r)
 	m_painter->drawText(QRect(topPort_lt_pt, topPort_rb_pt), topPort);
 	m_painter->drawText(QRect(bottomPort_lt_pt, bottomPort_rb_pt), bottomPort);
 
-	m_painter->restore();
+	// m_painter->restore();
 }
 
 void SvgTransformer::DrawWholeCircuitLine(CircuitLine* pCircuitLine, QPoint& startPoint)
@@ -1564,10 +1508,9 @@ void SvgTransformer::DrawVirtualIcon(const QPoint& pt, VirtualType _type, const 
 
 void SvgTransformer::DrawVirtualText(const QRect& rect, QString val)
 {
-	m_painter->save();
+	//m_painter->save();
+	PAINTER_STATE_GUARD(m_painter);
 
-	// 约定：当传入的 rect 高度为 0 时，表示这是“数值占位标签”，不直接绘制数字，
-	// 仅在 SVG 中留下一个不可见的占位元素，由交互层 InteractiveSvgItem 动态绘制。
 	if (rect.height() == 0) {
 		// 使用 font-family 携带占位信息：id 以及矩形位置尺寸
 		// group0: id，仅用流水 m_element_id
@@ -1587,7 +1530,7 @@ void SvgTransformer::DrawVirtualText(const QRect& rect, QString val)
 		m_painter->setPen(pen);
 		m_painter->setBrush(brush);
 		m_painter->drawRect(rect);
-		m_painter->restore();
+		// m_painter->restore();
 		return;
 	}
 
@@ -1599,14 +1542,15 @@ void SvgTransformer::DrawVirtualText(const QRect& rect, QString val)
 	m_painter->setPen(pen);
 	m_painter->setFont(font);
 	m_painter->drawText(rect, val);
-	m_painter->restore();
+	// m_painter->restore();
 }
 
 void SvgTransformer::DrawPlate(const QHash<QString, PlateRect>& hash)
 {
 	foreach(const PlateRect& plateRect, hash)
 	{
-		m_painter->save();
+		//m_painter->save();
+		PAINTER_STATE_GUARD(m_painter);
 		// 绘制压板矩形
 		QPen pen;
 		QFont font;
@@ -1636,13 +1580,14 @@ void SvgTransformer::DrawPlate(const QHash<QString, PlateRect>& hash)
 		font.setPointSize(TYPE_Plate_HITBOX);
 		m_painter->setFont(font);
 		m_painter->drawRect(QRect(QPoint(centerPt.x() - PLATE_CIRCLE_RADIUS, centerPt.y() - PLATE_CIRCLE_RADIUS), QSize(PLATE_WIDTH, PLATE_HEIGHT)));
-		m_painter->restore();
+		// m_painter->restore();
 	}
 }
 
 void SvgTransformer::DrawGseIcon(const QPoint& pt, const quint32 color)
 {
-	m_painter->save();
+	PAINTER_STATE_GUARD(m_painter);
+	//m_painter->save();
 	//float iconScale = 0.07;
 	// 绘制边框
 	QPen pen;
@@ -1670,12 +1615,13 @@ void SvgTransformer::DrawGseIcon(const QPoint& pt, const quint32 color)
 	pen.setWidth(2);
 	m_painter->setPen(pen);
 	m_painter->drawPolyline(points, 6);
-	m_painter->restore();
+	// m_painter->restore();
 }
 
 void SvgTransformer::DrawSvIcon(const QPoint& pt, const quint32 color)
 {
-	m_painter->save();
+	PAINTER_STATE_GUARD(m_painter);
+	//m_painter->save();
 	// 绘制边框
 	QPen pen;
 	pen.setColor(ColorHelper::Color(color));
@@ -1699,12 +1645,13 @@ void SvgTransformer::DrawSvIcon(const QPoint& pt, const quint32 color)
 	pen.setWidth(2);
 	m_painter->setPen(pen);
 	m_painter->drawPath(path);
-	m_painter->restore();
+	// m_painter->restore();
 }
 
 void SvgTransformer::DrawPlateIcon(const QPoint& centerPt, bool status, const QString& info)
 {
-    m_painter->save();
+	PAINTER_STATE_GUARD(m_painter);
+    //m_painter->save();
     quint32 color = status ? ColorHelper::pure_green : ColorHelper::pure_red; // 根据闭合状态使用默认颜色
     QPen pen;
     QFont font;
@@ -1743,7 +1690,7 @@ void SvgTransformer::DrawPlateIcon(const QPoint& centerPt, bool status, const QS
 		m_painter->drawLine(ptList[0], ptList[1]);
 		m_painter->drawLine(ptList[2], ptList[3]);
 	}
-	m_painter->restore();
+	// m_painter->restore();
 }
 
 void SvgTransformer::ReSignIedRect(pugi::xml_document& doc)
@@ -1763,181 +1710,6 @@ void SvgTransformer::ReSignIedRect(pugi::xml_document& doc)
 	}
 }
 
-void SvgTransformer::ReSignSvg(pugi::xml_document& doc, BaseSvg& svg)
-{
-	if (!doc.document_element()) return;
-
-	// 单次遍历所有 <g> 节点，按 font-size 分发，避免多次 XPath 全文扫描
-	struct Walker {
-		SvgTransformer* self;
-
-		void resetFont(pugi::xml_node node, bool resetWeight)
-		{
-			pugi::xml_attribute fam = node.attribute("font-family");
-			if (!fam) fam = node.append_attribute("font-family");
-			fam.set_value("SimSun");
-			pugi::xml_attribute fs = node.attribute("font-size");
-			if (!fs) fs = node.append_attribute("font-size");
-			fs.set_value("15");
-			if (resetWeight) {
-				pugi::xml_attribute fw = node.attribute("font-weight");
-				if (!fw) fw = node.append_attribute("font-weight");
-				fw.set_value("400");
-			}
-		}
-
-		void processG(pugi::xml_node g)
-		{
-			int fsVal = g.attribute("font-size").as_int(0);
-			if (fsVal == SvgTransformer::TYPE_IED) {
-				// IED 矩形标识
-				QString iedName = g.attribute("font-family").value();
-				g.append_attribute("iedname").set_value(iedName.toStdString().c_str());
-				g.append_attribute("type").set_value("ied");
-				resetFont(g, false);
-				return;
-			}
-			if (fsVal == SvgTransformer::TYPE_LogicCircuit) {
-				QString packed = g.attribute("font-family").value();
-				QList<QStringList> grp = self->splitGroupAndFields(packed);
-				QString id = self->getField(grp, 0, 0);
-				QString srcIedName = self->getField(grp, 1, 0);
-				QString cbName = self->getField(grp, 1, 1);
-				QString destIedName = self->getField(grp, 2, 0);
-				QString circuitId = g.attribute("font-weight").value();
-				g.append_attribute("id").set_value(id.toStdString().c_str());
-				g.append_attribute("src-iedname").set_value(srcIedName.toStdString().c_str());
-				g.append_attribute("src-cbname").set_value(cbName.toStdString().c_str());
-				g.append_attribute("dest-iedname").set_value(destIedName.toStdString().c_str());
-				g.append_attribute("type").set_value("logic");
-				g.append_attribute("circuit-code").set_value(circuitId.toStdString().c_str());
-				resetFont(g, true);
-				return;
-			}
-			if (fsVal == SvgTransformer::TYPE_OpticalCircuit) {
-				QString attrStr = g.attribute("font-family").value();
-				QList<QStringList> strList = self->splitGroupAndFields(attrStr);
-				QString id = g.attribute("font-weight").value();
-				QString code = self->getField(strList, 0, 0);
-				QString srcIedName = self->getField(strList, 1, 0);
-				QString srcPort = self->getField(strList, 1, 1);
-				QString destIedName = self->getField(strList, 2, 0);
-				QString destPort = self->getField(strList, 2, 1);
-				QString connStatus = self->getField(strList, 3, 0);
-				QString remoteId = self->getField(strList, 4, 0);
-
-				g.append_attribute("src-ied").set_value(srcIedName.toStdString().c_str());
-				g.append_attribute("src-port").set_value(srcPort.toStdString().c_str());
-				g.append_attribute("dest-ied").set_value(destIedName.toStdString().c_str());
-				g.append_attribute("dest-port").set_value(destPort.toStdString().c_str());
-				g.append_attribute("code").set_value(code.toStdString().c_str());
-				g.append_attribute("status").set_value(connStatus.toStdString().c_str());
-				g.append_attribute("remote-id").set_value(remoteId.toStdString().c_str());
-				g.append_attribute("type").set_value("optical");
-				g.append_attribute("id").set_value(id.toStdString().c_str());
-				resetFont(g, true);
-				return;
-			}
-			if (fsVal == SvgTransformer::TYPE_Optical_ConnCircle) {
-				QString id = g.attribute("font-weight").value();
-				g.append_attribute("id").set_value(id.toStdString().c_str());
-				resetFont(g, true);
-				return;
-			}
-			if (fsVal == SvgTransformer::TYPE_VirtualCircuit) {
-				QString attrStr = g.attribute("font-family").value();
-				QList<QStringList> strList = self->splitGroupAndFields(attrStr);
-				QString id = self->getField(strList, 0, 0);
-				QString srcIedName = self->getField(strList, 1, 0);
-				QString destIedName = self->getField(strList, 1, 1);
-				QString srcSoftPlateDesc = self->getField(strList, 2, 0);
-				QString destSoftPlateDesc = self->getField(strList, 2, 1);
-				QString srcSoftPlateRef = self->getField(strList, 3, 0);
-				QString destSoftPlateRef = self->getField(strList, 3, 1);
-				QString remoteId = self->getField(strList, 6, 0);
-				QString remoteSigId_A = self->getField(strList, 6, 1);
-				QString remoteSigId_B = self->getField(strList, 6, 2);
-				QString vType = self->getField(strList, 7, 0);
-
-				g.append_attribute("id").set_value(id.toStdString().c_str());
-				g.append_attribute("srcIedName").set_value(srcIedName.toStdString().c_str());
-				g.append_attribute("destIedName").set_value(destIedName.toStdString().c_str());
-				g.append_attribute("srcSoftPlateDesc").set_value(srcSoftPlateDesc.toStdString().c_str());
-				g.append_attribute("destSoftPlateDesc").set_value(destSoftPlateDesc.toStdString().c_str());
-				g.append_attribute("srcSoftPlateRef").set_value(srcSoftPlateRef.toStdString().c_str());
-				g.append_attribute("destSoftPlateRef").set_value(destSoftPlateRef.toStdString().c_str());
-				g.append_attribute("remoteId").set_value(remoteId.toStdString().c_str());
-				g.append_attribute("remoteSigId_A").set_value(remoteSigId_A.toStdString().c_str());
-				g.append_attribute("remoteSigId_B").set_value(remoteSigId_B.toStdString().c_str());
-				g.append_attribute("type").set_value("virtual");
-				g.append_attribute("virtual-type").set_value(vType.toStdString().c_str());
-				resetFont(g, true);
-				return;
-			}
-			if (fsVal == SvgTransformer::TYPE_Circuit_Arrow) {
-				QString arrowDesc = g.attribute("font-family").value();
-				QString id = self->getField(self->splitGroupAndFields(arrowDesc), 0, 0);
-				g.append_attribute("id").set_value(id.toStdString().c_str());
-				g.append_attribute("type").set_value("arrow");
-				resetFont(g, true);
-				return;
-			}
-			if (fsVal == SvgTransformer::TYPE_Plate_HITBOX) {
-				QString plateDesc = g.attribute("font-family").value();
-				QList<QStringList> grp = self->splitGroupAndFields(plateDesc);
-				QString id = self->getField(grp, 0, 0);
-				QString desc = self->getField(grp, 1, 0);
-				QString ref = self->getField(grp, 1, 1);
-				g.append_attribute("id").set_value(id.toStdString().c_str());
-				g.append_attribute("plate-desc").set_value(desc.toStdString().c_str());
-				g.append_attribute("plate-ref").set_value(ref.toStdString().c_str());
-				g.append_attribute("type").set_value("plate");
-				resetFont(g, false);
-				return;
-			}
-			if (fsVal == SvgTransformer::TYPE_Plate_RECT || fsVal == SvgTransformer::TYPE_Plate_ICON) {
-				QString plateDesc = g.attribute("font-family").value();
-				QList<QStringList> grp = self->splitGroupAndFields(plateDesc);
-				QString id = self->getField(grp, 0, 0);
-				g.append_attribute("type").set_value("plate-component");
-				g.append_attribute("id").set_value(id.toStdString().c_str());
-				resetFont(g, false);
-				return;
-			}
-			if (fsVal == SvgTransformer::TYPE_Virtual_Value) {
-				QString packed = g.attribute("font-family").value();
-				QList<QStringList> groups = self->splitGroupAndFields(packed);
-				QString id = self->getField(groups, 0, 0);
-				QString x = self->getField(groups, 1, 0);
-				QString y = self->getField(groups, 1, 1);
-				QString w = self->getField(groups, 1, 2);
-				QString h = self->getField(groups, 1, 3);
-				g.append_attribute("type").set_value("virtual-value");
-				g.append_attribute("id").set_value(id.toStdString().c_str());
-				g.append_attribute("x").set_value(x.toStdString().c_str());
-				g.append_attribute("y").set_value(y.toStdString().c_str());
-				g.append_attribute("w").set_value(w.toStdString().c_str());
-				g.append_attribute("h").set_value(h.toStdString().c_str());
-				resetFont(g, true);
-				return;
-			}
-		}
-
-		void run(pugi::xml_node n)
-		{
-			for (pugi::xml_node c = n.first_child(); c; c = c.next_sibling()) {
-				if (qstrcmp(c.name(), "g") == 0) processG(c);
-				if (c.first_child()) run(c);
-			}
-		}
-	} w;
-	w.self = this;
-	pugi::xml_node root = doc.document_element();
-	if (root) w.run(root);
-
-	ReSignSvgViewBox(doc, svg.viewBoxX, svg.viewBoxY, svg.viewBoxWidth, svg.viewBoxHeight);
-}
-
 void SvgTransformer::ReSignSvg(const QString& filename, BaseSvg& svg)
 {
 	pugi::xml_document doc;
@@ -1947,7 +1719,13 @@ void SvgTransformer::ReSignSvg(const QString& filename, BaseSvg& svg)
 		qDebug() << __FILE__ << __LINE__ << "load file failed";
 		return;
 	}
-	ReSignSvg(doc, svg);
+
+	ReSignIedRect(doc);
+	ReSignCircuitLine(doc);
+	ReSignPlate(doc);
+	ReSignVirtualValuePlaceholders(doc);
+	ReSignSvgViewBox(doc, svg.viewBoxX, svg.viewBoxY, svg.viewBoxWidth, svg.viewBoxHeight);
+
 	if (!doc.save_file(filename.toLocal8Bit()))
 	{
 		qDebug() << "save file failed";

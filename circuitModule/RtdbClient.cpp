@@ -18,7 +18,7 @@ bool RtdbClient::open(RtdbOpenType eType) {
 bool RtdbClient::getIedList(std::list<CRtdbEleModelIed*>& listIed) const
 {
     return false;
-}
+}  
 
 // 读取模拟量：RTDB_GetEle -> 解析 stuRtdbAnalog
 bool RtdbClient::getAnalog(qulonglong code, double& outValue, bool applyScale,

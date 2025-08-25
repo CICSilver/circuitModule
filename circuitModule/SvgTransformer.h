@@ -5,9 +5,6 @@
 #include <QPainter>
 #include <QSvgGenerator>
 #include <QTextStream>
-#include <QBuffer>
-#include <QByteArray>
-#include <include/pugixml/pugixml.hpp>
 
 #define GET_RADIANS(angle) (angle * M_PI / 180)
 // 字符串组分隔符 grp = field 0x1F field
@@ -136,16 +133,6 @@ public:
 
 	void GenerateSvgByIedName(const QString& iedName);
 
-	// 并行生成三种/多种 SVG（传入需要的输出路径，留空则跳过该类型）
-	void GenerateAllSvgParallel(const IED* pIed,
-								const QString& logicFilePath,
-								const QString& opticalFilePath,
-								const QString& virtualFilePath,
-								const QString& wholeFilePath = QString());
-
-	// 便捷接口：按 IED 名称与输出目录生成（文件名约定：*_logic/_optical/_virtual/_whole）
-	void GenerateAllSvgByIedParallel(const QString& iedName, const QString& outputDir);
-
 	void GenerateLogicSvg(const IED* pIed, const QString& filePath);
 	void GenerateOpticalSvg(const IED* pIed, const QString& filePath);
 	void GenerateVirtualSvg(const IED* pIed, const QString& filePath);
@@ -158,26 +145,20 @@ protected:
 	{
 		if (!pIed || filePath.isEmpty()) return;
 		QSvgGenerator svgGenerator;
-		QBuffer buffer;
-		buffer.open(QIODevice::WriteOnly);
-		svgGenerator.setOutputDevice(&buffer);
+
+		svgGenerator.setFileName(filePath);
 		//svgGenerator.setViewBox(QRect(0, 0, svg.viewBoxWidth, svg.viewBoxHeight));
 		svgGenerator.setViewBox(QRect(0, 0, SVG_VIEWBOX_WIDTH, SVG_VIEWBOX_HEIGHT));
 
 		m_painter->begin(&svgGenerator);
+		QPainter painter;
 		SvgType svg;
 		(this->*generateSvgFunc)(pIed, svg);
 		(this->*drawSvgFunc)(svg);
-		m_painter->end();
-		buffer.close();
 
-		// 内存中解析与重标识，然后一次性落盘
-		pugi::xml_document doc;
-		if (buffer.data().size() > 0) {
-			doc.load_buffer(buffer.data().constData(), buffer.data().size());
-		}
-		ReSignSvg(doc, svg);
-		doc.save_file(filePath.toLocal8Bit());
+		m_painter->end();
+		svgGenerator.setFileName(QString());
+		ReSignSvg(filePath, svg);
 	}
 	//************************************
 	// 函数名称:	GenerateLogicSvgByIed
@@ -460,8 +441,6 @@ private:
 
 	// 对SVG文件进行解析重标识
 	void ReSignSvg(const QString&filename, BaseSvg& svg);
-	// 内存文档版本的重标识（避免二次磁盘IO）
-	void ReSignSvg(pugi::xml_document& doc, BaseSvg& svg);
 	// 重标识IED属性
 	void ReSignIedRect(pugi::xml_document& doc);
 	// 重标识链路属性

@@ -96,6 +96,9 @@
     <ClInclude Include="include\rtdb\YsdRtdbInclude.h">
       <Filter>thirdparty\rtdb</Filter>
     </ClInclude>
+    <ClInclude Include="PainterStateGuard.h">
+      <Filter>header</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="mainwindow.h">

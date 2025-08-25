@@ -142,6 +142,7 @@
     <ClInclude Include="include\rtdb\YsdRtdbEle.h" />
     <ClInclude Include="include\rtdb\YsdRtdbInclude.h" />
     <ClInclude Include="InteractiveSvgItem.h" />
+    <ClInclude Include="PainterStateGuard.h" />
     <ClInclude Include="RtdbClient.h" />
     <ClInclude Include="svgmodel.h" />
     <ClInclude Include="SvgTransformer.h" />

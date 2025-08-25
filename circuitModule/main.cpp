@@ -72,7 +72,7 @@ int main(int argc, char* argv[]) {
 	QString iedName = "IMT2201L1";
 	//QString scdPath = QCoreApplication::applicationDirPath() + "/scd_test.scd";
 	//QString configPath = QCoreApplication::applicationDirPath() + "/circuit_config.csv";
-
+	QElapsedTimer timer;
 
 	CircuitConfig* pCircuitConfig = CircuitConfig::Instance();
 	pCircuitConfig->LoadCimeFile();
@@ -80,7 +80,7 @@ int main(int argc, char* argv[]) {
 	//transformer.GenerateSvgByIedName(iedName);
 
 	// 实时库测试
-	//RunRtdbReadTest();
+	RunRtdbReadTest();
 
 	QList<QString> pathList;
 	pathList
@@ -96,27 +96,20 @@ int main(int argc, char* argv[]) {
 			dir.mkpath(path);
 		}
 	}
-	
 	foreach(IED * pIed, pCircuitConfig->GetIedList())
 	{
 		QString path;
 		if (pIed->name.contains("SW"))
 			continue;
-		// 一次性生成三类 SVG（顺序执行，兼容 Qt4/C++03）
-		transformer.GenerateAllSvgParallel(
-			pIed,
-			pathList.at(0) + "/" + pIed->name + "_logic_circuit.svg",
-			pathList.at(1) + "/" + pIed->name + "_optical_circuit.svg",
-			pathList.at(2) + "/" + pIed->name + "_virtual_circuit.svg"
-			// , pathList.at(3) + "/" + pIed->name + "_whole_circuit.svg" // 如需整图可打开
-		);
+		transformer.GenerateLogicSvg(pIed, pathList.at(0) + "/" + pIed->name + "_logic_circuit.svg");
+		transformer.GenerateOpticalSvg(pIed, pathList.at(1) + "/" + pIed->name + "_optical_circuit.svg");
+		transformer.GenerateVirtualSvg(pIed, pathList.at(2) + "/" + pIed->name + "_virtual_circuit.svg");
 		//transformer.GenerateWholeCircuitSvg(pIed, pathList.at(3) + "/" + pIed->name + "_whole_circuit.svg");
 	}
 	qDebug() << "SVG files generated successfully.";
 
 
-	// 生成后释放内存
-	//pCircuitConfig->Clear();
+
 	//QString svgPath = QCoreApplication::applicationDirPath() + "/PT2202A_virtual_circuit.svg";
 	//showSingleSvg(svgPath);
 

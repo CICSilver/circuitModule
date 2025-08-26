@@ -120,103 +120,6 @@ void SvgTransformer::GenerateLogicSvgByIed(const IED* pIed, LogicSvg& svg)
 	// 调整链路位置
 	AdjustLogicCircuitLinePosition(svg);
 
-	//if (svg.mainIedRect) {
-	//	QFont font; font.setPointSize(15);
-	//	QFontMetrics fm(font);
-	//	int titleWidthMain = fm.width(QString::fromLocal8Bit("检修域"));
-	//	int titleWidthSide = fm.width(QString::fromLocal8Bit("影响域"));
-	//	int descHeight = fm.height() * 2 + 10;
-	//	const int descGap = 20;
-
-	//	int minX = svg.mainIedRect->x - svg.mainIedRect->horizontal_margin - titleWidthMain;
-	//	int maxX = svg.mainIedRect->x + svg.mainIedRect->width + svg.mainIedRect->horizontal_margin;
-	//	int minY = svg.mainIedRect->y - svg.mainIedRect->vertical_margin;
-	//	int maxY = svg.mainIedRect->GetExtendBottomY() + svg.mainIedRect->vertical_margin;
-
-	//	// 左列（含标题和说明框）
-	//	if (!svg.leftIedRectList.isEmpty()) {
-	//		IedRect* first = svg.leftIedRectList.first();
-	//		IedRect* last = svg.leftIedRectList.last();
-	//		int extLeftX = first->x - first->horizontal_margin - titleWidthSide;
-	//		if (extLeftX < minX) minX = extLeftX;
-	//		int extTopY = first->y - first->vertical_margin;
-	//		int descTopY = extTopY - (descHeight + descGap);
-	//		if (descTopY < minY) minY = descTopY;
-	//		int extRightX = first->x + first->width + first->horizontal_margin;
-	//		if (extRightX > maxX) maxX = extRightX;
-	//		int extBottomY = last->y + last->height + last->vertical_margin;
-	//		if (extBottomY > maxY) maxY = extBottomY;
-	//		foreach (IedRect* r, svg.leftIedRectList) {
-	//			if (!r) continue;
-	//			int l = r->x - r->horizontal_margin;
-	//			int rgt = r->x + r->width + r->horizontal_margin;
-	//			int top = r->y - r->vertical_margin;
-	//			int bot = r->GetExtendBottomY() + r->vertical_margin;
-	//			if (l < minX) minX = l;
-	//			if (rgt > maxX) maxX = rgt;
-	//			if (top < minY) minY = top;
-	//			if (bot > maxY) maxY = bot;
-	//		}
-	//	}
-	//	// 右列（含标题，不含说明框）
-	//	if (!svg.rightIedRectList.isEmpty()) {
-	//		IedRect* first = svg.rightIedRectList.first();
-	//		IedRect* last = svg.rightIedRectList.last();
-	//		int extLeftX = first->x - first->horizontal_margin - titleWidthSide;
-	//		if (extLeftX < minX) minX = extLeftX;
-	//		int extTopY = first->y - first->vertical_margin;
-	//		if (extTopY < minY) minY = extTopY;
-	//		int extRightX = first->x + first->width + first->horizontal_margin;
-	//		if (extRightX > maxX) maxX = extRightX;
-	//		int extBottomY = last->y + last->height + last->vertical_margin;
-	//		if (extBottomY > maxY) maxY = extBottomY;
-	//		foreach (IedRect* r, svg.rightIedRectList) {
-	//			if (!r) continue;
-	//			int l = r->x - r->horizontal_margin;
-	//			int rgt = r->x + r->width + r->horizontal_margin;
-	//			int top = r->y - r->vertical_margin;
-	//			int bot = r->GetExtendBottomY() + r->vertical_margin;
-	//			if (l < minX) minX = l;
-	//			if (rgt > maxX) maxX = rgt;
-	//			if (top < minY) minY = top;
-	//			if (bot > maxY) maxY = bot;
-	//		}
-	//	}
-	//	int w = maxX - minX;
-	//	int h = maxY - minY;
-	//	if (w > 0) svg.viewBoxWidth = w;
-	//	if (h > 0) svg.viewBoxHeight = h;
-	//}
-
-	// 计算逻辑图 viewBox 尺寸（内容边界 + 边距），以保证导出后视图自适应
-	//if (svg.mainIedRect) {
-	//	int minX = svg.mainIedRect->x - svg.mainIedRect->horizontal_margin;
-	//	int maxX = svg.mainIedRect->x + svg.mainIedRect->width + svg.mainIedRect->horizontal_margin;
-	//	int minY = svg.mainIedRect->y - svg.mainIedRect->vertical_margin;
-	//	int maxY = svg.mainIedRect->GetExtendBottomY() + svg.mainIedRect->vertical_margin;
-	//	// 左侧 IED
-	//	foreach(IedRect* r, svg.leftIedRectList) {
-	//		if (!r) continue;
-	//		if (r->x - r->horizontal_margin < minX) minX = r->x - r->horizontal_margin;
-	//		if (r->x + r->width + r->horizontal_margin > maxX) maxX = r->x + r->width + r->horizontal_margin;
-	//		if (r->y - r->vertical_margin < minY) minY = r->y - r->vertical_margin;
-	//		int by = r->GetExtendBottomY() + r->vertical_margin;
-	//		if (by > maxY) maxY = by;
-	//	}
-	//	// 右侧 IED
-	//	foreach(IedRect* r, svg.rightIedRectList) {
-	//		if (!r) continue;
-	//		if (r->x - r->horizontal_margin < minX) minX = r->x - r->horizontal_margin;
-	//		if (r->x + r->width + r->horizontal_margin > maxX) maxX = r->x + r->width + r->horizontal_margin;
-	//		if (r->y - r->vertical_margin < minY) minY = r->y - r->vertical_margin;
-	//		int by = r->GetExtendBottomY() + r->vertical_margin;
-	//		if (by > maxY) maxY = by;
-	//	}
-	//	if (minX < 0) minX = 0; if (minY < 0) minY = 0;
-	//	int w = maxX - minX;
-	//	int h = maxY - minY;
-	//	if (w > 0) svg.viewBoxWidth = w; if (h > 0) svg.viewBoxHeight = h;
-	//}
 }
 
 void SvgTransformer::ParseCircuitFromIed(LogicSvg& svg, const IED* pIed)
@@ -277,7 +180,6 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 	const int horizontal_distance = 50;
 	const int vertical_distance = 150;
 	const int switcherWidth = SVG_VIEWBOX_WIDTH * 0.75;
-	int iedWithSwCnt = 0;	// 经过交换机的设备数量
 	QList<IedRect*> directRectList;		// 直连IED列表
 	QList<IedRect*> indirectRectList;	// 经过交换机的IED列表
 	QHash<IedRect*, qint8> connectPtHash;	// 记录连接点数量，交换机不记录直接绘制垂直线
@@ -297,6 +199,10 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 		// 主IED没有连接其他设备，直接返回
 		return;
 	}
+	if(pIed->name == "PL2205NA")
+	{
+		int a = 1;
+	}
 	foreach(OpticalCircuit * optCircuit, pIed->optical_list_new)
 	{
 		// 一端为主IED，另一端为对侧IED的光纤链路
@@ -305,13 +211,11 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 		{
 			optLine = new OpticalCircuitLine();
 			optLine->lineCode = optCircuit->code;
-			optLine->arrowState |= optCircuit->srcIedName == pIed->name ? Arrow_Out : Arrow_In;	// 判断方向
 			optLine->pOpticalCircuit = optCircuit;
 			svg.opticalCircuitLineList.append(optLine);
-		}else
+		}
+		else
 		{
-			// 已有该线路，再次出现则为反方向，更新方向
-			optLine->arrowState |= Arrow_InOut;
 			continue;
 		}
 		QString oppsiteIedName = optCircuit->srcIedName == pIed->name ? optCircuit->destIedName : optCircuit->srcIedName;
@@ -334,6 +238,7 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 		{
 			// 光纤一端是交换机，获取另一端光纤
 			// pIed的connectedIedNameList和交换机的connectedIedNameList的交集即为对侧IED
+			optLine->arrowState = Arrow_None; // 经过交换机的光纤链路，方向不明确，初始化
 			QSet<QString> iedSet = pIed->connectedIedNameSet;
 			IED* pOppsiteIed = m_circuitConfig->GetIedByName(oppsiteIedName);
 			if(!pOppsiteIed)
@@ -347,59 +252,82 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 				m_errStr += QString("光纤链路 %1 中的交换机设备 %2 与对侧设备没有连接，请检查光纤链路配置文件 \n").arg(optCircuit->code).arg(oppsiteIedName);
 				continue;
 			}
-			QString iedName = iedSet.values().first();
-			// 交换机连接的IED
-			IedRect* pIedRect = svg.GetIedRectByIedName(iedName);
-			if (!pIedRect)
+			foreach(QString iedName, iedSet)
 			{
-				pIedRect = GetIedRect(
-					iedName,
-					m_circuitConfig->GetIedByName(iedName)->desc,
-					0,	// x，暂不设置
-					SVG_VIEWBOX_HEIGHT - RECT_DEFAULT_HEIGHT * 2 - horizontal_distance,	// y
-					RECT_DEFAULT_WIDTH,
-					RECT_DEFAULT_HEIGHT,
-					ColorHelper::ied_border,
-					ColorHelper::ied_underground);
-				svg.iedRectList.append(pIedRect);
-				indirectRectList.append(pIedRect);
-			}
-			// 获取对端设备和交换机的光纤链路
-			QList<OpticalCircuit*> oppsiteOptList = m_circuitConfig->getOpticalByIeds(pOppsiteIed->name, iedName);
-			if(oppsiteOptList.isEmpty())
-			{
-				m_errStr += QString("光纤链路 %1 中的交换机设备 %2 与对侧设备 %3 没有连接，请检查光纤链路配置文件 \n").arg(optCircuit->code).arg(oppsiteIedName).arg(iedName);
-				continue;
-			}
-			OpticalCircuit* oppsiteOptCircuit = oppsiteOptList.first();	// 双向的两条光纤链路，链路编号一致，取第一条即可
-			OpticalCircuitLine* oppsiteOptLine = svg.GetOpticalCircuitLineByLineCode(oppsiteOptCircuit->code);
-			if(!oppsiteOptLine)
-			{
-				oppsiteOptLine = new OpticalCircuitLine();
-				oppsiteOptLine->lineCode = oppsiteOptCircuit->code;
-				oppsiteOptLine->pSrcRect = svg.GetIedRectByIedName(oppsiteOptCircuit->pSrcIed->name);
-				oppsiteOptLine->pDestRect = svg.GetIedRectByIedName(oppsiteOptCircuit->pDestIed->name);
-				oppsiteOptLine->pOpticalCircuit = oppsiteOptCircuit;
-				svg.opticalCircuitLineList.append(oppsiteOptLine);
-			}
-			if (oppsiteOptList.size() > 1)
-			{
-				// 结果不止一条，则为双向光纤链路
-				oppsiteOptLine->arrowState |= Arrow_InOut;	// 双向光纤链路
-			}
-			else
-			{
-				// 判断方向
-				oppsiteOptLine->arrowState |= oppsiteOptCircuit->srcIedName == pOppsiteIed->name ? Arrow_In : Arrow_Out;
+
+				// 真正的对端IED名称
+				//QString iedName = iedSet.values().first();
+				// 交换机连接的IED
+				IedRect* pIedRect = svg.GetIedRectByIedName(iedName);
+				if (!pIedRect)
+				{
+					pIedRect = GetIedRect(
+						iedName,
+						m_circuitConfig->GetIedByName(iedName)->desc,
+						0,	// x，暂不设置
+						SVG_VIEWBOX_HEIGHT - RECT_DEFAULT_HEIGHT * 2 - horizontal_distance,	// y
+						RECT_DEFAULT_WIDTH,
+						RECT_DEFAULT_HEIGHT,
+						ColorHelper::ied_border,
+						ColorHelper::ied_underground);
+					svg.iedRectList.append(pIedRect);
+					indirectRectList.append(pIedRect);
+				}
+				// 获取对端设备和交换机的光纤链路
+				QList<OpticalCircuit*> oppsiteOptList = m_circuitConfig->getOpticalByIeds(pOppsiteIed->name, iedName);
+				if(oppsiteOptList.isEmpty())
+				{
+					m_errStr += QString("光纤链路 %1 中的交换机设备 %2 与对侧设备 %3 没有连接，请检查光纤链路配置文件 \n").arg(optCircuit->code).arg(oppsiteIedName).arg(iedName);
+					continue;
+				}
+				OpticalCircuit* oppsiteOptCircuit = oppsiteOptList.first();	// 双向的两条光纤链路，链路编号一致，取第一条即可
+				OpticalCircuitLine* oppsiteOptLine = svg.GetOpticalCircuitLineByLineCode(oppsiteOptCircuit->code);
+				if(!oppsiteOptLine)
+				{
+					oppsiteOptLine = new OpticalCircuitLine();
+					oppsiteOptLine->lineCode = oppsiteOptCircuit->code;
+					oppsiteOptLine->pSrcRect = svg.GetIedRectByIedName(oppsiteOptCircuit->pSrcIed->name);
+					oppsiteOptLine->pDestRect = svg.GetIedRectByIedName(oppsiteOptCircuit->pDestIed->name);
+					oppsiteOptLine->pOpticalCircuit = oppsiteOptCircuit;
+					svg.opticalCircuitLineList.append(oppsiteOptLine);
+				}
+				QList<LogicCircuit*> inCircuitList = m_circuitConfig->GetInLogicCircuitListByIedName(pIed->name);
+				QList<LogicCircuit*> outCircuitList = m_circuitConfig->GetOutLogicCircuitListByIedName(pIed->name);
+				SetArrowStateThroughSwitch(inCircuitList, outCircuitList, iedName, iedSet.size(), oppsiteOptLine->arrowState, optLine->arrowState);
+				//foreach(LogicCircuit * pLogicCircuit, inCircuitList)
+				//{
+				//	if (pLogicCircuit->pSrcIed->name == iedName)
+				//	{
+				//		// 当只有一个经过交换机的IED时，该IED与主IED同在上方，方向相反；多个交换机时，方向相同
+				//		oppsiteOptLine->arrowState |= iedSet.size() > 1 ? Arrow_In : Arrow_Out;
+				//		optLine->arrowState |= Arrow_In;
+				//		break;
+				//	}
+				//}
+				//foreach(LogicCircuit * pLogicCircuit, outCircuitList)
+				//{
+				//	if (pLogicCircuit->pDestIed->name == iedName)
+				//	{
+				//		// 方向为出
+				//		oppsiteOptLine->arrowState |= iedSet.size() > 1 ? Arrow_Out : Arrow_In;
+				//		optLine->arrowState |= Arrow_Out;
+				//		break;
+				//	}
+				//}
+				++connectPtHash[pIedRect];
 			}
 			pOppsiteIedRect->y = svg.mainIedRect->y + svg.mainIedRect->height + vertical_distance + svg.switcherRectList.size() * (RECT_DEFAULT_HEIGHT + vertical_distance * 0.5);	// 调整交换机位置到主IED下方
-			++connectPtHash[pIedRect];
 			svg.switcherRectList.append(pOppsiteIedRect);
-			iedWithSwCnt++;
 		}
 		else
 		{
 			// 直连设备
+			//optLine->arrowState
+			SetArrowStateDirect(
+				m_circuitConfig->GetInLogicCircuitListByIedName(pIed->name),
+				m_circuitConfig->GetOutLogicCircuitListByIedName(pIed->name),
+				oppsiteIedName,
+				optLine->arrowState);
 			directRectList.append(pOppsiteIedRect);
 			++connectPtHash[pOppsiteIedRect];
 		}
@@ -444,9 +372,9 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 			for (size_t i = 0; i < indirectRectList.size(); ++i)
 			{
 				IedRect* rect = indirectRectList.at(i);
-				quint16 startX = directRectList.last()->x + directRectList.last()->width;
+				quint16 startX = directRectList.isEmpty() ? svg.switcherRectList.first()->x : directRectList.last()->x + directRectList.last()->width;
 				rect->x = startX + horizontal_distance + i * (horizontal_distance + rect->width);
-				rect->y = directRectList.last()->y;
+				rect->y = directRectList.isEmpty() ? svg.switcherRectList.last()->y + svg.switcherRectList.last()->height + horizontal_distance : directRectList.last()->y;
 				totalWidth += rect->width + horizontal_distance;
 			}
 			totalWidth -= horizontal_distance;
@@ -459,10 +387,20 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 		switcher->x = switcherX;
 		switcher->width = totalWidth;
 	}
+	if (directRectList.isEmpty())
+	{
+		// 没有直连IED时，主IED与交换机居中
+		IedRect* swRect = svg.switcherRectList.first();
+		svg.mainIedRect->x = swRect->x + (swRect->width - svg.mainIedRect->width) / 2;
+	}
 	int midPtCnt_l = 0;	// 左侧中间转折点计数
 	int midPtCnt_r = 0;	// 右侧中间转折点计数
 	// 连接点位置
 	QHash<IedRect*, qint8> connectCntHash;
+	if(pIed->name == "PL2205NA")
+	{
+		int a = 1;
+	}
 	for(size_t i = 0;i < svg.opticalCircuitLineList.size(); ++i)
 	{
 		OpticalCircuitLine* optLine = svg.opticalCircuitLineList.at(i);
@@ -520,8 +458,8 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 
 	// 重新计算光纤图 viewBox：考虑主 IED、下方 IED 及交换机
 	if (svg.mainIedRect) {
-		int minX = directRectList.isEmpty() ?			// 直连IED在左侧，若为空则最左侧是主IED
-			svg.mainIedRect->x : directRectList.first()->x;
+		int minX = directRectList.isEmpty() ?			// 直连IED在左侧，若为空则最左侧是主IED/交换机
+			qMin(svg.mainIedRect->x, svg.switcherRectList.first()->x) : directRectList.first()->x;
 		int minY = svg.mainIedRect->y - svg.mainIedRect->vertical_margin;	// 主IED上侧边距
 		int maxX = svg.switcherRectList.isEmpty() ? // 交换机在右侧，若为空则最右侧是主IED
 			svg.mainIedRect->x + svg.mainIedRect->width + svg.mainIedRect->horizontal_margin * 2 :
@@ -530,7 +468,9 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 			directRectList.isEmpty() ?	// 下方IED在主IED下方，若为空则最下侧是主IED
 				svg.switcherRectList.isEmpty() ?	
 				svg.mainIedRect->GetInnerBottomY() + svg.mainIedRect->vertical_margin * 2 :	// 若交换机也为空，则下方为主IED
-				svg.switcherRectList.last()->GetInnerBottomY() + svg.switcherRectList.last()->vertical_margin * 2 :	// 若直连IED为空，则下方为交换机;
+			indirectRectList.size() > 1 ?
+				indirectRectList.last()->GetInnerBottomY() + indirectRectList.last()->vertical_margin * 2 :	// 若有多个经过交换机的IED，则下方为最后一个IED
+				svg.switcherRectList.last()->GetInnerBottomY() + svg.switcherRectList.last()->vertical_margin * 2 :	// 若直连IED为空，则下方为;
 			directRectList.last()->GetInnerBottomY() + svg.mainIedRect->vertical_margin * 2;
 		if (minX < 0) minX = 0; if (minY < 0) minY = 0;
 		int w = maxX - minX;
@@ -638,6 +578,10 @@ void SvgTransformer::DrawLogicSvg(LogicSvg& svg)
 
 void SvgTransformer::DrawOpticalSvg(OpticalSvg& svg)
 {
+	if(svg.mainIedRect->iedName == "PL2205NA")
+	{
+		int a = 1;
+	}
 	// 主IED
 	DrawIedRect(svg.mainIedRect);
 	// 下方关联IED
@@ -763,6 +707,51 @@ void SvgTransformer::AdjustExtendRectByCircuit(QList<IedRect*>& iedList, LogicSv
 	}
 }
 
+void SvgTransformer::SetArrowStateDirect(const QList<LogicCircuit*>& inList, const QList<LogicCircuit*>& outList, const QString& peerIedName, quint8& lineState)
+{
+	quint8 dummy = 0;
+	SetArrowStateThroughSwitch(inList, outList, peerIedName, 1,
+		dummy,
+		lineState);
+}
+
+void SvgTransformer::SetArrowStateThroughSwitch(const QList<LogicCircuit*>& inList,
+	const QList<LogicCircuit*>& outList,
+	const QString& peerIedName,
+	int peersCount,
+	quint8& oppLineState,
+	quint8& mainSwitchState)
+{
+	// 对侧 IED -> 主 IED（主IED的入链路里，源为对侧 IED）
+	foreach(LogicCircuit * pLogicCircuit, inList)
+	{
+		if (pLogicCircuit && pLogicCircuit->pSrcIed && pLogicCircuit->pSrcIed->name == peerIedName)
+		{
+			// 多个 IED 经同一交换机：交换机↔对侧 的方向与只有一个时相反
+			oppLineState |= (peersCount > 1) ? Arrow_In : Arrow_Out;
+			// 主↔交换机 这段为“入”
+			mainSwitchState |= Arrow_In;
+			break; 
+		}
+	}
+
+	// 主 IED -> 对侧 IED（主IED的出链路里，目的为对侧 IED）
+	foreach(LogicCircuit * pLogicCircuit, outList)
+	{
+		if (pLogicCircuit && pLogicCircuit->pDestIed && pLogicCircuit->pDestIed->name == peerIedName)
+		{
+			// 多个 IED 经同一交换机：交换机↔对侧 的方向与只有一个时相反
+			oppLineState |= (peersCount > 1) ? Arrow_Out : Arrow_In;
+			// 主↔交换机 这段为“出”
+			mainSwitchState |= Arrow_Out;
+			break;
+		}
+	}
+
+	// 如果两种都没命中，就不改状态（保持原值）
+}
+
+
 void SvgTransformer::drawArrowHeader(const QPoint& endPoint, double arrowAngle, QColor color, int arrowLen)
 {
 	//m_painter->save();
@@ -799,7 +788,7 @@ double SvgTransformer::GetAngleByVec(const QPointF& vec) const
 
 QPoint SvgTransformer::GetArrowPt(const QPoint& pt, int arrowLen, int conn_r, double angle, bool isUnderConnpt)
 {
-	int offset = 2;	// 箭头偏移量，向前兼容
+	int offset = 10;	// 箭头偏移量，向前兼容
     
     // 保留原有垂直方向的特殊处理逻辑，确保向前兼容
     if (abs(angle - 90) < 0.001 || abs(angle + 90) < 0.001) {
@@ -1391,6 +1380,7 @@ void SvgTransformer::DrawVirtualCircuitLine(QList<IedRect*>& rectList)
 
 void SvgTransformer::DrawOpticalLine(OpticalCircuitLine* optLine)
 {
+
     QPen pen;
     pen.setColor(ColorHelper::Color(ColorHelper::pure_green));
     //m_painter->save();
@@ -1427,8 +1417,10 @@ void SvgTransformer::DrawOpticalLine(OpticalCircuitLine* optLine)
 	font.setPointSize(TYPE_Optical_ConnCircle);
 	//font.setFamily(DEFAULT_FONT_FAMILY);
 	m_painter->setFont(font);
-    DrawConnCircle(optLine->startPoint, CONN_R);
-    DrawConnCircle(optLine->endPoint, CONN_R, false);
+	QPoint& upPoint = optLine->startPoint.y() < optLine->endPoint.y() ? optLine->startPoint : optLine->endPoint;
+	QPoint& downPoint = optLine->startPoint.y() < optLine->endPoint.y() ? optLine->endPoint : optLine->startPoint;
+    DrawConnCircle(upPoint, CONN_R);
+    DrawConnCircle(downPoint, CONN_R, false);
 	quint16 underRectY = optLine->pSrcRect->y > optLine->pDestRect->y ? optLine->pSrcRect->y : optLine->pDestRect->y;
 
     // 绘制箭头
@@ -1436,13 +1428,13 @@ void SvgTransformer::DrawOpticalLine(OpticalCircuitLine* optLine)
 	m_painter->setFont(font);
     if (optLine->arrowState & Arrow_Out)
     {
-        drawArrowHeader(GetArrowPt(optLine->startPoint, ARROW_LEN, CONN_R, outAngle, true), outAngle);
-        drawArrowHeader(GetArrowPt(optLine->endPoint, ARROW_LEN, CONN_R, outAngle, optLine->endPoint.y() > underRectY), outAngle);
+        drawArrowHeader(GetArrowPt(upPoint, ARROW_LEN, CONN_R, outAngle, true), outAngle);
+        drawArrowHeader(GetArrowPt(downPoint, ARROW_LEN, CONN_R, outAngle, downPoint.y() > underRectY), outAngle);
     }
     if (optLine->arrowState & Arrow_In)
     {
-        drawArrowHeader(GetArrowPt(optLine->startPoint, ARROW_LEN, CONN_R, inAngle, true), inAngle);
-        drawArrowHeader(GetArrowPt(optLine->endPoint, ARROW_LEN, CONN_R, inAngle, optLine->endPoint.y() > underRectY), inAngle);
+        drawArrowHeader(GetArrowPt(upPoint, ARROW_LEN, CONN_R, inAngle, true), inAngle);
+        drawArrowHeader(GetArrowPt(downPoint, ARROW_LEN, CONN_R, inAngle, downPoint.y() > underRectY), inAngle);
     }
 
     // m_painter->restore();
@@ -1461,9 +1453,13 @@ void SvgTransformer::DrawPortText(OpticalCircuitLine* line, int conn_r)
 	font.setPointSize(18);
 	m_painter->setPen(pen);
 	m_painter->setFont(font);
-	int topPtY = line->startPoint.y() + offset;
+	QPoint& topPoint = line->startPoint.y() < line->endPoint.y() ? line->startPoint : line->endPoint;
+	QPoint& bottomPoint = line->startPoint.y() < line->endPoint.y() ? line->endPoint : line->startPoint;
+	IedRect* topRect = line->pSrcRect->y < line->pDestRect->y ? line->pSrcRect : line->pDestRect;
+	IedRect* bottomRect = line->pSrcRect->y < line->pDestRect->y ? line->pDestRect : line->pSrcRect;
+	int topPtY = topRect->iedName.contains("SW")? topPoint.y() - offset : topPoint.y() + offset;
 	// 下侧设备为交换机时，端口号绘制在矩形内
-	int bottomPtY = line->pSrcRect->iedName.contains("SW") || line->pDestRect->iedName.contains("SW") ? line->endPoint.y() + offset : line->endPoint.y() - offset;
+	int bottomPtY = bottomRect->iedName.contains("SW") ? bottomPoint.y() + offset : bottomPoint.y() - offset;
 	QString topPort = line->pSrcRect->y > line->pDestRect->y ? 
 		line->pOpticalCircuit->destIedPort :		// 源设备位于下方时，上方端口号为目的设备端口号
 		line->pOpticalCircuit->srcIedPort;			// 源设备位于上方时，上方端口号为源设备端口号
@@ -1474,10 +1470,10 @@ void SvgTransformer::DrawPortText(OpticalCircuitLine* line, int conn_r)
 	int upperPortStrWidth = fm.width(topPort);
 	int bottomPortStrWidth = fm.width(bottomPort);
 
-	QPoint topPort_lt_pt(line->startPoint.x() - upperPortStrWidth / 2, topPtY - 5);
-	QPoint topPort_rb_pt(line->startPoint.x() + upperPortStrWidth / 2, topPtY + fm.height());
-	QPoint bottomPort_lt_pt(line->endPoint.x() - bottomPortStrWidth / 2, bottomPtY - 5);
-	QPoint bottomPort_rb_pt(line->endPoint.x() + bottomPortStrWidth / 2, bottomPtY + fm.height());
+	QPoint topPort_lt_pt(topPoint.x() - upperPortStrWidth / 2, topPtY - 5);
+	QPoint topPort_rb_pt(topPoint.x() + upperPortStrWidth / 2, topPtY + fm.height());
+	QPoint bottomPort_lt_pt(bottomPoint.x() - bottomPortStrWidth / 2, bottomPtY - 5);
+	QPoint bottomPort_rb_pt(bottomPoint.x() + bottomPortStrWidth / 2, bottomPtY + fm.height());
 	// 绘制端口号
 	m_painter->drawText(QRect(topPort_lt_pt, topPort_rb_pt), topPort);
 	m_painter->drawText(QRect(bottomPort_lt_pt, bottomPort_rb_pt), bottomPort);
@@ -1785,16 +1781,17 @@ void SvgTransformer::ReSignCircuitLine(pugi::xml_document& doc)
 		lineNode.append_attribute("id");
 		QString attrStr = lineNode.attribute("font-family").value();
 		QList<QStringList> strList = splitGroupAndFields(attrStr);
-		QString id = lineNode.attribute("font-weight").value();	// id
-		QString code = getField(strList, 0, 0);	// code
-		QString srcIedName = getField(strList, 1, 0);	// srcIedName
-		QString srcPort = getField(strList, 1, 1);	// srcPort
-		QString destIedName = getField(strList, 2, 0);	// destIedName
-		QString destPort = getField(strList, 2, 1);	// destPort
-		QString connStatus = getField(strList, 3, 0);	// connStatus
-		QString remoteId = getField(strList, 4, 0);	// remoteId
+		QString id = getField(strList, 0, 0);	// id
+		QString code = getField(strList, 1, 0);	// code
+		QString srcIedName = getField(strList, 2, 0);	// srcIedName
+		QString srcPort = getField(strList, 2, 1);	// srcPort
+		QString destIedName = getField(strList, 3, 0);	// destIedName
+		QString destPort = getField(strList, 3, 1);	// destPort
+		QString connStatus = getField(strList, 4, 0);	// connStatus
+		QString remoteId = getField(strList, 5, 0);	// remoteId
 
 		lineNode.attribute("type").set_value("optical");
+		lineNode.attribute("id").set_value(id.toStdString().c_str());
 		lineNode.attribute("src-ied").set_value(srcIedName.toStdString().c_str());
 		lineNode.attribute("src-port").set_value(srcPort.toStdString().c_str());
 		lineNode.attribute("dest-ied").set_value(destIedName.toStdString().c_str());
@@ -1802,7 +1799,6 @@ void SvgTransformer::ReSignCircuitLine(pugi::xml_document& doc)
 		lineNode.attribute("code").set_value(code.toStdString().c_str());
 		lineNode.attribute("status").set_value(connStatus.toStdString().c_str());
 		lineNode.attribute("remote-id").set_value(remoteId.toStdString().c_str());
-		lineNode.attribute("id").set_value(id.toStdString().c_str());
 		// 重置不相关属性为默认值
 		lineNode.attribute("font-family").set_value("SimSun");
 		lineNode.attribute("font-size").set_value("15");

@@ -176,7 +176,7 @@ public:
             return c;
         }
 
-    // 直接修改字段即可：code.ied=..; code.ds=..; code.chl=..; code.type=..; code.res=..
+    // code.ied=..; code.ds=..; code.chl=..; code.type=..; code.res=..
 
         // 调试输出
         QString toString() const {

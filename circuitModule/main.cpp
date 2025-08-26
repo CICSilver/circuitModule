@@ -30,7 +30,7 @@ using std::string;
 static void RunRtdbReadTest()
 {
 	RtdbClient client;
-	// 以只读方式打开实时库（枚举定义见 include/rtdb/YsdRtdbInclude.h）
+	// 以只读方式打开实时库
 	if (!client.open(RTDB_OPEN_RO)) {
 		qWarning() << "RTDB open failed";
 		return;
@@ -86,8 +86,8 @@ int main(int argc, char* argv[]) {
 	pathList
 		<< QCoreApplication::applicationDirPath() + "/logic"		
 		<< QCoreApplication::applicationDirPath() + "/optical"		
-		<< QCoreApplication::applicationDirPath() + "/virtual"		
-		<< QCoreApplication::applicationDirPath() + "/whole";		
+		<< QCoreApplication::applicationDirPath() + "/virtual";	
+		// << QCoreApplication::applicationDirPath() + "/whole";		
 	foreach(QString path, pathList)
 	{
 		QDir dir(path);

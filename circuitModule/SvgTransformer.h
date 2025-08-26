@@ -326,6 +326,20 @@ private:
 	{
 		return angle * M_PI / 180.0;
 	}
+
+	void SvgTransformer::SetArrowStateDirect(const QList<LogicCircuit*>& inList,
+		const QList<LogicCircuit*>& outList,
+		const QString& peerIedName,
+		quint8& lineState);
+
+
+	void SetArrowStateThroughSwitch(const QList<LogicCircuit*>& inList,
+		const QList<LogicCircuit*>& outList,
+		const QString& peerIedName,
+		int peersCount,
+		quint8& oppLineState,      // 交换机↔对侧IED
+		quint8& mainSwitchState);  // 主IED↔交换机
+
 	//************************************
 	// 函数名称:	drawArrowHeader
 	// 函数全名:	SvgTransformer::drawArrowHeader

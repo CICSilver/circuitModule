@@ -17,6 +17,7 @@
 #include <QtAlgorithms>
 #include <string>
 #include <sstream>
+#include <QToolTip>
 
 // 简单折线简化：去除近似共线或与前后点共线且距离阈值内的中间点
 static void simplifyPolyline(QVector<QPointF>& pts, qreal tol)
@@ -60,6 +61,7 @@ static void simplifyPolyline(QVector<QPointF>& pts, qreal tol)
 
 InteractiveSvgMapItem::InteractiveSvgMapItem(const QString& svgPath)
 	: m_highlightedLineIdx(-1)
+	, m_hoverPlateIdx(-1)
 	, m_dragging(false)
 	, m_fittedOnce(false)
 {
@@ -95,7 +97,7 @@ void InteractiveSvgMapItem::paint(QPainter* painter, const QStyleOptionGraphicsI
 		for (int j = 1; j < line.points.size(); ++j)
 			painter->drawLine(line.points[j - 1], line.points[j]);
 
-		// 画此回路的箭头（样式复用回路线条样式）
+		// 画此回路的箭头
 		for (int k = 0; k < line.arrows.size(); ++k) {
 			const ArrowHead& ah = line.arrows[k];
 			if (ah.points.size() < 3) continue;
@@ -157,7 +159,7 @@ void InteractiveSvgMapItem::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
 			QPoint curViewPos = v->mapFromScene(event->scenePos());
 			QPoint delta = curViewPos - m_lastViewPos;
 			m_lastViewPos = curViewPos;
-			// 用滚动条平移，方向取反实现“拖动画布”手感
+			// 用滚动条平移
 			QScrollBar* hbar = v->horizontalScrollBar();
 			QScrollBar* vbar = v->verticalScrollBar();
 			if (hbar) hbar->setValue(hbar->value() - delta.x());
@@ -225,6 +227,27 @@ void InteractiveSvgMapItem::setHighlightedLine(int idx)
 void InteractiveSvgMapItem::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
 {
 	QPointF pos = event->pos();
+	// 1) 压板悬停提示（优先级高于线路高亮）
+	int plateIdx = hitTestPlate(pos);
+	if (plateIdx >= 0) {
+		if (plateIdx != m_hoverPlateIdx) {
+			m_hoverPlateIdx = plateIdx;
+			const PlateItem& plate = m_allPlates[plateIdx];
+			const QString tip = buildPlateTooltip(plate);
+			// 将场景坐标转成屏幕坐标以在鼠标附近显示
+			QPoint globalPos = event->screenPos();
+			QToolTip::showText(globalPos, tip);
+		}
+		// 当悬停在压板上时，不再更新线路高亮
+		setHighlightedLine(-1);
+		return;
+	} else if (m_hoverPlateIdx != -1) {
+		// 离开压板区域时，隐藏 tip
+		m_hoverPlateIdx = -1;
+		QToolTip::hideText();
+	}
+
+	// 2) 线路最近高亮
 	int closest = -1;
 	double minDist = 99999.0;
 	for (int i = 0; i < m_allLines.size(); ++i) {
@@ -243,6 +266,56 @@ void InteractiveSvgMapItem::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
 	else
 		setHighlightedLine(-1);
 }
+
+void InteractiveSvgMapItem::hoverLeaveEvent(QGraphicsSceneHoverEvent* event)
+{
+	Q_UNUSED(event);
+	if (m_hoverPlateIdx != -1) {
+		m_hoverPlateIdx = -1;
+		QToolTip::hideText();
+	}
+}
+
+// InteractiveSvgMapItem.cpp
+
+void InteractiveSvgMapItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
+{
+	const QPointF pos = event->pos();
+
+	int closest = -1;
+	double minDist = 1e100;
+	for (int i = 0; i < m_allLines.size(); ++i) {
+		const QVector<QPointF>& pts = m_allLines[i].points;
+		for (int j = 1; j < pts.size(); ++j) {
+			const QLineF seg(pts[j - 1], pts[j]);
+			const double dist = (seg.p1() == seg.p2())
+				? QLineF(pos, seg.p1()).length()
+				: utils::pointToSegmentDistance(pos, seg.p1(), seg.p2());
+			if (dist < minDist) { minDist = dist; closest = i; }
+		}
+	}
+
+	if (closest >= 0 && minDist < 15.0) {
+		const MapLine& line = m_allLines[closest];
+		if (line.type == LineType_Optical && !line.attrs.isNull()) {
+			const MapLine::OpticalAttrs* a =
+				static_cast<const MapLine::OpticalAttrs*>(line.attrs.data());
+
+			QString tip;
+			tip += QString::fromLocal8Bit("光纤链路\n");
+			tip += QString::fromLocal8Bit("端口①: %1 / %2\n").arg(a->srcIed, a->srcPort);
+			tip += QString::fromLocal8Bit("端口②: %1 / %2\n").arg(a->destIed, a->destPort);
+			if (!a->code.isEmpty())    tip += QString("Code: %1\n").arg(a->code);
+			if (!a->status.isEmpty())  tip += QString("Status: %1\n").arg(a->status);
+			if (!a->remoteId.isEmpty())tip += QString("RemoteId: %1\n").arg(a->remoteId);
+
+			QToolTip::showText(event->screenPos(), tip);
+		}
+	}
+
+	event->accept();
+}
+
 
 void InteractiveSvgMapItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
@@ -282,6 +355,15 @@ int InteractiveSvgMapItem::hitTestPlate(const QPointF& pos) const
 		if (m_allPlates[i].rect.contains(pos)) return i;
 	}
 	return -1;
+}
+
+QString InteractiveSvgMapItem::buildPlateTooltip(const PlateItem& plate) const
+{
+	// 两行：名称（desc）与引用（ref）。若缺失则留空/仅显示可用字段。
+	QString line1 = plate.attrs.desc.isEmpty() ? QString::fromLocal8Bit("压板") : plate.attrs.desc;
+	QString line2 = plate.attrs.ref.isEmpty() ? QString() : plate.attrs.ref;
+	if (line2.isEmpty()) return line1; // 只有一行
+	return line1 + "\n" + line2;
 }
 
 QColor InteractiveSvgMapItem::colorForLine(const MapLine& line) const
@@ -488,7 +570,6 @@ void InteractiveSvgMapItem::parseVirtualSvg(const pugi::xml_document& doc)
 		PlateItem& p = m_allPlates[i];
 		if (!p.attrs.ref.isEmpty()) m_plateMap.insert(p.attrs.ref, &p);
 	}
-	qDebug() << m_plateMap.values();
 
 	// 解析虚拟数值文本框
 	parseVirtualValueBoxes(doc);

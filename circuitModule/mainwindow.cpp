@@ -17,12 +17,10 @@ MainWindow::MainWindow(QWidget *parent)
     InitView();
     this->resize(1920, 1080);
 
-    // Install event filter on the VIEWPORTS (wheel events go to viewport in Qt4)
     ui.logicView->viewport()->installEventFilter(this);
     ui.opticalView->viewport()->installEventFilter(this);
     ui.wholeView->viewport()->installEventFilter(this);
 
-    // Ensure the views accept wheel focus so the viewport receives wheel events
     ui.logicView->setFocusPolicy(Qt::WheelFocus);
     ui.opticalView->setFocusPolicy(Qt::WheelFocus);
     ui.wholeView->setFocusPolicy(Qt::WheelFocus);
@@ -63,36 +61,7 @@ void MainWindow::InitView()
 
 bool MainWindow::eventFilter(QObject* watched, QEvent* event)
 {
-	// 在 Qt4 中，滚轮事件发送到 QGraphicsView 的 viewport（QWidget），
-	// 因此这里要从 watched 的父级获取 QGraphicsView
 	if (event->type() == QEvent::Wheel) {
-		//QGraphicsView* view = qobject_cast<QGraphicsView*>(watched);
-		//if (!view) {
-		//	QWidget* vw = qobject_cast<QWidget*>(watched);
-		//	if (vw) view = qobject_cast<QGraphicsView*>(vw->parent());
-		//}
-		//if (view) {
-		//	QWheelEvent* we = static_cast<QWheelEvent*>(event);
-		//	const double factor = (we->delta() > 0) ? 1.15 : (1.0 / 1.15);
-		//	const double minS = 1.0;
-		//	const double maxS = 2.0;
-
-		//	// 当前缩放
-		//	const QTransform t = view->transform();
-		//	const double sx = t.m11();
-		//	const double sy = t.m22();
-		//	const double tx = sx * factor;
-		//	const double ty = sy * factor;
-
-		//	// 如果缩放将超限，则直接拦截
-		//	if ((we->delta() > 0 && (tx > maxS || ty > maxS)) ||
-		//		(we->delta() <= 0 && (tx < minS || ty < minS))) {
-		//		return true;
-		//	}
-
-		//	view->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
-		//	view->scale(factor, factor);
-		//	view->setTransformationAnchor(QGraphicsView::AnchorViewCenter);
 			return false;
 		//}
 	}
@@ -123,6 +92,11 @@ void MainWindow::InitList()
 	QStringList iedNameList;
 	foreach(IED * pIed, ied_list)
 	{
+		if(pIed->name.contains("SW"))
+		{
+			// 交换机设备不显示在列表中
+			continue;
+		}
 		iedNameList << pIed->name;
 	}
 	m_iedListModel->setStringList(iedNameList);

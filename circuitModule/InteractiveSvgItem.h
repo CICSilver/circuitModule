@@ -12,14 +12,12 @@
 #include <QMap>
 #include <QSharedPointer>
 
-// 前置声明以避免在头文件中包含大量 Qt 头（减少编译依赖并修复不完整类型报错）
 class QGraphicsSceneHoverEvent;
 class QGraphicsSceneContextMenuEvent;
 class QGraphicsSceneMouseEvent;
 class QGraphicsSceneWheelEvent;
 class QScrollBar;
 
-// 先定义样式与箭头，再定义 MapLine
 struct SvgNodeStyle
 {
     QColor stroke;
@@ -32,7 +30,6 @@ struct SvgNodeStyle
     SvgNodeStyle() : strokeWidth(1), strokeOpacity(1.0), fillOpacity(1.0) {}
 };
 
-// 极简线条样式，用于回路与箭头，满足“加粗/变颜色/闪烁”三需求
 struct LineStyle
 {
 	QRgb strokeRgb;         // 只存颜色值，绘制时组装 QColor
@@ -191,6 +188,8 @@ public:
 
 protected:
 	void hoverMoveEvent(QGraphicsSceneHoverEvent* event);
+	void hoverLeaveEvent(QGraphicsSceneHoverEvent* event);
+	void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event);
 	void contextMenuEvent(QGraphicsSceneContextMenuEvent* event);
 	void mousePressEvent(QGraphicsSceneMouseEvent* event);
 	void mouseMoveEvent(QGraphicsSceneMouseEvent* event);
@@ -215,6 +214,7 @@ private:
 	// 命中测试：返回点击命中的压板索引，未命中返回 -1
 	int hitTestPlate(const QPointF& pos) const;
     void drawPlateIcon(QPainter* painter, const QPointF& center) const;
+	QString buildPlateTooltip(const PlateItem& plate) const;
 
 	//// 解析压板相关信息
 	// 解析svg中圆的贝塞尔近似描述
@@ -246,6 +246,7 @@ private:
 	struct ValuePair { bool hasLeft; bool hasRight; ValueBox left; ValueBox right; ValuePair():hasLeft(false),hasRight(false){} };
 	QMap<int, ValuePair> m_valuePairs; // lineId -> {left,right}
 	int m_highlightedLineIdx;
+	int m_hoverPlateIdx; // 当前悬停的压板索引，-1 表示无
 	bool m_dragging;
 	QPoint m_lastViewPos;
 	bool m_fittedOnce;

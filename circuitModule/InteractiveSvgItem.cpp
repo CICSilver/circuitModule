@@ -276,8 +276,6 @@ void InteractiveSvgMapItem::hoverLeaveEvent(QGraphicsSceneHoverEvent* event)
 	}
 }
 
-// InteractiveSvgMapItem.cpp
-
 void InteractiveSvgMapItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 {
 	const QPointF pos = event->pos();

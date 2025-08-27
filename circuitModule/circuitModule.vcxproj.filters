@@ -4,6 +4,9 @@
     <ClCompile Include="circuitconfig.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="InteractiveCircuitOverlay.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
     <ClCompile Include="customsvgitem.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -46,6 +49,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="circuitconfig.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="InteractiveCircuitOverlay.h">
       <Filter>header</Filter>
     </ClInclude>
     <ClInclude Include="customsvgitem.h">

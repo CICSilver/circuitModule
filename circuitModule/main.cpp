@@ -6,6 +6,8 @@
 #include "customsvgitem.h"
 #include "basemodel.h"
 #include "InteractiveSvgItem.h"
+#include "RtdbClient.h"
+
 
 #include <QApplication>
 #include <QDir>
@@ -22,8 +24,6 @@
 #include <QGraphicsSvgItem>
 #include <QSvgRenderer>
 #include <QMouseEvent>
-#include "RtdbClient.h"
-
 using std::string;
 
 // 简单的 RTDB 读取测试：演示如何打开实时库并读取一个模拟量通道

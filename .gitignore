@@ -362,3 +362,8 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /circuitModule/debug.svg
+
+# Custom
+/circuitModule/cime_template/
+/circuitModule/build/
+/circuitModule/GeneratedFiles/

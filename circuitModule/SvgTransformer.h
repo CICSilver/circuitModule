@@ -378,7 +378,7 @@ private:
 	//************************************
 	void drawArrowHeader(const QPoint& endPoint, double arrowAngle, QColor color = ColorHelper::pure_green, int arrowLen = ARROW_LEN);
 	double GetAngleByVec(const QPointF& vec) const;
-	QPoint GetArrowPt(const QPoint& pt, int arrowLen, int conn_r, double angle, bool isUnderConnpt);
+	QPoint GetArrowPt(const QPoint& pt, int arrowLen, int conn_r, double angle, bool isUnderConnpt, int offset = 10);
 	// 关联IED图形，两侧绘制。rectIndex为ied矩形编号，用于控制矩形位置
 	IedRect* GetOtherIedRect(quint16 rectIndex, IedRect* mainIedRect, const IED* pIed, const quint32 border_color, const quint32 underground_color = ColorHelper::pure_black);
 

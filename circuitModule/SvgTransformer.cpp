@@ -1078,9 +1078,9 @@ double SvgTransformer::GetAngleByVec(const QPointF& vec) const
 	return angle;
 }
 
-QPoint SvgTransformer::GetArrowPt(const QPoint& pt, int arrowLen, int conn_r, double angle, bool isUnderConnpt)
+QPoint SvgTransformer::GetArrowPt(const QPoint& pt, int arrowLen, int conn_r, double angle, bool isUnderConnpt, int offset /* 箭头偏移量，向前兼容 */)
 {
-	int offset = 10;	// 箭头偏移量，向前兼容
+	//int offset = 10;	
     
     // 保留原有垂直方向的特殊处理逻辑，确保向前兼容
     if (abs(angle - 90) < 0.001 || abs(angle + 90) < 0.001) {
@@ -1604,7 +1604,7 @@ void SvgTransformer::DrawLogicCircuitLine(QList<IedRect*>& rectList)
 
 			font.setPointSize(TYPE_Circuit_Arrow);
 			m_painter->setFont(font);
-			drawArrowHeader(GetArrowPt(line->endPoint, ARROW_LEN, 0, angle, false), angle, color);
+			drawArrowHeader(GetArrowPt(line->endPoint, ARROW_LEN, 0, angle, false, 0), angle, color);
 			// m_painter->restore();
 		}
 	}

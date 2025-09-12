@@ -2,7 +2,7 @@
 #define _RTDB_DLL_H_
 
 #include "rtdb_dll_def.h"
-#include "YsdRtdbEle.h"
+#include "../../ysd_rtdb_include/YsdRtdbEle.h"
 
 //导出的全局函数接口
 ExpFunc bool RTDB_Open(RtdbOpenType eType);//打开RTDB

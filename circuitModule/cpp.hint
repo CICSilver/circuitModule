@@ -2,3 +2,5 @@
 // 如函数和宏的名称。
 // 有关详细信息，请参见 https://go.microsoft.com/fwlink/?linkid=865984
 #define slots
+#define Q_OBJECT public: Q_OBJECT_CHECK static const QMetaObject staticMetaObject; Q_OBJECT_GETSTATICMETAOBJECT virtual const QMetaObject *metaObject() const; virtual void *qt_metacast(const char *); QT_TR_FUNCTIONS virtual int qt_metacall(QMetaObject::Call, int, void **); private: Q_DECL_HIDDEN static const QMetaObjectExtraData staticMetaObjectExtraData; Q_DECL_HIDDEN static void qt_static_metacall(QObject *, QMetaObject::Call, int, void **);
+#define Q_OBJECT

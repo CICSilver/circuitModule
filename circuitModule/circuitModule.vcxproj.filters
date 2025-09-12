@@ -4,12 +4,6 @@
     <ClCompile Include="circuitconfig.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="InteractiveCircuitOverlay.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="customsvgitem.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -34,9 +28,6 @@
     <ClCompile Include="include\pugixml\pugixml.cpp">
       <Filter>thirdparty\pugixml</Filter>
     </ClCompile>
-    <ClCompile Include="GeneratedFiles\Debug\moc_viewwindow.cpp">
-      <Filter>Generated Files</Filter>
-    </ClCompile>
     <ClCompile Include="InteractiveSvgItem.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -46,15 +37,12 @@
     <ClCompile Include="RtdbClient.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="GeneratedFiles\Debug\moc_InteractiveSvgItem.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="circuitconfig.h">
-      <Filter>header</Filter>
-    </ClInclude>
-    <ClInclude Include="InteractiveCircuitOverlay.h">
-      <Filter>header</Filter>
-    </ClInclude>
-    <ClInclude Include="customsvgitem.h">
       <Filter>header</Filter>
     </ClInclude>
     <ClInclude Include="GeneratedFiles\ui_mainwindow.h">
@@ -72,35 +60,14 @@
     <ClInclude Include="include\pugixml\pugixml.hpp">
       <Filter>thirdparty\pugixml</Filter>
     </ClInclude>
-    <ClInclude Include="GeneratedFiles\ui_viewwindow.h">
-      <Filter>Generated Files</Filter>
-    </ClInclude>
     <ClInclude Include="include\cime\cime.h">
       <Filter>thirdparty\cime</Filter>
-    </ClInclude>
-    <ClInclude Include="InteractiveSvgItem.h">
-      <Filter>header</Filter>
     </ClInclude>
     <ClInclude Include="SvgUtils.h">
       <Filter>header</Filter>
     </ClInclude>
     <ClInclude Include="RtdbClient.h">
       <Filter>header</Filter>
-    </ClInclude>
-    <ClInclude Include="include\rtdb\rtdb_dll.h">
-      <Filter>thirdparty\rtdb</Filter>
-    </ClInclude>
-    <ClInclude Include="include\rtdb\rtdb_dll_def.h">
-      <Filter>thirdparty\rtdb</Filter>
-    </ClInclude>
-    <ClInclude Include="include\rtdb\YsdRtdbDefine.h">
-      <Filter>thirdparty\rtdb</Filter>
-    </ClInclude>
-    <ClInclude Include="include\rtdb\YsdRtdbEle.h">
-      <Filter>thirdparty\rtdb</Filter>
-    </ClInclude>
-    <ClInclude Include="include\rtdb\YsdRtdbInclude.h">
-      <Filter>thirdparty\rtdb</Filter>
     </ClInclude>
     <ClInclude Include="PainterStateGuard.h">
       <Filter>header</Filter>
@@ -115,6 +82,9 @@
     </CustomBuild>
     <CustomBuild Include="mainwindow.qrc">
       <Filter>resources</Filter>
+    </CustomBuild>
+    <CustomBuild Include="InteractiveSvgItem.h">
+      <Filter>header</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
@@ -141,9 +111,6 @@
     </Filter>
     <Filter Include="thirdparty\cime">
       <UniqueIdentifier>{01085d42-215b-4231-9c49-9af4c480455e}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="thirdparty\rtdb">
-      <UniqueIdentifier>{c35a6567-4b18-407f-aed4-2c0cd10a848e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

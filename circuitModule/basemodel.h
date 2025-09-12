@@ -4,129 +4,14 @@
 #include <QList>
 #include <QMap>
 #include <QDebug>
-#include <QRegexp>
 struct IED;
 struct Data;
-struct DataSet;
+//struct DataSet;
 struct GSEControl;
 struct SMVControl;
 struct LogicCircuit;
 struct BaseCommCB;
 struct BaseControl;
-
-// ================ 数据模型 ================
-struct Data
-{
-	Data() {}
-	Data(QString& addr)
-	{
-		// ldInst/(prefix)lnClasslnInst.doName.daName
-		QStringList firstList = addr.split('/');
-		if (firstList.size() != 2)
-		{
-			// 没有ldInst 不符合标准
-			qDebug() << "addr: " << addr << " invalid";
-			return;
-		}
-		ldInst = firstList.at(0);
-		QStringList secondList = firstList.at(1).split('.');
-		if (secondList.size() == 3)
-		{
-			// 有daName
-			daName = secondList.at(2);
-			doName = secondList.at(1);
-		}
-		else if (secondList.size() == 2)
-		{
-			// 只有doName
-			doName = secondList.at(1);
-		}
-		else
-		{
-			// 没有DataName，不符合标准
-			qDebug() << "addr: " << addr << " invalid";
-			return;
-		}
-		QString lnName = secondList.at(0);	// prefix(optinal)+lnClass+lnInst
-		// prefix m个字符
-		// lnClass 4字符 DL/T 860.74定义的兼容逻辑节点名 均为英文大写字母字符
-		// lnInst n个字符
-		// m+n <= 7
-		QRegExp exp("^(.*)([A-Z]{4})(\\d+)$", Qt::CaseSensitive, QRegExp::RegExp2);
-		if (exp.indexIn(lnName) != -1)
-		{
-			prefix = exp.cap(1);
-			lnClass = exp.cap(2);
-			lnInst = exp.cap(3);
-		}
-	}
-	QString Addr() const
-	{
-		QString strDaName;
-		if (!daName.isEmpty())
-		{
-			strDaName = QString("%1").arg(daName);
-		}
-		return QString("%1/%5%2%3.%4.%6")
-			.arg(ldInst)
-			.arg(lnClass)
-			.arg(lnInst)
-			.arg(doName)
-			.arg(prefix)
-			.arg(strDaName);
-	}
-	bool operator==(const Data& other) const
-	{
-		return	ldInst == other.ldInst &&
-			lnClass == other.lnClass &&
-			prefix == other.prefix &&
-			doName == other.doName &&
-			daName == other.daName &&
-			//fc == other.fc &&
-			lnInst == other.lnInst;
-	}
-
-	QString desc;
-
-	QString ldInst;
-	QString lnClass;
-	QString prefix;
-	QString doName;
-	QString daName;
-	QString fc;
-	QString lnInst;
-
-	bool isPlate;	// 是否归属压板，为真时prefix则为压板名
-
-	DataSet* pParent;
-};
-struct DataSet
-{
-	DataSet() {}
-	~DataSet() 
-	{
-		//qDeleteAll(dataList);
-		dataList.clear();
-	}
-	bool ContainsData(const Data& data) const;
-	QString ldInst;
-	QString name;
-	QString desc;
-	QList<Data*> dataList;
-	BaseControl* pParent;
-};
-
-inline bool DataSet::ContainsData(const Data& data) const
-{
-	foreach(Data * pData, dataList)
-	{
-		if (*pData == data)
-		{
-			return true;
-		}
-	}
-	return false;
-}
 
 // 虚回路类型
 enum VirtualType
@@ -147,7 +32,7 @@ struct BaseControl
 	QString apName;
 	QString ldInst;
 	VirtualType cbType;
-	DataSet* pDataSet;
+	//DataSet* pDataSet;
 };
 struct GSEControl : public BaseControl
 {
@@ -262,7 +147,7 @@ struct IED
 	QString ccd;						// CCD校验码
 	QString icd;						// ICD校验码
 	QSet<QString> connectedIedNameSet;	// 链路关联IED设备列表
-	QList<OpticalCircuit*> optical_list_new;
+	QList<OpticalCircuit*> optical_list;
 };
 
 struct LogicCircuit

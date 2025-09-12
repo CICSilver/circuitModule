@@ -111,12 +111,12 @@
 #	endif
 #endif
 
-// If C++ is 2011 or higher, use 'nullptr'
+// If C++ is 2011 or higher, use 'NULL'
 #ifndef PUGIXML_NULL
 #	if __cplusplus >= 201103
-#		define PUGIXML_NULL nullptr
+#		define PUGIXML_NULL NULL
 #	elif defined(_MSC_VER) && _MSC_VER >= 1600
-#		define PUGIXML_NULL nullptr
+#		define PUGIXML_NULL NULL
 #	else
 #		define PUGIXML_NULL 0
 #	endif

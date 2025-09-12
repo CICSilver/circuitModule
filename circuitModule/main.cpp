@@ -3,7 +3,6 @@
 #include "mainwindow.h"
 #include "math.h"
 #include "SvgTransformer.h"
-#include "customsvgitem.h"
 #include "basemodel.h"
 #include "InteractiveSvgItem.h"
 #include "RtdbClient.h"
@@ -17,13 +16,15 @@
 #include <string>
 #include <QDebug>
 #include <QElapsedTimer>
-#include <windows.h>
 #include <QtSvg>
 #include <QGraphicsView>
 #include <QGraphicsScene>
 #include <QGraphicsSvgItem>
 #include <QSvgRenderer>
 #include <QMouseEvent>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 using std::string;
 
 // 简单的 RTDB 读取测试：演示如何打开实时库并读取一个模拟量通道
@@ -72,41 +73,42 @@ int main(int argc, char* argv[]) {
 	QString iedName = "IMT2201L1";
 	//QString scdPath = QCoreApplication::applicationDirPath() + "/scd_test.scd";
 	//QString configPath = QCoreApplication::applicationDirPath() + "/circuit_config.csv";
-	QElapsedTimer timer;
+	//QElapsedTimer timer;
 
 	CircuitConfig* pCircuitConfig = CircuitConfig::Instance();
 	pCircuitConfig->LoadCimeFile();
 	SvgTransformer transformer;
 	//transformer.GenerateSvgByIedName(iedName);
 
-	// 实时库测试
-	RunRtdbReadTest();
+	 //实时库测试
+	//RunRtdbReadTest();
 
-	QList<QString> pathList;
-	pathList
-		<< QCoreApplication::applicationDirPath() + "/logic"		
-		<< QCoreApplication::applicationDirPath() + "/optical"		
-		<< QCoreApplication::applicationDirPath() + "/virtual";	
-		// << QCoreApplication::applicationDirPath() + "/whole";		
-	foreach(QString path, pathList)
-	{
-		QDir dir(path);
-		if (!dir.exists())
-		{
-			dir.mkpath(path);
-		}
-	}
-	foreach(IED * pIed, pCircuitConfig->GetIedList())
-	{
-		QString path;
-		if (pIed->name.contains("SW"))
-			continue;
-		transformer.GenerateLogicSvg(pIed, pathList.at(0) + "/" + pIed->name + "_logic_circuit.svg");
-		transformer.GenerateOpticalSvg(pIed, pathList.at(1) + "/" + pIed->name + "_optical_circuit.svg");
-		transformer.GenerateVirtualSvg(pIed, pathList.at(2) + "/" + pIed->name + "_virtual_circuit.svg");
-		//transformer.GenerateWholeCircuitSvg(pIed, pathList.at(3) + "/" + pIed->name + "_whole_circuit.svg");
-	}
-	qDebug() << "SVG files generated successfully.";
+	// SVG 生成
+	//QList<QString> pathList;
+	//pathList
+	//	<< QCoreApplication::applicationDirPath() + "/logic"		
+	//	<< QCoreApplication::applicationDirPath() + "/optical"		
+	//	<< QCoreApplication::applicationDirPath() + "/virtual";	
+	//	// << QCoreApplication::applicationDirPath() + "/whole";		
+	//foreach(QString path, pathList)
+	//{
+	//	QDir dir(path);
+	//	if (!dir.exists())
+	//	{
+	//		dir.mkpath(path);
+	//	}
+	//}
+	//foreach(IED * pIed, pCircuitConfig->GetIedList())
+	//{
+	//	QString path;
+	//	if (pIed->name.contains("SW"))
+	//		continue;
+	//	transformer.GenerateLogicSvg(pIed, pathList.at(0) + "/" + pIed->name + "_logic_circuit.svg");
+	//	transformer.GenerateOpticalSvg(pIed, pathList.at(1) + "/" + pIed->name + "_optical_circuit.svg");
+	//	transformer.GenerateVirtualSvg(pIed, pathList.at(2) + "/" + pIed->name + "_virtual_circuit.svg");
+	//	//transformer.GenerateWholeCircuitSvg(pIed, pathList.at(3) + "/" + pIed->name + "_whole_circuit.svg");
+	//}
+	//qDebug() << "SVG files generated successfully.";
 
 
 
@@ -115,8 +117,7 @@ int main(int argc, char* argv[]) {
 
 
 	QGraphicsScene* scene = new QGraphicsScene();
-	MainWindow mainWindow;
-	// 将场景接入到 UI 中的 opticalView（通过对象名）
+	MainWindow mainWindow(true);
 	if (QGraphicsView* opticalView = mainWindow.findChild<QGraphicsView*>("opticalView")) {
 		opticalView->setScene(scene);
 		opticalView->setDragMode(QGraphicsView::NoDrag);

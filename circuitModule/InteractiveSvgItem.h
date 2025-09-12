@@ -2,6 +2,7 @@
 #define INTERACTIVESVGMAPITEM_H
 
 #include <QGraphicsItem>
+#include <QObject>
 #include <QPixmap>
 #include <QVector>
 #include <QPointF>
@@ -11,7 +12,7 @@
 #include <QTransform>
 #include <QMap>
 #include <QSharedPointer>
-
+#include <circuitconfig.h>
 class QGraphicsSceneHoverEvent;
 class QGraphicsSceneContextMenuEvent;
 class QGraphicsSceneMouseEvent;
@@ -91,15 +92,23 @@ enum LineType
     LineType_Optical = 2
 };
 
+enum LineStatus
+{
+	Status_Disconnected = 0,	// 断开
+	Status_Connected = 1,		// 连接
+	Status_Alarm = 2			// 告警
+};
+
 struct MapLine
 {
 	QVector<QPointF> points;
 	LineType type; // 类型标记（虚/逻/光）
-	LineStyle style;                    // 线条样式
-	QVector<ArrowHead> arrows;         // 箭头多边形
-	int svgGrpId;                      // 来自组的 id，用于与虚拟数值框关联
-	QString code;                      // 统一的线路 code（optical: code; logic: circuit-code; virtual: code 如有）
-
+	LineStyle style;					// 线条样式
+	QVector<ArrowHead> arrows;			// 箭头多边形
+	int svgGrpId;						// 来自组的 id，用于与虚拟数值框关联
+	QString code;						// 统一的线路 code（optical: code; logic: circuit-code; virtual: code 如有）
+	LineStatus status;					// 线路状态
+	bool isBlinking;					// 是否闪烁
 	// 显式回路属性（按类型划分），仅保留一类；使用单一多态指针以减小内存
 	struct AttrBase { virtual ~AttrBase() {} };
 	struct OpticalAttrs : AttrBase {
@@ -162,10 +171,13 @@ static QColor parseColor(const char* s, double opacity = 1.0) {
 }
 
 
-class InteractiveSvgMapItem : public QGraphicsItem
+class InteractiveSvgMapItem : public QGraphicsObject
 {
+	Q_OBJECT
 public:
 	InteractiveSvgMapItem(const QString& svgPath);
+	// 从内存 SVG 字节构造（与文件版逻辑一致）
+	InteractiveSvgMapItem(const QByteArray& svgBytes);
 
 	QRectF boundingRect() const;
 	void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget);
@@ -196,9 +208,14 @@ protected:
 	void mouseReleaseEvent(QGraphicsSceneMouseEvent* event);
 	void wheelEvent(QGraphicsSceneWheelEvent* event);
 
+protected slots:
+	void onBlinkTimeout();
+
 private:
+	void initCommon();
 	void Clean();
 	void parseSvgAndInit(const QString& svgPath);
+	void parseSvgAndInit(const QByteArray& svgBytes);
 	void parseVirtualSvg(const pugi::xml_document& doc);
 	void parseLogicSvg(const pugi::xml_document& doc);
 	void parseOpticalSvg(const pugi::xml_document& doc);
@@ -215,6 +232,12 @@ private:
 	int hitTestPlate(const QPointF& pos) const;
     void drawPlateIcon(QPainter* painter, const QPointF& center) const;
 	QString buildPlateTooltip(const PlateItem& plate) const;
+
+	/// 跳转
+	void showOpticalRelatedCircuits(const MapLine& line);
+
+	/// 绘制线路
+	void paintLine(QPainter* painter, const MapLine& line, bool isHighLight) const;
 
 	//// 解析压板相关信息
 	// 解析svg中圆的贝塞尔近似描述
@@ -235,7 +258,8 @@ private:
 
 	void fitToViewIfPossible();
 
-
+	QTimer* m_blinkTimer;
+	bool m_blinkOn;
 	QPixmap m_bgPixmap;
 	QVector<MapLine> m_allLines;
     QVector<PlateItem> m_allPlates;
@@ -258,7 +282,7 @@ private:
     // 解析节点的通用样式属性
     SvgNodeStyle parseNodeStyle(const pugi::xml_node& node);
 	LineStyle parseLineStyle(const pugi::xml_node& node);
-
+	CircuitConfig* m_circuitConfig;
 };
 
 #endif // INTERACTIVESVGMAPITEM_H

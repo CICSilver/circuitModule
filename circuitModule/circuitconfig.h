@@ -5,6 +5,7 @@
 #include <QDebug>
 #include "pugixml/pugixml.hpp"
 #include "basemodel.h"
+#include "RtdbClient.h"
 //#include "boost/smart_ptr/shared_ptr.hpp"
 // SCL	- 
 //		- Header
@@ -92,6 +93,8 @@ public:
 	bool LoadSvCimeFile(QString file);
 
 	bool LoadIedCimeFile(QString file);
+	// 加载实时库内容
+	bool LoadRTDB();
 
 	//************************************
 	// 函数名称:	LoadOpticalCimeFile
@@ -140,7 +143,7 @@ public:
 	// 函数名称:	GetCircuitListBySrcAndDest
 	// 函数全名:	CircuitConfig::GetCircuitListBySrcAndDest
 	// 访问权限:	public 
-	// 函数说明:	根据源IED和目的IED名称获取链路列表
+	// 函数说明:	根据源IED和目的IED名称获取链路列表，不区分方向
 	// 函数参数:	const QString & srcIedName
 	// 函数参数:	const QString & destIedName
 	// 返回值:		QList<LogicCircuit*>
@@ -148,11 +151,11 @@ public:
 	QList<LogicCircuit*> GetCircuitListBySrcAndDest(const QString& srcIedName, const QString& destIedName)
 	{
 		QList<LogicCircuit*> ret;
-		foreach(LogicCircuit* pLogicCircuit, m_inLogicCircuitHash.values(destIedName))
-		{
-			if (pLogicCircuit->pSrcIed->name == srcIedName)
-				ret.append(pLogicCircuit);
-		}
+		//foreach(LogicCircuit* pLogicCircuit, m_inLogicCircuitHash.values(destIedName))
+		//{
+		//	if (pLogicCircuit->pSrcIed->name == srcIedName)
+		//		ret.append(pLogicCircuit);
+		//}
 		foreach(LogicCircuit* pLogicCircuit, m_outLogicCircuitHash.values(srcIedName))
 		{
 			if (pLogicCircuit->pDestIed->name == destIedName)
@@ -190,6 +193,21 @@ public:
 		ret += m_opticalCircuitHash.values(qMakePair(ied_2, ied_1));
 		return ret;
 	}
+
+	// 根据IED名称和交换机名称获取经过该交换机的逻辑链路
+	//QList<LogicCircuit*> getLogicCircuitListByIedNameAndSw(const QString& iedName, const QString& swName)
+	//{
+	//	IED* pIed = GetIedByName(iedName);
+	//	foreach(QString connectedIedName, pIed->connectedIedNameSet)
+	//	{
+	//		if (connectedIedName == swName)
+	//			continue;
+	//		QList<LogicCircuit*> list = GetCircuitListBySrcAndDest(iedName, connectedIedName);
+	//		if (!list.isEmpty())  
+	//			return list;
+	//	}
+	//	return QList<LogicCircuit*>();
+	//}
 
 	IED* GetIedByName(const QString& name)
 	{
@@ -239,45 +257,45 @@ protected:
 	//************************************
 	//void CompleteDataDesc(pugi::xml_node& datasetNode, Data* pData);
 
-	inline QString attrToQStr(pugi::xml_node& node, const char* attr)
+	inline QString attrToQStr(const pugi::xml_node& node, const char* attr)
 	{
 		return QString::fromUtf8(node.attribute(attr).as_string());
 	}
 	// ldInst/(prefix)lnClasslnInst.doName.daName
-	Data GetDataByExtref(pugi::xml_node& extrefNode)
-	{
-		Data data;
-		data.ldInst = extrefNode.attribute("ldInst").as_string();
-		data.lnClass = extrefNode.attribute("lnClass").as_string();
-		data.lnInst = extrefNode.attribute("lnInst").as_string();
-		data.fc = extrefNode.attribute("fc").as_string();
-		data.doName = extrefNode.attribute("doName").as_string();
-		data.daName = extrefNode.attribute("daName").as_string();
-		data.prefix = extrefNode.attribute("prefix").as_string();
-		return data;
-	}
+	//Data GetDataByExtref(pugi::xml_node& extrefNode)
+	//{
+	//	Data data;
+	//	data.ldInst = extrefNode.attribute("ldInst").as_string();
+	//	data.lnClass = extrefNode.attribute("lnClass").as_string();
+	//	data.lnInst = extrefNode.attribute("lnInst").as_string();
+	//	data.fc = extrefNode.attribute("fc").as_string();
+	//	data.doName = extrefNode.attribute("doName").as_string();
+	//	data.daName = extrefNode.attribute("daName").as_string();
+	//	data.prefix = extrefNode.attribute("prefix").as_string();
+	//	return data;
+	//}
 
-	inline QString combineExtrefAddr(pugi::xml_node& extrefNode)
-	{
-		QString daName = extrefNode.attribute("daName") ? QString(".%1").arg(extrefNode.attribute("daName").as_string()) : "";
-		return QString("%1/%5%2%3.%4%6")
-			.arg(extrefNode.attribute("ldInst").as_string())
-			.arg(extrefNode.attribute("lnClass").as_string())
-			.arg(extrefNode.attribute("lnInst").as_string())
-			.arg(extrefNode.attribute("doName").as_string())
-			.arg(extrefNode.attribute("prefix").as_string())
-			.arg(daName);
-	}
-	inline QString combineDataPath(Data* pData)
-	{
-		return QString("%1/%2%3$%4$%5$%6")
-			.arg(pData->pParent->ldInst)
-			.arg(pData->lnClass)
-			.arg(pData->lnInst)
-			.arg(pData->fc)
-			.arg(pData->doName)
-			.arg(pData->daName);
-	}
+	//inline QString combineExtrefAddr(pugi::xml_node& extrefNode)
+	//{
+	//	QString daName = extrefNode.attribute("daName") ? QString(".%1").arg(extrefNode.attribute("daName").as_string()) : "";
+	//	return QString("%1/%5%2%3.%4%6")
+	//		.arg(extrefNode.attribute("ldInst").as_string())
+	//		.arg(extrefNode.attribute("lnClass").as_string())
+	//		.arg(extrefNode.attribute("lnInst").as_string())
+	//		.arg(extrefNode.attribute("doName").as_string())
+	//		.arg(extrefNode.attribute("prefix").as_string())
+	//		.arg(daName);
+	//}
+	//inline QString combineDataPath(Data* pData)
+	//{
+	//	return QString("%1/%2%3$%4$%5$%6")
+	//		.arg(pData->pParent->ldInst)
+	//		.arg(pData->lnClass)
+	//		.arg(pData->lnInst)
+	//		.arg(pData->fc)
+	//		.arg(pData->doName)
+	//		.arg(pData->daName);
+	//}
 	QString GetEndDescByIntAddr(pugi::xml_node& sclNode, QString& iedName, QString& intAddr)
 	{
 		// intAddr: "5-A:PISV/SVINGGIO1.DelayTRtg"
@@ -403,24 +421,24 @@ private:
 	// =======================================================================================================================
 	// 数据分级映射 查询指定数据方法：IED - LDevice[ldInst] - LN[lnClass, lnInst, prefix] - DOI[name] - DAI[name]，从左到右由优先级排列
 	// 类型命名规则：key_value_hash
-	typedef QMultiHash<QString, Data*> da_data_mhash;			// <DAI name> - Data
-	typedef QHash<QString, da_data_mhash> do_da_hash;	// <DOI name> - DaNameHash
-	typedef QHash<QString, do_da_hash> lnPrefix_do_hash;	// <LN prefix> - DoNameHash		
-	typedef QHash<QString, lnPrefix_do_hash> lnInst_lnPrefix_hash;	// <LN inst> - PrefixHash		该属性可能为空
-	typedef QHash<QString, lnInst_lnPrefix_hash> lnClass_lnPrefix_hash;	// <LN class> - LnInstHash
-	typedef QHash<QString, lnClass_lnPrefix_hash> ldInst_lnClass_hash;	// <LDevice inst> - LnClassHash
-	typedef QHash<QString, ldInst_lnClass_hash> ied_ldInst_hash;		// IEDName - LdInstHash
+	//typedef QMultiHash<QString, Data*> da_data_mhash;			// <DAI name> - Data
+	//typedef QHash<QString, da_data_mhash> do_da_hash;	// <DOI name> - DaNameHash
+	//typedef QHash<QString, do_da_hash> lnPrefix_do_hash;	// <LN prefix> - DoNameHash		
+	//typedef QHash<QString, lnPrefix_do_hash> lnInst_lnPrefix_hash;	// <LN inst> - PrefixHash		该属性可能为空
+	//typedef QHash<QString, lnInst_lnPrefix_hash> lnClass_lnPrefix_hash;	// <LN class> - LnInstHash
+	//typedef QHash<QString, lnClass_lnPrefix_hash> ldInst_lnClass_hash;	// <LDevice inst> - LnClassHash
+	//typedef QHash<QString, ldInst_lnClass_hash> ied_ldInst_hash;		// IEDName - LdInstHash
 
-	void InsertPathData(QString iedName, Data* pData)
-	{
-		// 按地址逐级插入数据
-		// 确保IED存在
-		if (!m_dataPathHash.contains(iedName))
-			m_dataPathHash.insert(iedName, ldInst_lnClass_hash());
-		ldInst_lnClass_hash& ldInstHash = m_dataPathHash[iedName];
+	//void InsertPathData(QString iedName, Data* pData)
+	//{
+	//	// 按地址逐级插入数据
+	//	// 确保IED存在
+	//	if (!m_dataPathHash.contains(iedName))
+	//		m_dataPathHash.insert(iedName, ldInst_lnClass_hash());
+	//	ldInst_lnClass_hash& ldInstHash = m_dataPathHash[iedName];
 
-		InsertPathData(ldInstHash, pData);
-	}
+	//	InsertPathData(ldInstHash, pData);
+	//}
 
 	//************************************
 	// 函数名称:	InsertPathData
@@ -431,43 +449,42 @@ private:
 	// 函数参数:	Data * pData
 	// 返回值:		void
 	//************************************
-	void InsertPathData(ldInst_lnClass_hash ldeviceHash, Data* pData)
-	{
-		// 确保LDevice存在
-		if (!ldeviceHash.contains(pData->ldInst))
-			ldeviceHash.insert(pData->ldInst, lnClass_lnPrefix_hash());
-		lnClass_lnPrefix_hash& lnClassHash = ldeviceHash[pData->ldInst];
+	//void InsertPathData(ldInst_lnClass_hash ldeviceHash, Data* pData)
+	//{
+	//	// 确保LDevice存在
+	//	if (!ldeviceHash.contains(pData->ldInst))
+	//		ldeviceHash.insert(pData->ldInst, lnClass_lnPrefix_hash());
+	//	lnClass_lnPrefix_hash& lnClassHash = ldeviceHash[pData->ldInst];
 
-		// LN class
-		if (!lnClassHash.contains(pData->lnClass))
-			lnClassHash.insert(pData->lnClass, lnInst_lnPrefix_hash());
-		lnInst_lnPrefix_hash& lnInstHash = lnClassHash[pData->lnClass];
+	//	// LN class
+	//	if (!lnClassHash.contains(pData->lnClass))
+	//		lnClassHash.insert(pData->lnClass, lnInst_lnPrefix_hash());
+	//	lnInst_lnPrefix_hash& lnInstHash = lnClassHash[pData->lnClass];
 
-		// LN inst
-		if (!lnInstHash.contains(pData->lnInst))
-			lnInstHash.insert(pData->lnInst, lnPrefix_do_hash());
-		lnPrefix_do_hash& lnPrefixHash = lnInstHash[pData->lnInst];
+	//	// LN inst
+	//	if (!lnInstHash.contains(pData->lnInst))
+	//		lnInstHash.insert(pData->lnInst, lnPrefix_do_hash());
+	//	lnPrefix_do_hash& lnPrefixHash = lnInstHash[pData->lnInst];
 
-		// LN prefix
-		if (!lnPrefixHash.contains(pData->prefix))
-			lnPrefixHash.insert(pData->prefix, do_da_hash());
-		do_da_hash& doHash = lnPrefixHash[pData->prefix];
+	//	// LN prefix
+	//	if (!lnPrefixHash.contains(pData->prefix))
+	//		lnPrefixHash.insert(pData->prefix, do_da_hash());
+	//	do_da_hash& doHash = lnPrefixHash[pData->prefix];
 
-		// DOI
-		if (!doHash.contains(pData->doName))
-			doHash.insert(pData->doName, da_data_mhash());
-		da_data_mhash& daMultiHash = doHash[pData->doName];
+	//	// DOI
+	//	if (!doHash.contains(pData->doName))
+	//		doHash.insert(pData->doName, da_data_mhash());
+	//	da_data_mhash& daMultiHash = doHash[pData->doName];
 
-		// DAI
-		daMultiHash.insertMulti(pData->daName, pData);
-	}
-	//template<typename >
+	//	// DAI
+	//	daMultiHash.insertMulti(pData->daName, pData);
+	//}
 
 	// =======================================================================================================================
 	// 数据集映射表，由于不同LDevice下存在同名DataSet，所以需要分级查找，查询方法：IED - LDevice[inst] - DataSet[name]
-	typedef QHash<QString, DataSet*> NameDataSetHash;		// <DataSet name - DataSet*>
-	typedef QHash<QString, NameDataSetHash> LdInstDataSetHash;	// <LDevice inst - DataSetNameHash>
-	typedef QHash<QString, LdInstDataSetHash> DataSetHash;		// <IED name - LdInstDataSetHash>
+	//typedef QHash<QString, DataSet*> NameDataSetHash;		// <DataSet name - DataSet*>
+	//typedef QHash<QString, NameDataSetHash> LdInstDataSetHash;	// <LDevice inst - DataSetNameHash>
+	//typedef QHash<QString, LdInstDataSetHash> DataSetHash;		// <IED name - LdInstDataSetHash>
 	//************************************
 	// 函数名称:	GetNameDataSetHashByldInst
 	// 函数全名:	CircuitConfig::GetNameDataSetHashByldInst
@@ -476,7 +493,7 @@ private:
 	// 函数参数:	QString ldInst
 	// 返回值:		CircuitConfig::NameDataSetHash
 	//************************************
-	NameDataSetHash GetNameDataSetHashByldInst(QString iedName, QString ldInst) { return m_dataSetHash.value(iedName).value(ldInst, NameDataSetHash()); }
+	//NameDataSetHash GetNameDataSetHashByldInst(QString iedName, QString ldInst) { return m_dataSetHash.value(iedName).value(ldInst, NameDataSetHash()); }
 	//************************************
 	// 函数名称:	GetDataSetByLdInstAndDataSetName
 	// 函数全名:	CircuitConfig::GetDataSetByLdInstAndDataSetName
@@ -487,7 +504,7 @@ private:
 	// 函数参数:	QString name
 	// 返回值:		DataSet*
 	//************************************
-	DataSet* GetDataSet(QString iedName, QString ldInst, QString datSetName) { return m_dataSetHash.value(iedName).value(ldInst).value(datSetName, NULL); }
+	//DataSet* GetDataSet(QString iedName, QString ldInst, QString datSetName) { return m_dataSetHash.value(iedName).value(ldInst).value(datSetName, NULL); }
 	//************************************
 	// 函数名称:	InsertDataSet
 	// 函数全名:	CircuitConfig::InsertDataSet
@@ -497,22 +514,22 @@ private:
 	// 函数参数:	DataSet * pDataSet
 	// 返回值:		void
 	//************************************
-	void InsertDataSet(QString iedName, DataSet* pDataSet) 
-	{ 
-		QString ldInst = pDataSet->ldInst;
-		if (ldInst.isEmpty())
-			qDebug() << __FILE__ << __LINE__ << "DataSet ldInst is empty";
-		if (!m_dataSetHash.contains(iedName))
-			m_dataSetHash.insert(iedName, LdInstDataSetHash());
-		if (!m_dataSetHash.value(iedName).contains(ldInst))
-			m_dataSetHash[iedName].insert(ldInst, NameDataSetHash());
+	//void InsertDataSet(QString iedName, DataSet* pDataSet) 
+	//{ 
+	//	QString ldInst = pDataSet->ldInst;
+	//	if (ldInst.isEmpty())
+	//		qDebug() << __FILE__ << __LINE__ << "DataSet ldInst is empty";
+	//	if (!m_dataSetHash.contains(iedName))
+	//		m_dataSetHash.insert(iedName, LdInstDataSetHash());
+	//	if (!m_dataSetHash.value(iedName).contains(ldInst))
+	//		m_dataSetHash[iedName].insert(ldInst, NameDataSetHash());
 
-		m_dataSetHash[iedName][ldInst][pDataSet->name] = pDataSet;
-	}
+	//	m_dataSetHash[iedName][ldInst][pDataSet->name] = pDataSet;
+	//}
 
 private:
 	QString m_errMsg;
-
+	RtdbClient m_rtdb;
 	// =======================================================================================================================
 	// 数据源，参与内存管理
 	QList<IED*> m_iedList;
@@ -525,8 +542,8 @@ private:
 	// 关系数据，不参与内存管理
 	QHash<QString, IED*> m_iedHash;
 	QMultiHash<QPair<QString, QString>, OpticalCircuit*> m_opticalCircuitHash;	// <srcIedName, destIedName> - OpticalCircuit
-	ied_ldInst_hash m_dataPathHash;			// 数据映射表，用于根据数据路径查找具体数据
-	DataSetHash m_dataSetHash;		// 数据集映射表，用于判断数据集所属控制块关系，通过ldInst和datasetName查找
+	//ied_ldInst_hash m_dataPathHash;			// 数据映射表，用于根据数据路径查找具体数据
+	//DataSetHash m_dataSetHash;		// 数据集映射表，用于判断数据集所属控制块关系，通过ldInst和datasetName查找
 	// LogicCircuit数据源由BaseCommCB管理
 	QMultiHash<QString, LogicCircuit*> m_inLogicCircuitHash;		// 对于键的IedName为入链路
 	QMultiHash<QString, LogicCircuit*> m_outLogicCircuitHash;		// 对于键的IedName为出链路

@@ -74,6 +74,17 @@ bool CircuitConfig::LoadIedCimeFile(QString file)
 	return true;
 }
 
+bool CircuitConfig::LoadRTDB()
+{
+	if (!m_rtdb.open(RTDB_OPEN_RO))
+	{
+		qDebug() << "RTDB open failed";
+		return false;
+	}
+
+	return true;
+}
+
 bool CircuitConfig::LoadOpticalCimeFile(QString file)
 {
 	xcime::Cime cime;
@@ -97,8 +108,8 @@ bool CircuitConfig::LoadOpticalCimeFile(QString file)
 		IED *pDestIed = m_iedHash[pOptCircuit->destIedName];
 		pOptCircuit->pSrcIed = pSrcIed;
 		pOptCircuit->pDestIed = pDestIed;
-		pSrcIed->optical_list_new.append(pOptCircuit);
-		pDestIed->optical_list_new.append(pOptCircuit);
+		pSrcIed->optical_list.append(pOptCircuit);
+		pDestIed->optical_list.append(pOptCircuit);
 		m_opticalCircuitList.append(pOptCircuit);
 		// 记录光纤直连设备及交换机设备
 		pSrcIed->connectedIedNameSet.insert(pOptCircuit->destIedName);
@@ -201,6 +212,6 @@ void CircuitConfig::Clear()
 	m_inLogicCircuitHash.clear();
 	m_outLogicCircuitHash.clear();
 	m_iedHash.clear();
-	m_dataPathHash.clear();
-	m_dataSetHash.clear();
+	//m_dataPathHash.clear();
+	//m_dataSetHash.clear();
 }

@@ -12478,7 +12478,7 @@ namespace pugi
 		if (_begin != _storage)
 			impl::xml_memory::deallocate(_begin);
 
-		// size check is necessary because for begin_ = end_ = nullptr, memcpy is UB
+		// size check is necessary because for begin_ = end_ = NULL, memcpy is UB
 		if (size_)
 			memcpy(storage, begin_, size_ * sizeof(xpath_node));
 

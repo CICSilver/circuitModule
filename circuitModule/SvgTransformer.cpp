@@ -5,6 +5,8 @@
 #include <include/pugixml/pugixml.hpp>
 #include "svgmodel.h"
 #include "PainterStateGuard.h"
+#include <QBuffer>
+#include <sstream>
 
 SvgTransformer::SvgTransformer()
 {
@@ -76,6 +78,182 @@ void SvgTransformer::GenerateSvgByIedName(const QString& iedName)
 	}
 }
 
+void SvgTransformer::RenderLogicByIedName(const QString& iedName, QPaintDevice* device)
+{
+	if (!device) return;
+	IED* pIed = m_circuitConfig->GetIedByName(iedName);
+	if (!pIed) return;
+	QPainter painter;
+	if (!painter.begin(device)) return;
+	QPainter* old = m_painter; // 备份
+	m_painter = &painter;      // 替换绘图目标
+	LogicSvg svg;
+	GenerateLogicSvgByIed(pIed, svg);
+	DrawLogicSvg(svg);
+	m_painter = old;
+	painter.end();
+}
+
+void SvgTransformer::RenderLogicByIedName(const QString& iedName, QPainter* activePainter)
+{
+	if (!activePainter) return;
+	IED* pIed = m_circuitConfig->GetIedByName(iedName);
+	if (!pIed) return;
+	QPainter* old = m_painter;
+	m_painter = activePainter;
+	LogicSvg svg;
+	GenerateLogicSvgByIed(pIed, svg);
+	DrawLogicSvg(svg);
+	m_painter = old;
+}
+
+void SvgTransformer::RenderOpticalByIedName(const QString& iedName, QPaintDevice* device)
+{
+	if (!device) return;
+	IED* pIed = m_circuitConfig->GetIedByName(iedName);
+	if (!pIed) return;
+	QPainter painter;
+	if (!painter.begin(device)) return;
+	QPainter* old = m_painter;
+	m_painter = &painter;
+	OpticalSvg svg;
+	GenerateOpticalSvgByIed(pIed, svg);
+	DrawOpticalSvg(svg);
+	m_painter = old;
+	painter.end();
+}
+
+void SvgTransformer::RenderOpticalByIedName(const QString& iedName, QPainter* activePainter)
+{
+	if (!activePainter) return;
+	IED* pIed = m_circuitConfig->GetIedByName(iedName);
+	if (!pIed) return;
+	QPainter* old = m_painter;
+	m_painter = activePainter;
+	OpticalSvg svg;
+	GenerateOpticalSvgByIed(pIed, svg);
+	DrawOpticalSvg(svg);
+	m_painter = old;
+}
+
+void SvgTransformer::RenderVirtualByIedName(const QString& iedName, QPaintDevice* device)
+{
+	if (!device) return;
+	IED* pIed = m_circuitConfig->GetIedByName(iedName);
+	if (!pIed) return;
+	QPainter painter;
+	if (!painter.begin(device)) return;
+	QPainter* old = m_painter;
+	m_painter = &painter;
+	VirtualSvg svg;
+	GenerateVirtualSvgByIed(pIed, svg);
+	DrawVirtualSvg(svg);
+	m_painter = old;
+	painter.end();
+}
+
+void SvgTransformer::RenderVirtualByIedName(const QString& iedName, QPainter* activePainter)
+{
+	if (!activePainter) return;
+	IED* pIed = m_circuitConfig->GetIedByName(iedName);
+	if (!pIed) return;
+	QPainter* old = m_painter;
+	m_painter = activePainter;
+	VirtualSvg svg;
+	GenerateVirtualSvgByIed(pIed, svg);
+	DrawVirtualSvg(svg);
+	m_painter = old;
+}
+
+void SvgTransformer::RenderWholeCircuitByIedName(const QString& iedName, QPaintDevice* device)
+{
+	if (!device) return;
+	IED* pIed = m_circuitConfig->GetIedByName(iedName);
+	if (!pIed) return;
+	QPainter painter;
+	if (!painter.begin(device)) return;
+	QPainter* old = m_painter;
+	m_painter = &painter;
+	WholeCircuitSvg svg;
+	GenerateWholeCircuitSvgByIed(pIed, svg);
+	DrawWholeSvg(svg);
+	m_painter = old;
+	painter.end();
+}
+
+void SvgTransformer::RenderWholeCircuitByIedName(const QString& iedName, QPainter* activePainter)
+{
+	if (!activePainter) return;
+	IED* pIed = m_circuitConfig->GetIedByName(iedName);
+	if (!pIed) return;
+	QPainter* old = m_painter;
+	m_painter = activePainter;
+	WholeCircuitSvg svg;
+	GenerateWholeCircuitSvgByIed(pIed, svg);
+	DrawWholeSvg(svg);
+	m_painter = old;
+}
+
+QImage SvgTransformer::RenderLogicToImage(const QString& iedName, const QSize& size)
+{
+	IED* pIed = m_circuitConfig->GetIedByName(iedName);
+	if (!pIed) return QImage();
+	QSize target = size.isValid() ? size : QSize(SVG_VIEWBOX_WIDTH, SVG_VIEWBOX_HEIGHT);
+	QImage img(target, QImage::Format_ARGB32_Premultiplied);
+	img.fill(Qt::black);
+	QPainter painter(&img);
+	QPainter* old = m_painter; m_painter = &painter;
+	LogicSvg svg; GenerateLogicSvgByIed(pIed, svg);
+	DrawLogicSvg(svg);
+	m_painter = old; painter.end();
+	return img;
+}
+
+QImage SvgTransformer::RenderOpticalToImage(const QString& iedName, const QSize& size)
+{
+	IED* pIed = m_circuitConfig->GetIedByName(iedName);
+	if (!pIed) return QImage();
+	QSize target = size.isValid() ? size : QSize(SVG_VIEWBOX_WIDTH, SVG_VIEWBOX_HEIGHT);
+	QImage img(target, QImage::Format_ARGB32_Premultiplied);
+	img.fill(Qt::black);
+	QPainter painter(&img);
+	QPainter* old = m_painter; m_painter = &painter;
+	OpticalSvg svg; GenerateOpticalSvgByIed(pIed, svg);
+	DrawOpticalSvg(svg);
+	m_painter = old; painter.end();
+	return img;
+}
+
+QImage SvgTransformer::RenderVirtualToImage(const QString& iedName, const QSize& size)
+{
+	IED* pIed = m_circuitConfig->GetIedByName(iedName);
+	if (!pIed) return QImage();
+	QSize target = size.isValid() ? size : QSize(SVG_VIEWBOX_WIDTH, SVG_VIEWBOX_HEIGHT);
+	QImage img(target, QImage::Format_ARGB32_Premultiplied);
+	img.fill(Qt::black);
+	QPainter painter(&img);
+	QPainter* old = m_painter; m_painter = &painter;
+	VirtualSvg svg; GenerateVirtualSvgByIed(pIed, svg);
+	DrawVirtualSvg(svg);
+	m_painter = old; painter.end();
+	return img;
+}
+
+QImage SvgTransformer::RenderWholeCircuitToImage(const QString& iedName, const QSize& size)
+{
+	IED* pIed = m_circuitConfig->GetIedByName(iedName);
+	if (!pIed) return QImage();
+	QSize target = size.isValid() ? size : QSize(SVG_VIEWBOX_WIDTH, SVG_VIEWBOX_HEIGHT);
+	QImage img(target, QImage::Format_ARGB32_Premultiplied);
+	img.fill(Qt::black);
+	QPainter painter(&img);
+	QPainter* old = m_painter; m_painter = &painter;
+	WholeCircuitSvg svg; GenerateWholeCircuitSvgByIed(pIed, svg);
+	DrawWholeSvg(svg);
+	m_painter = old; painter.end();
+	return img;
+}
+
 void SvgTransformer::GenerateLogicSvg(const IED* pIed, const QString& filePath)
 {
 	GenerateSvg<LogicSvg>(pIed, filePath, &SvgTransformer::GenerateLogicSvgByIed, &SvgTransformer::DrawLogicSvg);
@@ -86,14 +264,128 @@ void SvgTransformer::GenerateOpticalSvg(const IED* pIed, const QString& filePath
 	GenerateSvg<OpticalSvg>(pIed, filePath, &SvgTransformer::GenerateOpticalSvgByIed, &SvgTransformer::DrawOpticalSvg);
 }
 
-void SvgTransformer::GenerateVirtualSvg(const IED* pIed, const QString& filePath)
+//void SvgTransformer::GenerateVirtualSvg(const IED* pIed, const QString& filePath)
+//{
+//	GenerateSvg<VirtualSvg>(pIed, filePath, &SvgTransformer::GenerateVirtualSvgByIed, &SvgTransformer::DrawVirtualSvg);
+//}
+
+//void SvgTransformer::GenerateWholeCircuitSvg(const IED* pIed, const QString& filePath)
+//{
+//	GenerateSvg<WholeCircuitSvg>(pIed, filePath, &SvgTransformer::GenerateWholeCircuitSvgByIed, &SvgTransformer::DrawWholeSvg);
+//}
+
+QByteArray SvgTransformer::GenerateLogicSvgBytes(const QString& iedName)
 {
-	GenerateSvg<VirtualSvg>(pIed, filePath, &SvgTransformer::GenerateVirtualSvgByIed, &SvgTransformer::DrawVirtualSvg);
+	IED* pIed = m_circuitConfig->GetIedByName(iedName);
+	if (!pIed) return QByteArray();
+	QByteArray bytes;
+	QBuffer buffer(&bytes);
+	buffer.open(QIODevice::WriteOnly);
+	QSvgGenerator generator;
+	generator.setOutputDevice(&buffer);
+	generator.setViewBox(QRect(0, 0, SVG_VIEWBOX_WIDTH, SVG_VIEWBOX_HEIGHT));
+	QPainter painter;
+	painter.begin(&generator);
+	QPainter* old = m_painter;
+	m_painter = &painter;
+	LogicSvg svg;
+	GenerateLogicSvgByIed(pIed, svg);
+	DrawLogicSvg(svg);
+	m_painter = old;
+	painter.end();
+	buffer.close();
+	pugi::xml_document doc;
+	doc.load_buffer(bytes.constData(), bytes.size());
+	ReSignSvgDoc(doc, svg);
+	std::ostringstream oss;
+	doc.save(oss, "", pugi::format_raw, pugi::encoding_utf8);
+	std::string s = oss.str();
+	return QByteArray(s.data(), int(s.size()));
 }
 
-void SvgTransformer::GenerateWholeCircuitSvg(const IED* pIed, const QString& filePath)
+QByteArray SvgTransformer::GenerateOpticalSvgBytes(const QString& iedName)
 {
-	GenerateSvg<WholeCircuitSvg>(pIed, filePath, &SvgTransformer::GenerateWholeCircuitSvgByIed, &SvgTransformer::DrawWholeSvg);
+	IED* pIed = m_circuitConfig->GetIedByName(iedName);
+	if (!pIed) return QByteArray();
+	QByteArray bytes;
+	QBuffer buffer(&bytes);
+	buffer.open(QIODevice::WriteOnly);
+	QSvgGenerator generator;
+	generator.setOutputDevice(&buffer);
+	generator.setViewBox(QRect(0, 0, SVG_VIEWBOX_WIDTH, SVG_VIEWBOX_HEIGHT));
+	QPainter painter;
+	painter.begin(&generator);
+	QPainter* old = m_painter;
+	m_painter = &painter;
+	OpticalSvg svg;
+	GenerateOpticalSvgByIed(pIed, svg);
+	DrawOpticalSvg(svg);
+	m_painter = old;
+	painter.end();
+	buffer.close();
+	pugi::xml_document doc;
+	doc.load_buffer(bytes.constData(), bytes.size());
+	ReSignSvgDoc(doc, svg);
+	std::ostringstream oss; 
+	doc.save(oss, "", pugi::format_raw, pugi::encoding_utf8);
+	std::string s = oss.str();
+	return QByteArray(s.data(), int(s.size()));
+}
+
+QByteArray SvgTransformer::GenerateVirtualSvgBytes(const QString& iedName, const QString& swName)
+{
+	IED* pIed = m_circuitConfig->GetIedByName(iedName);
+	if (!pIed) return QByteArray();
+	QByteArray bytes;
+	QBuffer buffer(&bytes);
+	buffer.open(QIODevice::WriteOnly);
+	QSvgGenerator generator;
+	generator.setOutputDevice(&buffer);
+	generator.setViewBox(QRect(0, 0, SVG_VIEWBOX_WIDTH, SVG_VIEWBOX_HEIGHT));
+	QPainter painter;
+	painter.begin(&generator);
+	QPainter* old = m_painter;
+	m_painter = &painter;
+	VirtualSvg svg;
+	GenerateVirtualSvgByIed(pIed, svg, swName);
+	DrawVirtualSvg(svg);
+	m_painter = old;
+	painter.end();
+	buffer.close();
+	pugi::xml_document doc;
+	doc.load_buffer(bytes.constData(), bytes.size());
+	ReSignSvgDoc(doc, svg);
+	std::ostringstream oss; doc.save(oss, "", pugi::format_raw, pugi::encoding_utf8);
+	std::string s = oss.str();
+	return QByteArray(s.data(), int(s.size()));
+}
+
+QByteArray SvgTransformer::GenerateWholeCircuitSvgBytes(const QString& iedName)
+{
+	IED* pIed = m_circuitConfig->GetIedByName(iedName);
+	if (!pIed) return QByteArray();
+	QByteArray bytes;
+	QBuffer buffer(&bytes);
+	buffer.open(QIODevice::WriteOnly);
+	QSvgGenerator generator;
+	generator.setOutputDevice(&buffer);
+	generator.setViewBox(QRect(0, 0, SVG_VIEWBOX_WIDTH, SVG_VIEWBOX_HEIGHT));
+	QPainter painter;
+	painter.begin(&generator);
+	QPainter* old = m_painter;
+	m_painter = &painter;
+	WholeCircuitSvg svg;
+	GenerateWholeCircuitSvgByIed(pIed, svg);
+	DrawWholeSvg(svg);
+	m_painter = old;
+	painter.end();
+	buffer.close();
+	pugi::xml_document doc;
+	doc.load_buffer(bytes.constData(), bytes.size());
+	ReSignSvgDoc(doc, svg);
+	std::ostringstream oss; doc.save(oss, "", pugi::format_raw, pugi::encoding_utf8);
+	std::string s = oss.str();
+	return QByteArray(s.data(), int(s.size()));
 }
 
 
@@ -203,7 +495,7 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 	{
 		int a = 1;
 	}
-	foreach(OpticalCircuit * optCircuit, pIed->optical_list_new)
+	foreach(OpticalCircuit * optCircuit, pIed->optical_list)
 	{
 		// 一端为主IED，另一端为对侧IED的光纤链路
 		OpticalCircuitLine* optLine = svg.GetOpticalCircuitLineByLineCode(optCircuit->code);
@@ -374,7 +666,7 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 				IedRect* rect = indirectRectList.at(i);
 				quint16 startX = directRectList.isEmpty() ? svg.switcherRectList.first()->x : directRectList.last()->x + directRectList.last()->width;
 				rect->x = startX + horizontal_distance + i * (horizontal_distance + rect->width);
-				rect->y = directRectList.isEmpty() ? svg.switcherRectList.last()->y + svg.switcherRectList.last()->height + horizontal_distance : directRectList.last()->y;
+				rect->y = directRectList.isEmpty() ? svg.switcherRectList.last()->y + svg.switcherRectList.last()->height + horizontal_distance * 2 : directRectList.last()->y;
 				totalWidth += rect->width + horizontal_distance;
 			}
 			totalWidth -= horizontal_distance;
@@ -482,7 +774,7 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 	}
 }
 
-void SvgTransformer::GenerateVirtualSvgByIed(const IED* pIed, VirtualSvg& svg)
+void SvgTransformer::GenerateVirtualSvgByIed(const IED* pIed, VirtualSvg& svg, const QString& swName)
 {
 	//// 生成图形
 	// 矩形构成：内矩形（IED名、描述）+ 外矩形（回路、回路类型图标、压板矩形（压板连接状态）、测量值、）+
@@ -1716,16 +2008,21 @@ void SvgTransformer::ReSignSvg(const QString& filename, BaseSvg& svg)
 		return;
 	}
 
-	ReSignIedRect(doc);
-	ReSignCircuitLine(doc);
-	ReSignPlate(doc);
-	ReSignVirtualValuePlaceholders(doc);
-	ReSignSvgViewBox(doc, svg.viewBoxX, svg.viewBoxY, svg.viewBoxWidth, svg.viewBoxHeight);
+	ReSignSvgDoc(doc, svg);
 
 	if (!doc.save_file(filename.toLocal8Bit()))
 	{
 		qDebug() << "save file failed";
 	}
+}
+
+void SvgTransformer::ReSignSvgDoc(pugi::xml_document& doc, BaseSvg& svg)
+{
+	ReSignIedRect(doc);
+	ReSignCircuitLine(doc);
+	ReSignPlate(doc);
+	ReSignVirtualValuePlaceholders(doc);
+	ReSignSvgViewBox(doc, svg.viewBoxX, svg.viewBoxY, svg.viewBoxWidth, svg.viewBoxHeight);
 }
 
 void SvgTransformer::ReSignCircuitLine(pugi::xml_document& doc)

@@ -31,6 +31,8 @@ QColor parseColor(const char* s, double opacity = 1.0);
 // extraTransform 一般为文档到像素的整体变换；内部会与节点自身的 transform 相乘。
 bool computePathBoundingRect(const pugi::xml_node& node, const QTransform& extraTransform, QRectF& outRect);
 
+void simplifyPolyline(QVector<QPointF>& pts, qreal tol);
+
 }
 
 #endif // SVGUTILS_H

@@ -302,4 +302,44 @@ bool computePathBoundingRect(const pugi::xml_node& node, const QTransform& extra
     return true;
 }
 
+void simplifyPolyline(QVector<QPointF>& pts, qreal tol)
+{
+	if (pts.size() < 3) return;
+	QVector<QPointF> out;
+	out.reserve(pts.size());
+	out.append(pts[0]);
+	int lastKeep = 0;
+	for (int i = 1; i < pts.size() - 1; ++i) {
+		const QPointF& A = pts[lastKeep];
+		const QPointF& B = pts[i];
+		const QPointF& C = pts[i + 1];
+		// 点到线段 AC 的距离
+		QLineF ac(A, C);
+		qreal dist;
+		if (ac.length() == 0) dist = QLineF(A, B).length();
+		else {
+			// 投影参数 t
+			QPointF ap = B - A; QPointF ab = C - A;
+			qreal ab2 = ab.x() * ab.x() + ab.y() * ab.y();
+			qreal t = (ap.x() * ab.x() + ap.y() * ab.y()) / (ab2 > 0 ? ab2 : 1);
+			if (t < 0) dist = QLineF(B, A).length();
+			else if (t > 1) dist = QLineF(B, C).length();
+			else {
+				QPointF proj = A + t * (C - A);
+				dist = QLineF(B, proj).length();
+			}
+		}
+		if (dist > tol) {
+			out.append(B);
+			lastKeep = i;
+		}
+		else {
+			// 丢弃 B
+		}
+	}
+	out.append(pts.last());
+	out.squeeze();
+	pts.swap(out);
+}
+
 } // namespace utils

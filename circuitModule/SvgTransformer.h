@@ -5,6 +5,9 @@
 #include <QPainter>
 #include <QSvgGenerator>
 #include <QTextStream>
+#include <QPaintDevice>
+#include <QImage>
+#include <QBuffer>
 
 #define GET_RADIANS(angle) (angle * M_PI / 180)
 // 字符串组分隔符 grp = field 0x1F field
@@ -26,6 +29,7 @@ namespace utils {
 	// 信息组合/拆分辅助类
 	class FieldJoiner {
 	public:
+		Q_DISABLE_COPY(FieldJoiner)
 		FieldJoiner(const QChar& sep = FIELD_SEPARATE_CHAR)
 			: separator(sep), first(true), stream(&buffer) {
 		}
@@ -133,10 +137,33 @@ public:
 
 	void GenerateSvgByIedName(const QString& iedName);
 
+	void RenderLogicByIedName(const QString& iedName, QPaintDevice* device);
+	void RenderOpticalByIedName(const QString& iedName, QPaintDevice* device);
+	void RenderVirtualByIedName(const QString& iedName, QPaintDevice* device);
+	void RenderWholeCircuitByIedName(const QString& iedName, QPaintDevice* device);
+	// 已开始的QPainter
+	void RenderLogicByIedName(const QString& iedName, QPainter* activePainter);
+	void RenderOpticalByIedName(const QString& iedName, QPainter* activePainter);
+	void RenderVirtualByIedName(const QString& iedName, QPainter* activePainter);
+	void RenderWholeCircuitByIedName(const QString& iedName, QPainter* activePainter);
+
+	// 返回绘制后的 QImage，以 SVG 视图框大小作为默认画布尺寸
+	QImage RenderLogicToImage(const QString& iedName, const QSize& size = QSize());
+	QImage RenderOpticalToImage(const QString& iedName, const QSize& size = QSize());
+	QImage RenderVirtualToImage(const QString& iedName, const QSize& size = QSize());
+	QImage RenderWholeCircuitToImage(const QString& iedName, const QSize& size = QSize());
+
 	void GenerateLogicSvg(const IED* pIed, const QString& filePath);
 	void GenerateOpticalSvg(const IED* pIed, const QString& filePath);
-	void GenerateVirtualSvg(const IED* pIed, const QString& filePath);
-	void GenerateWholeCircuitSvg(const IED* pIed, const QString& filePath);
+	//void GenerateVirtualSvg(const IED* pIed, const QString& filePath);
+	//void GenerateWholeCircuitSvg(const IED* pIed, const QString& filePath);
+
+	// 中转，不写盘直接用于显示
+	QByteArray GenerateLogicSvgBytes(const QString& iedName);
+	QByteArray GenerateOpticalSvgBytes(const QString& iedName);
+	// 若提供交换机名称，则只显示该交换机连接的虚回路
+	QByteArray GenerateVirtualSvgBytes(const QString& iedName, const QString& swName = "");
+	QByteArray GenerateWholeCircuitSvgBytes(const QString& iedName);
 
 protected:
 
@@ -216,7 +243,7 @@ protected:
 	// 函数参数:	VirtualSvg & svg
 	// 返回值:		void
 	//************************************
-	void GenerateVirtualSvgByIed(const IED* pIed, VirtualSvg& svg);
+	void GenerateVirtualSvgByIed(const IED* pIed, VirtualSvg& svg, const QString& swName = "");
 	//************************************
 	// 函数名称:	GenerateVirtualSvgByIed
 	// 函数全名:	SvgTransformer::GenerateVirtualSvgByIed
@@ -327,7 +354,7 @@ private:
 		return angle * M_PI / 180.0;
 	}
 
-	void SvgTransformer::SetArrowStateDirect(const QList<LogicCircuit*>& inList,
+	void SetArrowStateDirect(const QList<LogicCircuit*>& inList,
 		const QList<LogicCircuit*>& outList,
 		const QString& peerIedName,
 		quint8& lineState);
@@ -455,6 +482,8 @@ private:
 
 	// 对SVG文件进行解析重标识
 	void ReSignSvg(const QString&filename, BaseSvg& svg);
+	// 内存文档重签名（不进行文件读写）
+	void ReSignSvgDoc(pugi::xml_document& doc, BaseSvg& svg);
 	// 重标识IED属性
 	void ReSignIedRect(pugi::xml_document& doc);
 	// 重标识链路属性

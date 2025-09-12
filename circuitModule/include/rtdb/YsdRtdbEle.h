@@ -448,7 +448,7 @@ public:
 
 	void Clear();
 
-	void* GetRtdbChl(UINT64 codeChl, eChItemType& eType);//根据标识获取数据集通道 NULL:无法找到 eType:返回的通道类型
+	void* GetRtdbChl(UINT64 codeChl,eChItemType &eType);//根据标识获取数据集通道 NULL:无法找到 eType:返回的通道类型
 public:
 	stuRtdbIEDHead *m_pIedHead;
 	std::map<UINT64,stuRtdbLenger*> m_mapLenger;

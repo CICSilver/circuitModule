@@ -18,56 +18,37 @@
 #include <string>
 #include <sstream>
 #include <QToolTip>
-
-// 简单折线简化：去除近似共线或与前后点共线且距离阈值内的中间点
-static void simplifyPolyline(QVector<QPointF>& pts, qreal tol)
-{
-	if (pts.size() < 3) return;
-	QVector<QPointF> out;
-	out.reserve(pts.size());
-	out.append(pts[0]);
-	int lastKeep = 0;
-	for (int i = 1; i < pts.size() - 1; ++i) {
-		const QPointF& A = pts[lastKeep];
-		const QPointF& B = pts[i];
-		const QPointF& C = pts[i + 1];
-		// 点到线段 AC 的距离
-		QLineF ac(A, C);
-		qreal dist;
-		if (ac.length() == 0) dist = QLineF(A, B).length();
-		else {
-			// 投影参数 t
-			QPointF ap = B - A; QPointF ab = C - A;
-			qreal ab2 = ab.x()*ab.x() + ab.y()*ab.y();
-			qreal t = (ap.x()*ab.x() + ap.y()*ab.y()) / (ab2 > 0 ? ab2 : 1);
-			if (t < 0) dist = QLineF(B, A).length();
-			else if (t > 1) dist = QLineF(B, C).length();
-			else {
-				QPointF proj = A + t * (C - A);
-				dist = QLineF(B, proj).length();
-			}
-		}
-		if (dist > tol) {
-			out.append(B);
-			lastKeep = i;
-		} else {
-			// 丢弃 B
-		}
-	}
-	out.append(pts.last());
-	out.squeeze();
-	pts.swap(out);
-}
-
+#include <QTimer>
+// 闪烁间隔
+#define BLINK_CYCLE_MS 1000
 InteractiveSvgMapItem::InteractiveSvgMapItem(const QString& svgPath)
 	: m_highlightedLineIdx(-1)
 	, m_hoverPlateIdx(-1)
 	, m_dragging(false)
 	, m_fittedOnce(false)
+	, m_blinkOn(false)
 {
-	setAcceptHoverEvents(true);
-	m_docToPix = QTransform();
+	initCommon();
 	parseSvgAndInit(svgPath);
+}
+
+InteractiveSvgMapItem::InteractiveSvgMapItem(const QByteArray& svgBytes)
+	: m_highlightedLineIdx(-1)
+	, m_hoverPlateIdx(-1)
+	, m_dragging(false)
+	, m_fittedOnce(false)
+	, m_blinkOn(false)
+{
+	initCommon();
+	parseSvgAndInit(svgBytes);
+}
+
+void InteractiveSvgMapItem::initCommon() {
+	setAcceptHoverEvents(true);
+	m_circuitConfig = CircuitConfig::Instance();
+	m_blinkTimer = new QTimer();
+	connect(m_blinkTimer, SIGNAL(timeout()), this, SLOT(onBlinkTimeout()));
+	m_blinkTimer->start(500);
 }
 
 QRectF InteractiveSvgMapItem::boundingRect() const
@@ -81,52 +62,7 @@ void InteractiveSvgMapItem::paint(QPainter* painter, const QStyleOptionGraphicsI
 	// 先画回路
 	for (int i = 0; i < m_allLines.size(); ++i) {
 		const MapLine& line = m_allLines[i];
-	QColor stroke = colorForLine(line);
-		if (!stroke.isValid()) stroke = Qt::green;
-		QPen pen(stroke);
-		int baseW = int(line.style.strokeWidth);
-		int w = baseW;
-		if (i == m_highlightedLineIdx) {
-			w = baseW * 3;
-			if (w < 2) w = 2;
-		} else if (w < 1) {
-			w = 1;
-		}
-		pen.setWidth(w);
-		painter->setPen(pen);
-		for (int j = 1; j < line.points.size(); ++j)
-			painter->drawLine(line.points[j - 1], line.points[j]);
-
-		// 画此回路的箭头
-		for (int k = 0; k < line.arrows.size(); ++k) {
-			const ArrowHead& ah = line.arrows[k];
-			if (ah.points.size() < 3) continue;
-
-			QPen apen(pen.color());
-			// 高亮时箭头笔宽与线路一致；否则用基础宽
-			int aw = (i == m_highlightedLineIdx)
-					   ? w
-					   : qMax(1, int(line.style.strokeWidth));
-			apen.setWidth(aw);
-			apen.setCapStyle(Qt::SquareCap);
-			apen.setJoinStyle(Qt::MiterJoin);
-			painter->setPen(apen);
-
-			// 高亮时填充同色，未高亮保持空心
-			if (i == m_highlightedLineIdx) {
-				QColor fill = apen.color();
-				fill.setAlpha(255); // 确保不透明
-				painter->setBrush(fill);
-			} else {
-				painter->setBrush(Qt::NoBrush);
-			}
-
-			QPolygonF poly;
-			for (int pi = 0; pi < ah.points.size(); ++pi) poly << ah.points[pi];
-
-			// 使用 WindingFill 以避免复杂箭头边界的空洞问题
-			painter->drawPolygon(poly, Qt::WindingFill);
-		}
+		paintLine(painter, line, i == m_highlightedLineIdx);
 	}
 	// 后画压板
 	paintPlates(painter);
@@ -204,6 +140,12 @@ void InteractiveSvgMapItem::wheelEvent(QGraphicsSceneWheelEvent* event)
 		v->setTransformationAnchor(QGraphicsView::AnchorViewCenter);
 	}
 	event->accept();
+}
+
+void InteractiveSvgMapItem::onBlinkTimeout()
+{
+	m_blinkOn = !m_blinkOn;
+	update();
 }
 
 void InteractiveSvgMapItem::fitToViewIfPossible()
@@ -296,9 +238,11 @@ void InteractiveSvgMapItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* even
 	if (closest >= 0 && minDist < 15.0) {
 		const MapLine& line = m_allLines[closest];
 		if (line.type == LineType_Optical && !line.attrs.isNull()) {
+			// 选中光纤链路 跳转到关联设备图
+			showOpticalRelatedCircuits(line);
+			// 显示光纤链路信息
 			const MapLine::OpticalAttrs* a =
 				static_cast<const MapLine::OpticalAttrs*>(line.attrs.data());
-
 			QString tip;
 			tip += QString::fromLocal8Bit("光纤链路\n");
 			tip += QString::fromLocal8Bit("端口①: %1 / %2\n").arg(a->srcIed, a->srcPort);
@@ -308,6 +252,13 @@ void InteractiveSvgMapItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* even
 			if (!a->remoteId.isEmpty())tip += QString("RemoteId: %1\n").arg(a->remoteId);
 
 			QToolTip::showText(event->screenPos(), tip);
+		}
+		if (line.type == LineType_Virtual && !line.attrs.isNull())
+		{
+#ifdef _DEBUG
+			MapLine* dbgLine = &m_allLines[closest];
+			dbgLine->isBlinking = !dbgLine->isBlinking;
+#endif
 		}
 	}
 
@@ -364,6 +315,83 @@ QString InteractiveSvgMapItem::buildPlateTooltip(const PlateItem& plate) const
 	return line1 + "\n" + line2;
 }
 
+void InteractiveSvgMapItem::showOpticalRelatedCircuits(const MapLine& line)
+{
+	if (line.type != LineType_Optical || line.attrs.isNull()) return;
+	const MapLine::OpticalAttrs* a = static_cast<const MapLine::OpticalAttrs*>(line.attrs.data());
+	if (!a) return;
+	QString iedName1 = a->srcIed;
+	QString iedName2 = a->destIed;
+	if (iedName1.isEmpty() && iedName2.isEmpty()) return;
+	// 两种情况，直连/交换机
+	// 直连, 显示两个设备间所有虚回路
+	QList<LogicCircuit*> logicCircuitList = m_circuitConfig->GetCircuitListBySrcAndDest(iedName1, iedName2);
+	QList<LogicCircuit*> logicCircuitList2 = m_circuitConfig->GetCircuitListBySrcAndDest(iedName2, iedName1);
+	if (logicCircuitList.isEmpty())
+	{
+		// 有光纤回路无虚回路，解析出错
+		return;
+	}
+
+
+}
+
+void InteractiveSvgMapItem::paintLine(QPainter* painter, const MapLine& line, bool isHighLight) const
+{
+	if(line.isBlinking && !m_blinkOn) {
+		// 闪烁状态且当前为隐藏周期，不绘制
+		return;
+	}
+	QColor stroke = colorForLine(line);
+	if (!stroke.isValid()) stroke = Qt::green;
+	QPen pen(stroke);
+	int baseW = int(line.style.strokeWidth);
+	int w = baseW;
+	if (isHighLight) {
+		w = baseW * 3;
+		if (w < 2) w = 2;
+	}
+	else if (w < 1) {
+		w = 1;
+	}
+	pen.setWidth(w);
+	painter->setPen(pen);
+	for (int j = 1; j < line.points.size(); ++j)
+		painter->drawLine(line.points[j - 1], line.points[j]);
+
+	// 画此回路的箭头
+	for (int k = 0; k < line.arrows.size(); ++k) {
+		const ArrowHead& ah = line.arrows[k];
+		if (ah.points.size() < 3) continue;
+
+		QPen apen(pen.color());
+		// 高亮时箭头笔宽与线路一致；否则用基础宽
+		int aw = (isHighLight)
+			? w
+			: qMax(1, int(line.style.strokeWidth));
+		apen.setWidth(aw);
+		apen.setCapStyle(Qt::SquareCap);
+		apen.setJoinStyle(Qt::MiterJoin);
+		painter->setPen(apen);
+
+		// 高亮时填充同色，未高亮保持空心
+		if (isHighLight) {
+			QColor fill = apen.color();
+			fill.setAlpha(255); // 确保不透明
+			painter->setBrush(fill);
+		}
+		else {
+			painter->setBrush(Qt::NoBrush);
+		}
+
+		QPolygonF poly;
+		for (int pi = 0; pi < ah.points.size(); ++pi) poly << ah.points[pi];
+
+		// 使用 WindingFill 以避免复杂箭头边界的空洞问题
+		painter->drawPolygon(poly, Qt::WindingFill);
+	}
+}
+
 QColor InteractiveSvgMapItem::colorForLine(const MapLine& line) const
 {
 	// 基于 ref 的关联：任一关联压板非 closed 则灰色，全部 closed 则绿色；无关联则用原始色
@@ -412,7 +440,7 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
     QFile file(svgPath);
     if (!file.open(QIODevice::ReadOnly)) { qWarning("SVG文件打开失败"); return; }
     QByteArray svgData = file.readAll();
-    pugi::xml_document doc;
+	pugi::xml_document doc;
 	if (!doc.load_buffer(svgData.data(), svgData.size())) { qWarning("SVG加载失败"); return; }
 	// 释放原始 SVG 字节以降低峰值内存
 	svgData.clear(); svgData.squeeze();
@@ -471,8 +499,8 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
    // 修改后的内存 SVG 渲染到底图
 	QSvgRenderer renderer;
 	if (!renderer.load(modifiedSvg)) {
-        // 如果内存加载失败，回退到原文件
-        renderer.load(svgPath);
+		// 如果内存加载失败，回退到原文件
+		renderer.load(svgPath);
 	}
 	// 释放中间缓冲
 	modifiedSvg.clear(); modifiedSvg.squeeze();
@@ -498,6 +526,77 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
 
     prepareGeometryChange();
     m_bgPixmap = pixmap;
+}
+
+void InteractiveSvgMapItem::parseSvgAndInit(const QByteArray& svgBytes)
+{
+	pugi::xml_document doc;
+	if (!doc.load_buffer(svgBytes.constData(), svgBytes.size())) { qWarning("SVG加载失败"); return; }
+
+	double vbMinX = 0.0, vbMinY = 0.0, vbW = 0.0, vbH = 0.0;
+	double viewScale = 1.0;
+	{
+		pugi::xml_node root = doc.child("svg");
+		if (!root) root = doc.document_element();
+		const char* vb = root.attribute("viewBox").value();
+		if (vb && *vb) {
+			QStringList parts = QString::fromLatin1(vb).simplified().split(' ');
+			if (parts.size() >= 4) { vbMinX = parts[0].toDouble(); vbMinY = parts[1].toDouble(); vbW = parts[2].toDouble(); vbH = parts[3].toDouble(); }
+			else if (parts.size() >= 2) { vbMinX = parts[0].toDouble(); vbMinY = parts[1].toDouble(); }
+		}
+		const int kMaxBgDim = 4096;
+		if (vbW > 0.0 && vbH > 0.0) {
+			if (vbW > kMaxBgDim || vbH > kMaxBgDim) {
+				viewScale = qMin(double(kMaxBgDim) / vbW, double(kMaxBgDim) / vbH);
+			}
+		}
+		m_docToPix = QTransform::fromTranslate(-vbMinX, -vbMinY);
+		if (viewScale != 1.0) m_docToPix.scale(viewScale, viewScale);
+	}
+
+	// 类型识别：根据 type 节点选择分支
+	m_lineIdByCode.clear();
+	// 这里不依赖文件名，直接探测文档中的类型
+	if (!doc.select_nodes("//g[@type='virtual']").empty()) {
+		parseVirtualSvg(doc); m_svgType = LineType_Virtual;
+	} else if (!doc.select_nodes("//g[@type='logic']").empty()) {
+		parseLogicSvg(doc); m_svgType = LineType_Logic;
+	} else if (!doc.select_nodes("//g[@type='optical']").empty()) {
+		parseOpticalSvg(doc); m_svgType = LineType_Optical;
+	}
+
+	std::ostringstream oss;
+	doc.save(oss, "", pugi::format_raw, pugi::encoding_utf8);
+	const std::string s = oss.str();
+	QByteArray modifiedSvg(s.data(), int(s.size()));
+
+	QSvgRenderer renderer;
+	if (!renderer.load(modifiedSvg)) {
+		// 纯内存失败则直接返回
+		qWarning("QSvgRenderer 内存加载失败");
+		return;
+	}
+
+	QRectF viewBox = renderer.viewBoxF();
+	QSize imageSize;
+	if (viewBox.isValid()) {
+		if (vbW <= 0.0 || vbH <= 0.0) { vbW = viewBox.width(); vbH = viewBox.height(); }
+		imageSize = QSize(int(vbW * viewScale), int(vbH * viewScale));
+		if (imageSize.width() <= 0 || imageSize.height() <= 0) {
+			imageSize = QSize(int(viewBox.width()), int(viewBox.height()));
+		}
+	} else {
+		imageSize = QSize(2000, 2000);
+	}
+
+	QPixmap pixmap(imageSize);
+	pixmap.fill(Qt::black);
+	QPainter painter(&pixmap);
+	renderer.render(&painter);
+	painter.end();
+
+	prepareGeometryChange();
+	m_bgPixmap = pixmap;
 }
 
 void InteractiveSvgMapItem::parseVirtualSvg(const pugi::xml_document& doc)
@@ -595,6 +694,7 @@ QVector<MapLine> InteractiveSvgMapItem::parseCircuitLines(const pugi::xml_docume
 		pugi::xml_node g = groups[i].node();
 		// 聚合该组内的所有 polyline 段，作为同一条回路
 		MapLine line;
+		line.isBlinking = false;
 		if (qstrcmp(type, "optical") == 0)
 			line.type = LineType_Optical;
 		else if (qstrcmp(type, "logic") == 0)
@@ -632,7 +732,7 @@ QVector<MapLine> InteractiveSvgMapItem::parseCircuitLines(const pugi::xml_docume
 		// 简化并收缩点集，按像素容差（与线宽相关）
 		{
 			qreal tol = qMax<qreal>(0.5, 0.25 * qreal(line.style.strokeWidth));
-			simplifyPolyline(line.points, tol);
+			utils::simplifyPolyline(line.points, tol);
 			line.points.squeeze();
 		}
 

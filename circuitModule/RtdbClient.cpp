@@ -31,7 +31,7 @@ bool RtdbClient::getAnalog(qulonglong code, double& outValue, bool applyScale,
     }
 
     const stuRtdbAnalog* a = reinterpret_cast<const stuRtdbAnalog*>(static_cast<const void*>(p));
-    double v = std::atof(a->Val); // Val 为字符串，如 "1.234"
+    double v = std::atof(a->val); // Val 为字符串，如 "1.234"
     if (applyScale) {
         v = v * a->scaleFactor + a->scaleOffset; // 工程量换算
     }
@@ -53,7 +53,7 @@ bool RtdbClient::getStatus(qulonglong code, QString& outValue) const {
     }
 
     const stuRtdbStatus* s = reinterpret_cast<const stuRtdbStatus*>(static_cast<const void*>(p));
-    outValue = QString::fromLatin1(s->Val);
+    outValue = QString::fromLatin1(s->val);
     return true;
 }
 
@@ -70,7 +70,7 @@ bool RtdbClient::getSetting(qulonglong code, double& outValue, int sectorIndex, 
     }
 
     const stuRtdbSetting* st = reinterpret_cast<const stuRtdbSetting*>(static_cast<const void*>(p));
-    double v = std::atof(st->Val[sectorIndex - 1]);
+    double v = std::atof(st->val[sectorIndex - 1]);
     if (applyScale) {
         v = v * st->scaleFactor + st->scaleOffset;
     }

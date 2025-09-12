@@ -1,4 +1,4 @@
-#ifndef MAINWINDOW_H
+﻿#ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
 #include <QtGui/QWidget>
@@ -10,13 +10,15 @@
 
 #include "ui_mainwindow.h"
 
-class CustomSvgItem;
 class MainWindow : public QWidget
 {
 	Q_OBJECT
 
 public:
+	// 默认使用文件路径初始化
 	MainWindow(QWidget *parent = 0);
+	// 新增：可指定使用内存 svgBytes 初始化
+	explicit MainWindow(bool useSvgBytes, QWidget* parent = 0);
 	~MainWindow();
 
 protected:
@@ -25,7 +27,6 @@ protected:
 
 protected:
 	void InitView();
-	void InitView(QGraphicsView* view, CustomSvgItem* item, QString svgPath);
 	void InitList();
 
 	QString opticalSvgPath(const QString& iedName)
@@ -44,8 +45,11 @@ protected:
 	{
 		return QCoreApplication::applicationDirPath() + "/virtual/" + iedName + "_virtual_circuit.svg";
 	}
-	// 使用交互式视图加载器（InteractiveSvgMapItem）初始化/刷新某个 QGraphicsView
 	void InitInteractiveView(QGraphicsView* view, const QString& svgPath);
+	void InitInteractiveView(QGraphicsView* view, const QByteArray& svgBytes);
+
+private:
+    void SetupInteractiveView(QGraphicsView* view, class InteractiveSvgMapItem* item);
 
 private slots:
 	void onIedListItemClicked(const QModelIndex& index);
@@ -54,9 +58,8 @@ private:
 	Ui::MainWindowClass ui;
 	CircuitConfig* m_circuitConfig;
 	QStringListModel* m_iedListModel;
-	CustomSvgItem* m_logicSvgItem;
-	CustomSvgItem* m_opticalSvgItem;
-	CustomSvgItem* m_wholeSvgItem;
+	// 是否使用内存 SVG 字节流初始化交互视图
+	bool m_useSvgBytes;
 };
 
 #endif // MAINWINDOW_H

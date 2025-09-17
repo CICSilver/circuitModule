@@ -46,7 +46,7 @@ InteractiveSvgMapItem::InteractiveSvgMapItem(const QByteArray& svgBytes)
 void InteractiveSvgMapItem::initCommon() {
 	setAcceptHoverEvents(true);
 	m_circuitConfig = CircuitConfig::Instance();
-	m_blinkTimer = new QTimer();
+	m_blinkTimer = new QTimer(this);
 	connect(m_blinkTimer, SIGNAL(timeout()), this, SLOT(onBlinkTimeout()));
 	m_blinkTimer->start(500);
 }
@@ -395,29 +395,50 @@ void InteractiveSvgMapItem::paintLine(QPainter* painter, const MapLine& line, bo
 QColor InteractiveSvgMapItem::colorForLine(const MapLine& line) const
 {
 	// 基于 ref 的关联：任一关联压板非 closed 则灰色，全部 closed 则绿色；无关联则用原始色
-	if (line.type != LineType_Virtual || line.attrs.isNull())
+	if (line.type == LineType_Logic && line.attrs.isNull())
 		return QColor::fromRgba(line.style.strokeRgb);
-	const MapLine::VirtualAttrs* va = static_cast<const MapLine::VirtualAttrs*>(line.attrs.data());
-	bool hasAny = false;
-	if (va) {
-		if (!va->srcSoftPlateRef.isEmpty()) {
-			QMap<QString, PlateItem*>::const_iterator it = m_plateMap.find(va->srcSoftPlateRef);
-			if (it != m_plateMap.end() && it.value()) 
-			{ 
-				hasAny = true; 
-				if (!it.value()->isClosed) return QColor(Qt::gray); 
-			}
-		}
-		if (!va->destSoftPlateRef.isEmpty()) {
-			QMap<QString, PlateItem*>::const_iterator it = m_plateMap.find(va->destSoftPlateRef);
-			if (it != m_plateMap.end() && it.value()) 
-			{ 
-				hasAny = true; 
-				if (!it.value()->isClosed) return QColor(Qt::gray); 
-			}
-		}
+	if (line.type == LineType_Optical)
+	{
+		// 光纤链路状态色
+		// 连接：绿色 
+		// 断开：红色
+		// 告警：黄色
+		const MapLine::OpticalAttrs* oa = static_cast<const MapLine::OpticalAttrs*>(line.attrs.data());
+
 	}
-	if (!hasAny) return QColor::fromRgba(line.style.strokeRgb);
+	if (line.type == LineType_Virtual)
+	{
+		// 虚回路状态色，断开优先级高于压板
+		// 连接：绿色 
+		// 断开：红色
+		// 告警：黄色
+		// 压板断开：灰色
+		const MapLine::VirtualAttrs* va = static_cast<const MapLine::VirtualAttrs*>(line.attrs.data());
+		bool hasAny = false;
+		if (line.status == Status_Disconnected)
+		{
+			return QColor(Qt::red);
+		}
+		if (va) {
+			if (!va->srcSoftPlateRef.isEmpty()) {
+				QMap<QString, PlateItem*>::const_iterator it = m_plateMap.find(va->srcSoftPlateRef);
+				if (it != m_plateMap.end() && it.value())
+				{
+					hasAny = true;
+					if (!it.value()->isClosed) return QColor(Qt::gray);
+				}
+			}
+			if (!va->destSoftPlateRef.isEmpty()) {
+				QMap<QString, PlateItem*>::const_iterator it = m_plateMap.find(va->destSoftPlateRef);
+				if (it != m_plateMap.end() && it.value())
+				{
+					hasAny = true;
+					if (!it.value()->isClosed) return QColor(Qt::gray);
+				}
+			}
+		}
+		if (!hasAny) return QColor::fromRgba(line.style.strokeRgb);
+	}
 	return QColor(Qt::green);
 }
 

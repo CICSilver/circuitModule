@@ -1447,6 +1447,8 @@ namespace xcime
     class Cime
     {
     public:
+        typedef std::pair<std::string, CimeBlock *> BlockEntry;
+        typedef std::vector<BlockEntry> BlockContainer;
         /// 构造函数
         Cime();
         /// 析构函数，负责释放所有创建的数据块
@@ -1460,11 +1462,14 @@ namespace xcime
         CimeBlock *createBlock(const std::string &name, const std::string &description = "");
         void dropBlock(const std::string &name)
         {
-            CimeBlock *block = getBlock(name);
-            if (block)
+            for (BlockContainer::iterator it = m_blocks.begin(); it != m_blocks.end(); ++it)
             {
-                delete block;
-                m_blocks.erase(name);
+                if (it->first == name)
+                {
+                    delete it->second;
+                    m_blocks.erase(it);
+                    break;
+                }
             }
         }
         /// 添加已有数据块到管理器中
@@ -1489,7 +1494,7 @@ namespace xcime
         bool loadFromFile(const std::string &filename);
 
         /// 获取所有数据块的映射
-        const std::map<std::string, CimeBlock *> &getBlocks() const;
+        const BlockContainer &getBlocks() const;
 
         /**
          * @brief JSON 风格接口运算符
@@ -1510,7 +1515,7 @@ namespace xcime
 
 
     private:
-        std::map<std::string, CimeBlock *> m_blocks; ///< 存储所有数据块的映射
+        BlockContainer m_blocks; ///< 存储所有数据块，保持插入顺序
         /**
          * @brief 将单个数据块转换为 CSV 格式输出
          * @param os 输出流
@@ -1575,7 +1580,7 @@ namespace xcime
 
     inline Cime::~Cime()
     {
-        for (std::map<std::string, CimeBlock *>::iterator it = m_blocks.begin(); it != m_blocks.end(); ++it)
+        for (BlockContainer::iterator it = m_blocks.begin(); it != m_blocks.end(); ++it)
         {
             delete it->second;
         }
@@ -1585,23 +1590,46 @@ namespace xcime
     {
         CimeBlock *block = new CimeBlock(name, description);
         block->setParent(this); // 设置父指针为当前 Cime 实例
-        m_blocks[name] = block;
+        for (BlockContainer::iterator it = m_blocks.begin(); it != m_blocks.end(); ++it)
+        {
+            if (it->first == name)
+            {
+                it->second = block;
+                return block;
+            }
+        }
+        m_blocks.push_back(BlockEntry(name, block));
         return block;
     }
 
     inline void Cime::addBlock(CimeBlock *block)
     {
         if (block)
-            m_blocks[block->getFullName()] = block;
+        {
+            const std::string fullName = block->getFullName();
+            for (BlockContainer::iterator it = m_blocks.begin(); it != m_blocks.end(); ++it)
+            {
+                if (it->first == fullName)
+                {
+                    it->second = block;
+                    return;
+                }
+            }
+            m_blocks.push_back(BlockEntry(fullName, block));
+        }
     }
 
     inline CimeBlock *Cime::getBlock(const std::string &name) const
     {
-        std::map<std::string, CimeBlock *>::const_iterator it = m_blocks.find(name);
-        return (it != m_blocks.end()) ? it->second : 0;
+        for (BlockContainer::const_iterator it = m_blocks.begin(); it != m_blocks.end(); ++it)
+        {
+            if (it->first == name)
+                return it->second;
+        }
+        return 0;
     }
 
-    inline const std::map<std::string, CimeBlock *> &Cime::getBlocks() const
+    inline const Cime::BlockContainer &Cime::getBlocks() const
     {
         return m_blocks;
     }
@@ -1616,7 +1644,7 @@ namespace xcime
         }
         ofs << "<!System=OMS Version=1.0 Code=UTF-8 Data=1.0!>" << std::endl
             << std::endl;
-        for (std::map<std::string, CimeBlock *>::const_iterator mit = m_blocks.begin();
+        for (BlockContainer::const_iterator mit = m_blocks.begin();
              mit != m_blocks.end(); ++mit)
         {
             blockToCsv(ofs, mit->second);

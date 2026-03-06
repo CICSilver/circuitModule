@@ -1,9 +1,10 @@
-ï»¿#include "SvgUtils.h"
+#include "SvgUtils.h"
 #include <QtGlobal>
 #include <QStringList>
 #include <QRegExp>
 #include <cmath>
-
+#include <QPen>
+#include <QPainter>
 namespace utils {
 
 static inline QPointF cubicPoint(const QPointF& p0, const QPointF& p1,
@@ -213,7 +214,7 @@ QTransform parseTransformMatrix(const pugi::xml_node& node)
     const char* transformStr = node.attribute("transform").as_string();
     if (transformStr && strncmp(transformStr, "matrix(", 7) == 0) {
         QString s(transformStr + 7);
-        s.chop(1); // å»æ‰å°¾éƒ¨ ')'
+        s.chop(1); // È¥µôÎ²²¿ ')'
         QStringList parts = s.split(QRegExp("[\\s,]+"), QString::SkipEmptyParts);
         if (parts.size() == 6) {
             return QTransform(
@@ -266,7 +267,7 @@ QColor parseColor(const char* s, double opacity)
 
 bool computePathBoundingRect(const pugi::xml_node& node, const QTransform& extraTransform, QRectF& outRect)
 {
-    // æœé›†è¯¥èŠ‚ç‚¹ä¸‹çš„æ‰€æœ‰ <path> çš„ d çš„æŠ˜çº¿ç‚¹ï¼Œåˆå¹¶æˆä¸€ä¸ªåŒ…å›´ç›’
+    // ËÑ¼¯¸Ã½ÚµãÏÂµÄËùÓĞ <path> µÄ d µÄÕÛÏßµã£¬ºÏ²¢³ÉÒ»¸ö°üÎ§ºĞ
     double minX = 1e100, minY = 1e100, maxX = -1e100, maxY = -1e100;
     bool hasAny = false;
     QTransform tf = extraTransform * parseTransformMatrix(node);
@@ -313,12 +314,12 @@ void simplifyPolyline(QVector<QPointF>& pts, qreal tol)
 		const QPointF& A = pts[lastKeep];
 		const QPointF& B = pts[i];
 		const QPointF& C = pts[i + 1];
-		// ç‚¹åˆ°çº¿æ®µ AC çš„è·ç¦»
+		// µãµ½Ïß¶Î AC µÄ¾àÀë
 		QLineF ac(A, C);
 		qreal dist;
 		if (ac.length() == 0) dist = QLineF(A, B).length();
 		else {
-			// æŠ•å½±å‚æ•° t
+			// Í¶Ó°²ÎÊı t
 			QPointF ap = B - A; QPointF ab = C - A;
 			qreal ab2 = ab.x() * ab.x() + ab.y() * ab.y();
 			qreal t = (ap.x() * ab.x() + ap.y() * ab.y()) / (ab2 > 0 ? ab2 : 1);
@@ -334,12 +335,122 @@ void simplifyPolyline(QVector<QPointF>& pts, qreal tol)
 			lastKeep = i;
 		}
 		else {
-			// ä¸¢å¼ƒ B
+			// ¶ªÆú B
 		}
 	}
 	out.append(pts.last());
 	out.squeeze();
 	pts.swap(out);
+}
+
+void initBaseRect(SvgRect* rect, const quint16 x, const quint16 y, const quint16 width, const quint16 height, const quint32 border_color, const quint32 underground_color)
+{
+    rect->width = width;
+    rect->height = height;
+    rect->x = x;
+    rect->y = y;
+    rect->border_color = border_color;
+    rect->underground_color = underground_color;
+}
+
+IedRect* GetIedRect(QString iedName, QString iedDesc, const quint16 x, const quint16 y, const quint16 width, const quint16 height, const quint32 border_color, const quint32 underground_color)
+{
+    IedRect* iedRect = new IedRect;
+    iedRect->iedName = iedName;
+    iedRect->iedDesc = iedDesc;
+    initBaseRect(iedRect, x, y, width, height, border_color, underground_color);
+    return iedRect;
+}
+
+void drawGseIcon(QPainter* painter, const QPoint& pt, int icon_length, const QColor& color)
+{
+    QPen pen;
+    pen.setColor(color);
+    pen.setWidth(3);
+    painter->setPen(pen);
+    painter->drawRect(pt.x(), pt.y(), icon_length, icon_length);
+    // »æÖÆÄÚÈİ
+    qreal contentMargin = 3;
+    qreal contentVerticalMargin = 7;
+    qreal lineWidth = (icon_length - contentMargin * 2) / 3;
+    int firstLineWidth_bottom = lineWidth * 0.9;
+    int secondLineWidth_bottom = lineWidth * 1.25;
+    int thirdLineWidth_bottom = lineWidth * 0.9;
+    int contentTopY = pt.y() + contentVerticalMargin;
+    int contentBottomY = pt.y() + icon_length - contentVerticalMargin;
+    QPointF points[6] = {
+        QPointF(pt.x() + contentMargin, contentBottomY),
+        QPointF(pt.x() + contentMargin + firstLineWidth_bottom, contentBottomY),
+        QPointF(pt.x() + contentMargin + firstLineWidth_bottom, contentTopY),
+        QPointF(pt.x() + contentMargin + firstLineWidth_bottom + secondLineWidth_bottom, contentTopY),
+        QPointF(pt.x() + contentMargin + firstLineWidth_bottom + secondLineWidth_bottom, contentBottomY),
+        QPointF(pt.x() + contentMargin + firstLineWidth_bottom + secondLineWidth_bottom + thirdLineWidth_bottom + 0.5, contentBottomY)
+    };
+    pen.setWidth(2);
+    painter->setPen(pen);
+    painter->drawPolyline(points, 6);
+}
+
+void drawSvIcon(QPainter* painter, const QPoint& pt, int icon_length, const QColor& color)
+{
+    QPen pen;
+    pen.setColor(color);
+    pen.setWidth(3);
+    painter->setPen(pen);
+    painter->drawRect(pt.x(), pt.y(), icon_length, icon_length);
+    // »æÖÆÄÚÈİ
+    qreal contentMargin = 2;
+    qreal contentWidth = icon_length - contentMargin * 2;
+    qreal contentY = (pt.y() + static_cast<qreal>(icon_length)) / 2;
+    qreal contentTopY = pt.y() + contentMargin;
+    qreal contentBottomY = pt.y() + icon_length - contentMargin;
+    QPointF startPoint(pt.x() + contentMargin, pt.y() + icon_length / 2);
+    QPointF endPoint(pt.x() + icon_length - contentMargin, pt.y() + icon_length / 2);
+    QPointF controlPt1(pt.x() + contentWidth / 2 - 1, startPoint.y() - 5);
+    QPointF controlPt2(pt.x() + contentWidth / 4 * 3 + 1, startPoint.y() + 5);
+    QPainterPath path;
+    path.moveTo(startPoint);
+    path.cubicTo(controlPt1, controlPt1, QPointF((startPoint.x() + endPoint.x()) / 2, startPoint.y()));
+    path.cubicTo(controlPt2, controlPt2, endPoint);
+    pen.setWidth(2);
+    painter->setPen(pen);
+    painter->drawPath(path);
+}
+
+void drawPlateIcon(QPainter* painter, const QPoint& centerPt, const QPen& pen)
+{
+}
+
+void drawPlateIcon(QPainter* painter, const QPoint& centerPt, bool status, quint8 _type, const QColor& color, const QString& info)
+{
+    //QPen pen;
+    //QFont font;
+    //pen.setWidth(2);
+    //pen.setColor(color);
+    //font.setPointSize(_type);
+    //font.setFamily(info);
+
+    //painter->setFont(font);
+    //painter->setPen(pen);
+    //int distance = PLATE_WIDTH - PLATE_CIRCLE_RADIUS * 4;	// Á½¸öÔ²Ö®¼äµÄ¾àÀë = Ñ¹°åÍ¼ĞÎ×Ü¿í¶È - Á½¸öÔ²µÄÖ±¾¶
+    //// Ö±¾¶20µÄÔ²
+    //painter->drawEllipse(centerPt, PLATE_CIRCLE_RADIUS, PLATE_CIRCLE_RADIUS);
+    //painter->drawEllipse(centerPt + QPoint(distance, 0), PLATE_CIRCLE_RADIUS, PLATE_CIRCLE_RADIUS);
+    //// ¾ØĞÎÁ¬½Ó×ó²àÔ²
+    ////int rectWidth = 50;
+    //int rectHeight = PLATE_CIRCLE_RADIUS * 2;
+    ////painter->translate(centerPt);
+    //QPoint ptList[4] = {
+    //    QPoint(0, -rectHeight / 2),
+    //    QPoint(distance, -rectHeight / 2),
+    //    QPoint(distance, rectHeight / 2),
+    //    QPoint(0, rectHeight / 2),
+    //};
+    //// ±ÕºÏ×´Ì¬¾ØĞÎ
+    //pen.setColor(Qt::transparent);
+    //painter->setPen(pen);
+    //painter->drawLine(centerPt + ptList[0], centerPt + ptList[1]);
+    //painter->drawLine(centerPt + ptList[2], centerPt + ptList[3]);
 }
 
 } // namespace utils

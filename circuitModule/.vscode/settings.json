@@ -79,7 +79,8 @@
         "xstring": "cpp",
         "xtr1common": "cpp",
         "xtree": "cpp",
-        "xutility": "cpp"
+        "xutility": "cpp",
+        "qbuffer": "cpp"
     },
     "C_Cpp.default.includePath": [
         "${workspaceFolder}/**",

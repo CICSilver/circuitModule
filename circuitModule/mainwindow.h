@@ -1,33 +1,47 @@
-ï»¿#ifndef MAINWINDOW_H
+#ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
 #include <QtGui/QWidget>
 #include <QGraphicsView>
 #include <QGraphicsScene>
 #include <QStringListModel>
-#include "circuitconfig.h"
+#include <QString>
 #include <QEvent>
+#include <QStandardItemModel>
+#include <QHash>
+#include <QByteArray>
 
+#include "circuitconfig.h"
+#include "../circuitmodule_global.h"
 #include "ui_mainwindow.h"
 
-class MainWindow : public QWidget
+class CIRCUITMODULE_API CircuitModuleWidget : public QWidget
 {
 	Q_OBJECT
 
 public:
-	// é»˜è®¤ä½¿ç”¨æ–‡ä»¶è·¯å¾„åˆå§‹åŒ–
-	MainWindow(QWidget *parent = 0);
-	// æ–°å¢ï¼šå¯æŒ‡å®šä½¿ç”¨å†…å­˜ svgBytes åˆå§‹åŒ–
-	explicit MainWindow(bool useSvgBytes, QWidget* parent = 0);
-	~MainWindow();
+	// Ä¬ÈÏÊ¹ÓÃÎÄ¼şÂ·¾¶³õÊ¼»¯
+	CircuitModuleWidget(QWidget *parent = 0);
+	// ĞÂÔö£º¿ÉÖ¸¶¨Ê¹ÓÃÄÚ´æ svgBytes ³õÊ¼»¯
+	explicit CircuitModuleWidget(bool useSvgBytes, QWidget* parent = 0);
+	~CircuitModuleWidget();
+
+	void clear();
+	// Ë¢ĞÂ½çÃæÁ¬½ÓÊı¾İ
+	bool UpdateConnectionData();
+	// Ë¢ĞÂÊµÊ±¿âÊı¾İ¼°½çÃæÏÔÊ¾
+	bool Refresh();
+	static void* operator new(size_t size);
+	static void  operator delete(void* p) throw();
 
 protected:
-	// ç»Ÿä¸€åœ¨è§†å›¾å±‚é™åˆ¶ç¼©æ”¾èŒƒå›´
+	// Í³Ò»ÔÚÊÓÍ¼²ãÏŞÖÆËõ·Å·¶Î§
 	bool eventFilter(QObject* watched, QEvent* event);
 
 protected:
 	void InitView();
-	void InitList();
+	void InitSvg();
+	void InitTree();
 
 	QString opticalSvgPath(const QString& iedName)
 	{
@@ -49,16 +63,28 @@ protected:
 	void InitInteractiveView(QGraphicsView* view, const QByteArray& svgBytes);
 
 private:
-    void SetupInteractiveView(QGraphicsView* view, class InteractiveSvgMapItem* item);
+	bool InitializeCircuitData(const QString& cimeDirectory);
+	void InitializeWindow();
+	void SetupInteractiveView(QGraphicsView* view, class InteractiveSvgMapItem* item);
+	void DisplayIed(const QString& iedName);
+	void clearView(QGraphicsView* view);
 
 private slots:
-	void onIedListItemClicked(const QModelIndex& index);
+	void onStationTreeItemClicked(const QModelIndex& index);
 
 private:
 	Ui::MainWindowClass ui;
 	CircuitConfig* m_circuitConfig;
 	QStringListModel* m_iedListModel;
-	// æ˜¯å¦ä½¿ç”¨å†…å­˜ SVG å­—èŠ‚æµåˆå§‹åŒ–äº¤äº’è§†å›¾
+	QStandardItemModel* m_stationModel;
+	// ÊÇ·ñÊ¹ÓÃÄÚ´æ SVG ×Ö½ÚÁ÷³õÊ¼»¯½»»¥ÊÓÍ¼
+	struct SvgByteData
+	{
+		QByteArray logic;
+		QByteArray optical;
+		QByteArray virtualCircuit;
+	};
+	QHash<QString, SvgByteData> m_svgByteCache;
 	bool m_useSvgBytes;
 };
 

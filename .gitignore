@@ -363,7 +363,18 @@ MigrationBackup/
 FodyWeavers.xsd
 /circuitModule/debug.svg
 
-# Custom
+# Custom path
 /circuitModule/cime_template/
 /circuitModule/build/
 /circuitModule/GeneratedFiles/
+/circuitModule/Debug_exe/
+/circuitModule/cime_test/
+/circuitModule/tempFiles/
+/circuitModule/.VSCodeCounter/
+
+# Custom files
+circuitModule/transGbk.bat
+circuitModule/TODO LIST.txt
+circuitModule/_codex_write_test.txt
+circuitModule/cpp.hint
+circuitModule/STL.natvis

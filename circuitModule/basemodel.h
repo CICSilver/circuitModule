@@ -4,6 +4,7 @@
 #include <QList>
 #include <QMap>
 #include <QDebug>
+#include "../../rtdb_dll/YsdRtdbEle.h"
 struct IED;
 struct Data;
 //struct DataSet;
@@ -20,79 +21,30 @@ enum VirtualType
 	SV
 };
 
-// 控制块基类
-struct BaseControl
+// 连接状态类型
+enum OptLinkStatusType
 {
-	virtual ~BaseControl() {}
-	// 标识key，cbName:ldInst:apName
-	inline QString key() const { return QString("%1:%2:%3").arg(name).arg(ldInst).arg(apName); }
-	QString name;
-	QString desc;
-	QString confRev;
-	QString apName;
-	QString ldInst;
-	VirtualType cbType;
-	//DataSet* pDataSet;
+	LS_NORMAL = 1,		// 正常值
+	LS_INVERTED,		// 取反值
+	LS_VTDERIVED		// 虚回路衍生
 };
-struct GSEControl : public BaseControl
-{
-	QString type;
-	QString appid;	// 控制块appId，如：IL2202ANRPIT01/LLN0$GO$gocb1
-};
-struct SMVControl : public BaseControl
-{
-	QString smvid;	// IL2202ALZMUSV02/LLN0$SV$smvcb1
-	bool isMulticast;
-	quint16 nofASDU;
-	quint32 smpRate;
-};
-//
-//// 链路单端信息
-//struct CircuitEnd
-//{
-//	//QString name;
-//	QString addr;	// 数据路径
-//	QString port;
-//	QString desc;
-//	// 若连接交换机，则记录交换机信息
-//	QString switcherName;
-//	QString switcherPort;
-//	Data data;
-//};
-//struct Circuit
-//{
-//	CircuitEnd srcEnd;
-//	CircuitEnd destEnd;
-//	LogicCircuit* parent;
-//};
-
-//// 光纤链路，包含两IED下全部逻辑链路
-//struct OpticalCircuit
-//{
-//	QString srcPort;
-//	QString destPort;
-//	QString srcSwPort;
-//	QString destSwPort;
-//	QString swName;
-//	IED* pSrcIed;
-//	IED* pDestIed;
-//	QList<LogicCircuit*> logicCircuitList;
-//};
 
 // 光纤实回路
 struct OpticalCircuit
 {
-	quint16 code;				// 光纤编号
-	// QString loopCode;		
+	quint64 code;					// 光纤链路ID	从1开始
+	quint64 loopCode;				// 光纤环路编号，loopName的#后部分
+	QString loopName;			// 光纤名称，如：光纤线#环路编号
 	QString srcIedName;			// 源设备别名
 	QString destIedName;		// 目标设备别名
 	QString srcIedPort;			// 源设备端口
 	QString destIedPort;		// 目标设备端口
 	QString srcIedDesc;			// 源设备描述
 	QString destIedDesc;		// 目标设备描述
-	QString cableDesc;			// 线缆描述，如 PL2205LA:5-C_IL2202ALM:1-A
+	//QString cableDesc;			// 线缆描述，如 PL2205LA:5-C_IL2202ALM:1-A
 	QString reference;			// 路径，如 IL2202ALM/G1/1-A
-	qint16 remoteId;
+	OptLinkStatusType linkStatusType;	// 光纤链路状态类型
+	quint64 remoteId;
 	bool connStatus;
 	IED* pSrcIed;				// 源设备
 	IED* pDestIed;				// 目标设备
@@ -105,39 +57,52 @@ struct VirtualCircuit
 	explicit VirtualCircuit(VirtualType _type)
 		: type(_type)
 	{
-		remoteSigId_A = -1;
-		remoteSigId_B = -1;
-		remoteId = -1;
+		srcName = "";
+		outRemoteCode = -1;
+		inRemoteCode = -1;
 		val = _type == GOOSE ? 0.00 : 57.73;
 		connStatus = false;
+		leftOpticalCode = 0;
+		rightOpticalCode = 0;
 	}
-	VirtualType type;			// 链路类型
-	QString srcIedName;			// 源设备别名
-	QString destIedName;		// 目标设备别名
-	QString srcIedDesc;			// 源设备描述
-	QString destIedDesc;		// 目标设备描述
-	QString srcName;			// 输出名称
-	QString destName;			// 输入名称
-	QString srcDesc;			// 输出别名
-	QString destDesc;			// 输入别名
-	QString srcRef;				// 输出路径，如PL2205LAPIGO/B1PTRC1.ST.StrBF.PhsA
-	QString destRef;			// 输入路径
-	QString srcSoftPlateDesc;	// 开出软压板描述，当type为SV时不使用
-	QString srcSoftPlateRef;	// 开出软压板路径
-	QString destSoftPlateDesc;	// 开入软压板描述
-	QString destSoftPlateRef;	// 开入软压板路径
-	QString srcCbName;			// 输出控制块名称
-	qint16 remoteSigId_A;		// A网遥信ID
-	qint16 remoteSigId_B;		// B网遥信ID
-	qint16 remoteId;			// 当type为Goose时，代表Goose端子遥信ID；
-								// 当type为SV时，代表SV端子遥测ID
+	VirtualType type;				// 链路类型
+	quint64 code;					// 虚回路编号
+	quint64 linkCode;				// 链路状态ID
+	quint64 leftOpticalCode;		// 左侧光纤链路ID
+	quint64 rightOpticalCode;		// 右侧光纤链路ID
+	QString switchIedName;		// 交换机名称
+	QString srcIedName;				// 源设备别名
+	QString destIedName;			// 目标设备别名
+	QString srcIedDesc;				// 源设备描述
+	QString destIedDesc;			// 目标设备描述
+	QString srcName;				// 输出名称
+	QString destName;				// 输入名称
+	QString srcDesc;				// 输出别名
+	QString destDesc;				// 输入别名
+	QString srcRef;					// 输出路径，如PL2205LAPIGO/B1PTRC1.ST.StrBF.PhsA
+	QString destRef;				// 输入路径
+	quint64 srcSoftPlateCode;		// 开出软压板ID
+	QString srcSoftPlateDesc;		// 开出软压板描述，当type为SV时不使用
+	QString srcSoftPlateRef;		// 开出软压板路径
+	quint64 destSoftPlateCode;		// 开入软压板ID
+	QString destSoftPlateDesc;		// 开入软压板描述
+	QString destSoftPlateRef;		// 开入软压板路径
+	QString srcCbName;				// 输出控制块名称
+	quint64 outRemoteCode;			// 输出遥信
+	quint64 inRemoteCode;			// 输入遥信
+	//QString remoteCode;				// 当type为Goose时，代表Goose端子遥信ID；
+									// 当type为SV时，代表SV端子遥测ID
 	LogicCircuit* pLogicCircuit;	// 所属逻辑链路
-	float val;					// 原始值
-	bool connStatus;			// 通断状态
+	stuRtdbGseCircuit* pRtdbCircuit;// 实时库对应的GSE链路指针
+	float val;						// 原始值
+	bool connStatus;				// 通断状态
+	
 };
 
 struct IED
 {
+	quint64 code;
+	int id;								// 设备ID
 	QString name;						// 设备名称
 	QString type;						// 设备型号
 	QString desc;						// 设备描述
@@ -167,17 +132,6 @@ struct BaseCommCB
 		qDeleteAll(logicCircuitList);
 		logicCircuitList.clear();
 	}
-	//LogicCircuit* GetLogicCircuitByDestIedName(const QString& destIedName)
-	//{
-	//	foreach(LogicCircuit * pLogicCircuit, logicCircuitList)
-	//	{
-	//		if (pLogicCircuit->GetDestIed() && pLogicCircuit->GetDestIed()->name == destIedName)
-	//		{
-	//			return pLogicCircuit;
-	//		}
-	//	}
-	//	return NULL;
-	//}
 	inline QString key() const { return QString("%1:%2:%3").arg(cbName).arg(ldInst).arg(apName); }
 	QString apName;
 	QString subnetworkName;

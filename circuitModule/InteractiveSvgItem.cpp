@@ -1,10 +1,11 @@
-ï»¿#include "InteractiveSvgItem.h"
+#include "InteractiveSvgItem.h"
 #include "SvgUtils.h"
 #include <QPainter>
 #include <QGraphicsSceneHoverEvent>
 #include <QFile>
 #include <QDebug>
 #include "svgmodel.h"
+#include "secwidget.h"
 #include <QMap>
 #include <QTransform>
 #include <cmath>
@@ -19,14 +20,31 @@
 #include <sstream>
 #include <QToolTip>
 #include <QTimer>
-// é—ªçƒé—´éš”
+// ÉÁË¸¼ä¸ô
 #define BLINK_CYCLE_MS 1000
+#ifndef SVG_PIXMAP_REGEN_SCALE_THRESHOLD
+#define SVG_PIXMAP_REGEN_SCALE_THRESHOLD 1.5
+#endif
+#ifndef SVG_PIXMAP_REGEN_MAX_DIM
+#define SVG_PIXMAP_REGEN_MAX_DIM 8192
+#endif
+namespace utils {
+	static double toDouble(const char* val)
+	{
+		return (val && val[0] != '\0') ? atof(val) : 0.0;
+	}
+	static int toInt(const char* val)
+	{
+		return (val && val[0] != '\0') ? atoi(val) : 0;
+	}
+};
 InteractiveSvgMapItem::InteractiveSvgMapItem(const QString& svgPath)
 	: m_highlightedLineIdx(-1)
 	, m_hoverPlateIdx(-1)
 	, m_dragging(false)
 	, m_fittedOnce(false)
 	, m_blinkOn(false)
+	, m_rtdb(RtdbClient::Instance())
 {
 	initCommon();
 	parseSvgAndInit(svgPath);
@@ -38,6 +56,8 @@ InteractiveSvgMapItem::InteractiveSvgMapItem(const QByteArray& svgBytes)
 	, m_dragging(false)
 	, m_fittedOnce(false)
 	, m_blinkOn(false)
+	, m_rtdb(RtdbClient::Instance())
+	, m_statusTimer(NULL)
 {
 	initCommon();
 	parseSvgAndInit(svgBytes);
@@ -49,24 +69,44 @@ void InteractiveSvgMapItem::initCommon() {
 	m_blinkTimer = new QTimer(this);
 	connect(m_blinkTimer, SIGNAL(timeout()), this, SLOT(onBlinkTimeout()));
 	m_blinkTimer->start(500);
+	m_tooltipTimer = new QTimer(this);
+	m_tooltipTimer->setSingleShot(true);
+	connect(m_tooltipTimer, SIGNAL(timeout()), this, SLOT(onTooltipTimeout()));
+	m_statusTimer = new QTimer(this);
+	connect(m_statusTimer, SIGNAL(timeout()), this, SLOT(onStatusTimeout()));
+	m_statusTimer->start(1000);
+	m_tooltipPos = QPoint();
+	m_tooltipText = QString();
+	//m_tooltipTimer->start(500);
+	m_svgCache.clear();
+	m_svgCache.squeeze();
+	m_svgSourcePath.clear();
+	m_baseRasterSize = QSize();
+	m_itemSize = QSizeF();
+	m_currentHoverPart = Hover_None;
+	//m_secWidget = NULL;
 }
 
 QRectF InteractiveSvgMapItem::boundingRect() const
 {
-	return QRectF(0, 0, m_bgPixmap.width(), m_bgPixmap.height());
+	if (m_itemSize.isEmpty())
+		return QRectF();
+	return QRectF(0, 0, m_itemSize.width(), m_itemSize.height());
 }
 
 void InteractiveSvgMapItem::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget*)
 {
-	painter->drawPixmap(0, 0, m_bgPixmap);
-	// å…ˆç”»å›è·¯
+	if (!m_bgPixmap.isNull() && !m_itemSize.isEmpty()) {
+		painter->drawPixmap(QRectF(0, 0, m_itemSize.width(), m_itemSize.height()), m_bgPixmap, QRectF(0, 0, m_bgPixmap.width(), m_bgPixmap.height()));
+	}
+	// ÏÈ»­»ØÂ·
 	for (int i = 0; i < m_allLines.size(); ++i) {
 		const MapLine& line = m_allLines[i];
 		paintLine(painter, line, i == m_highlightedLineIdx);
 	}
-	// åç”»å‹æ¿
+	// ºó»­Ñ¹°å
 	paintPlates(painter);
-	// æœ€åç»˜åˆ¶è™šæ‹Ÿæ•°å€¼æ–‡æœ¬ï¼Œè¦†ç›–åœ¨æœ€ä¸Šå±‚
+	// ×îºó»æÖÆĞéÄâÊıÖµÎÄ±¾£¬¸²¸ÇÔÚ×îÉÏ²ã
 	paintVirtualValues(painter);
 }
 void InteractiveSvgMapItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
@@ -75,7 +115,7 @@ void InteractiveSvgMapItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
 		m_dragging = true;
 		if (scene() && !scene()->views().isEmpty()) {
 			QGraphicsView* v = scene()->views().first();
-			// è®°å½•æŒ‰ä¸‹æ—¶çš„è§†å›¾åæ ‡ä½ç½®ï¼ˆåƒç´ ï¼‰
+			// ¼ÇÂ¼°´ÏÂÊ±µÄÊÓÍ¼×ø±êÎ»ÖÃ£¨ÏñËØ£©
 			m_lastViewPos = v->mapFromScene(event->scenePos());
 		} else {
 			m_lastViewPos = event->screenPos();
@@ -91,11 +131,11 @@ void InteractiveSvgMapItem::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
 	if (m_dragging) {
 		if (scene() && !scene()->views().isEmpty()) {
 			QGraphicsView* v = scene()->views().first();
-			// å½“å‰é¼ æ ‡å¯¹åº”çš„è§†å›¾åæ ‡
+			// µ±Ç°Êó±ê¶ÔÓ¦µÄÊÓÍ¼×ø±ê
 			QPoint curViewPos = v->mapFromScene(event->scenePos());
 			QPoint delta = curViewPos - m_lastViewPos;
 			m_lastViewPos = curViewPos;
-			// ç”¨æ»šåŠ¨æ¡å¹³ç§»
+			// ÓÃ¹ö¶¯ÌõÆ½ÒÆ
 			QScrollBar* hbar = v->horizontalScrollBar();
 			QScrollBar* vbar = v->verticalScrollBar();
 			if (hbar) hbar->setValue(hbar->value() - delta.x());
@@ -122,7 +162,7 @@ void InteractiveSvgMapItem::wheelEvent(QGraphicsSceneWheelEvent* event)
 	if (scene() && !scene()->views().isEmpty()) {
 		QGraphicsView* v = scene()->views().first();
 		
-		// ç‹¬ç«‹çª—å£ä¸­çš„ç¼©æ”¾å¤„ç†
+		// ¶ÀÁ¢´°¿ÚÖĞµÄËõ·Å´¦Àí
 		const double factor = (event->delta() > 0) ? 1.15 : 1.0 / 1.15;
 		double sX = v->transform().m11();
 		double sY = v->transform().m22();
@@ -148,6 +188,39 @@ void InteractiveSvgMapItem::onBlinkTimeout()
 	update();
 }
 
+void InteractiveSvgMapItem::onTooltipTimeout()
+{
+	if (m_currentHoverPart == Hover_None) {
+		m_tooltipTimer->stop();
+		QToolTip::hideText();
+		m_tooltipTimer->setSingleShot(true);
+		return;
+	}
+	QGraphicsScene* s = scene();
+	QObject* p = s->parent();
+	QGraphicsView* v = NULL;
+	while (p)
+	{
+		v = qobject_cast<QGraphicsView*>(p);
+		if (v)
+			break;
+		p = p->parent();
+	}
+
+	QToolTip::showText(m_tooltipPos, m_tooltipText, v->viewport());
+
+	m_tooltipTimer->setSingleShot(false);
+	m_tooltipTimer->start(1000);
+}
+
+void InteractiveSvgMapItem::onStatusTimeout()
+{
+	// Ë¢ĞÂÑ¹°å×´Ì¬
+	updatePlateStatuses();
+	updateLineStatuses();
+}
+
+
 void InteractiveSvgMapItem::fitToViewIfPossible()
 {
 	if (!scene() || scene()->views().isEmpty()) return;
@@ -157,7 +230,7 @@ void InteractiveSvgMapItem::fitToViewIfPossible()
 	if (rect.isEmpty()) return;
 }
 
-// è®¾ç½®é«˜äº®çº¿è·¯
+// ÉèÖÃ¸ßÁÁÏßÂ·
 void InteractiveSvgMapItem::setHighlightedLine(int idx)
 {
 	if (m_highlightedLineIdx != idx) {
@@ -169,27 +242,37 @@ void InteractiveSvgMapItem::setHighlightedLine(int idx)
 void InteractiveSvgMapItem::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
 {
 	QPointF pos = event->pos();
-	// 1) å‹æ¿æ‚¬åœæç¤ºï¼ˆä¼˜å…ˆçº§é«˜äºçº¿è·¯é«˜äº®ï¼‰
+	// 1) Ñ¹°åĞüÍ£ÌáÊ¾£¨ÓÅÏÈ¼¶¸ßÓÚÏßÂ·¸ßÁÁ£©
 	int plateIdx = hitTestPlate(pos);
 	if (plateIdx >= 0) {
 		if (plateIdx != m_hoverPlateIdx) {
 			m_hoverPlateIdx = plateIdx;
 			const PlateItem& plate = m_allPlates[plateIdx];
-			const QString tip = buildPlateTooltip(plate);
-			// å°†åœºæ™¯åæ ‡è½¬æˆå±å¹•åæ ‡ä»¥åœ¨é¼ æ ‡é™„è¿‘æ˜¾ç¤º
-			QPoint globalPos = event->screenPos();
-			QToolTip::showText(globalPos, tip);
+			m_tooltipText = buildPlateTooltip(plate);
+			// ½«³¡¾°×ø±ê×ª³ÉÆÁÄ»×ø±êÒÔÔÚÊó±ê¸½½üÏÔÊ¾
+			m_tooltipPos = event->screenPos();
+			m_currentHoverPart = Hover_Plate;
+			//m_tooltipTimer->start(300);
+			//QToolTip::showText(m_tooltipPos, m_tooltipText);
 		}
-		// å½“æ‚¬åœåœ¨å‹æ¿ä¸Šæ—¶ï¼Œä¸å†æ›´æ–°çº¿è·¯é«˜äº®
+		m_tooltipPos = event->screenPos();
+		// µ±ĞüÍ£ÔÚÑ¹°åÉÏÊ±£¬²»ÔÙ¸üĞÂÏßÂ·¸ßÁÁ
 		setHighlightedLine(-1);
+		// ÑÓ³Ù 2s ÔÙÏÔÊ¾
+		m_tooltipTimer->stop();
+		m_tooltipTimer->setSingleShot(true);
+		m_tooltipTimer->start(100);
 		return;
 	} else if (m_hoverPlateIdx != -1) {
-		// ç¦»å¼€å‹æ¿åŒºåŸŸæ—¶ï¼Œéšè— tip
+		// Àë¿ªÑ¹°åÇøÓòÊ±£¬Òş²Ø tip
 		m_hoverPlateIdx = -1;
+		m_currentHoverPart = Hover_None;
+		m_tooltipTimer->stop();
 		QToolTip::hideText();
+		m_tooltipTimer->setSingleShot(true);
 	}
 
-	// 2) çº¿è·¯æœ€è¿‘é«˜äº®
+	// 2) ÏßÂ·×î½ü¸ßÁÁ
 	int closest = -1;
 	double minDist = 99999.0;
 	for (int i = 0; i < m_allLines.size(); ++i) {
@@ -203,10 +286,28 @@ void InteractiveSvgMapItem::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
 			}
 		}
 	}
-	if (minDist < 15.0) 
+	if (minDist < 15.0)
+	{
 		setHighlightedLine(closest);
-	else
+		m_currentHoverPart = Hover_Line;
+		m_tooltipText = buildLineTooltip(m_allLines.at(closest));
+		m_tooltipPos = event->screenPos();
+		// ÑÓ³Ù 2s ÔÙÏÔÊ¾
+		m_tooltipTimer->stop();
+		m_tooltipTimer->setSingleShot(true);
+		m_tooltipTimer->start(100);
+		return;
+	}
+
+	if (m_currentHoverPart != Hover_None) 
+	{
+		m_currentHoverPart = Hover_None;
+		m_hoverPlateIdx = -1;
 		setHighlightedLine(-1);
+		m_tooltipTimer->stop();
+		QToolTip::hideText();
+		m_tooltipTimer->setSingleShot(true);
+	}
 }
 
 void InteractiveSvgMapItem::hoverLeaveEvent(QGraphicsSceneHoverEvent* event)
@@ -214,6 +315,7 @@ void InteractiveSvgMapItem::hoverLeaveEvent(QGraphicsSceneHoverEvent* event)
 	Q_UNUSED(event);
 	if (m_hoverPlateIdx != -1) {
 		m_hoverPlateIdx = -1;
+		m_tooltipTimer->stop();
 		QToolTip::hideText();
 	}
 }
@@ -238,18 +340,18 @@ void InteractiveSvgMapItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* even
 	if (closest >= 0 && minDist < 15.0) {
 		const MapLine& line = m_allLines[closest];
 		if (line.type == LineType_Optical && !line.attrs.isNull()) {
-			// é€‰ä¸­å…‰çº¤é“¾è·¯ è·³è½¬åˆ°å…³è”è®¾å¤‡å›¾
+			// Ñ¡ÖĞ¹âÏËÁ´Â· Ìø×ªµ½¹ØÁªÉè±¸Í¼
 			showOpticalRelatedCircuits(line);
-			// æ˜¾ç¤ºå…‰çº¤é“¾è·¯ä¿¡æ¯
+			// ÏÔÊ¾¹âÏËÁ´Â·ĞÅÏ¢
 			const MapLine::OpticalAttrs* a =
 				static_cast<const MapLine::OpticalAttrs*>(line.attrs.data());
 			QString tip;
-			tip += QString::fromLocal8Bit("å…‰çº¤é“¾è·¯\n");
-			tip += QString::fromLocal8Bit("ç«¯å£â‘ : %1 / %2\n").arg(a->srcIed, a->srcPort);
-			tip += QString::fromLocal8Bit("ç«¯å£â‘¡: %1 / %2\n").arg(a->destIed, a->destPort);
-			if (!a->code.isEmpty())    tip += QString("Code: %1\n").arg(a->code);
-			if (!a->status.isEmpty())  tip += QString("Status: %1\n").arg(a->status);
-			if (!a->remoteId.isEmpty())tip += QString("RemoteId: %1\n").arg(a->remoteId);
+			tip += QString::fromLocal8Bit("¹âÏËÁ´Â·\n");
+			tip += QString::fromLocal8Bit("¶Ë¿Ú¢Ù: %1 / %2\n").arg(a->srcIed, a->srcPort);
+			tip += QString::fromLocal8Bit("¶Ë¿Ú¢Ú: %1 / %2\n").arg(a->destIed, a->destPort);
+			//if (!line.code.isEmpty())    tip += QString("Code: %1\n").arg(line.code);
+			//if (!a->status.isEmpty())  tip += QString("Status: %1\n").arg(a->status);
+			//if (!a->remoteId.isEmpty())tip += QString("RemoteId: %1\n").arg(a->remoteId);
 
 			QToolTip::showText(event->screenPos(), tip);
 		}
@@ -258,6 +360,9 @@ void InteractiveSvgMapItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* even
 #ifdef _DEBUG
 			MapLine* dbgLine = &m_allLines[closest];
 			dbgLine->isBlinking = !dbgLine->isBlinking;
+//#ifndef CIRCUITMODULE_LIBRARY
+//			showOpticalRelatedCircuits(line);
+//#endif
 #endif
 		}
 	}
@@ -269,7 +374,7 @@ void InteractiveSvgMapItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* even
 void InteractiveSvgMapItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
 	if(m_svgType != LineType_Virtual) {
-		// ä»…è™šå›è·¯æ”¯æŒå‹æ¿æ“ä½œ
+		// ½öĞé»ØÂ·Ö§³ÖÑ¹°å²Ù×÷
 		event->ignore();
 		return;
 	}
@@ -279,16 +384,21 @@ void InteractiveSvgMapItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* eve
 	if (pi >= 0) {
 		PlateItem& plate = m_allPlates[pi];
 		QAction* act = plate.isClosed
-			? menu.addAction(QString::fromLocal8Bit("ç½®åˆ†"))
-			: menu.addAction(QString::fromLocal8Bit("ç½®åˆ"));
+			? menu.addAction(QString::fromLocal8Bit("ÖÃ·Ö"))
+			: menu.addAction(QString::fromLocal8Bit("ÖÃºÏ"));
 		QAction* chosen = menu.exec(event->screenPos());
 		if (chosen == act) {
 			plate.isClosed = !plate.isClosed;
+			stuRtdbStatus* plateEle = m_rtdb.getRyb(plate.attrs.code.toULongLong());
+			if (plateEle) {
+				const char* newVal = plate.isClosed ? "1" : "0";
+				strcpy(plateEle->val, newVal);
+			}
 			update();
 		}
 	} else {
-		QAction* actAllClose = menu.addAction(QString::fromLocal8Bit("å…¨éƒ¨ç½®åˆ"));
-		QAction* actAllOpen  = menu.addAction(QString::fromLocal8Bit("å…¨éƒ¨ç½®åˆ†"));
+		QAction* actAllClose = menu.addAction(QString::fromLocal8Bit("È«²¿ÖÃºÏ"));
+		QAction* actAllOpen  = menu.addAction(QString::fromLocal8Bit("È«²¿ÖÃ·Ö"));
 		QAction* chosen = menu.exec(event->screenPos());
 		if (chosen == actAllClose || chosen == actAllOpen) {
 			bool toClosed = (chosen == actAllClose);
@@ -308,11 +418,12 @@ int InteractiveSvgMapItem::hitTestPlate(const QPointF& pos) const
 
 QString InteractiveSvgMapItem::buildPlateTooltip(const PlateItem& plate) const
 {
-	// ä¸¤è¡Œï¼šåç§°ï¼ˆdescï¼‰ä¸å¼•ç”¨ï¼ˆrefï¼‰ã€‚è‹¥ç¼ºå¤±åˆ™ç•™ç©º/ä»…æ˜¾ç¤ºå¯ç”¨å­—æ®µã€‚
-	QString line1 = plate.attrs.desc.isEmpty() ? QString::fromLocal8Bit("å‹æ¿") : plate.attrs.desc;
+	// Á½ĞĞ£ºÃû³Æ£¨desc£©ÓëÒıÓÃ£¨ref£©¡£ÈôÈ±Ê§ÔòÁô¿Õ/½öÏÔÊ¾¿ÉÓÃ×Ö¶Î¡£
+	QString line1 = plate.attrs.desc.isEmpty() ? QString::fromLocal8Bit("Ñ¹°å") : plate.attrs.desc;
 	QString line2 = plate.attrs.ref.isEmpty() ? QString() : plate.attrs.ref;
-	if (line2.isEmpty()) return line1; // åªæœ‰ä¸€è¡Œ
-	return line1 + "\n" + line2;
+	QString line3 = plate.attrs.code.isEmpty() ? QString() : plate.attrs.code;
+	if (line2.isEmpty()) return line1; // Ö»ÓĞÒ»ĞĞ
+	return line1 + "\n" + line2 + "\n" + line3;
 }
 
 void InteractiveSvgMapItem::showOpticalRelatedCircuits(const MapLine& line)
@@ -323,23 +434,40 @@ void InteractiveSvgMapItem::showOpticalRelatedCircuits(const MapLine& line)
 	QString iedName1 = a->srcIed;
 	QString iedName2 = a->destIed;
 	if (iedName1.isEmpty() && iedName2.isEmpty()) return;
-	// ä¸¤ç§æƒ…å†µï¼Œç›´è¿/äº¤æ¢æœº
-	// ç›´è¿, æ˜¾ç¤ºä¸¤ä¸ªè®¾å¤‡é—´æ‰€æœ‰è™šå›è·¯
-	QList<LogicCircuit*> logicCircuitList = m_circuitConfig->GetCircuitListBySrcAndDest(iedName1, iedName2);
-	QList<LogicCircuit*> logicCircuitList2 = m_circuitConfig->GetCircuitListBySrcAndDest(iedName2, iedName1);
-	if (logicCircuitList.isEmpty())
+	if (!iedName1.contains("SW"))
 	{
-		// æœ‰å…‰çº¤å›è·¯æ— è™šå›è·¯ï¼Œè§£æå‡ºé”™
-		return;
+		// Êä³öÉè±¸·Ç½»»»»ú£¬ÏÔÊ¾¸ÃÉè±¸Óë¶Ô¶ËÉè±¸£¨Èô¶Ô¶ËÎª½»»»»úÔòÏÔÊ¾¿ç½»»»»úµÄ¶Ô¶ËÉè±¸£©¼äµÄËùÓĞĞé»ØÂ·
+		if (iedName2.contains("SW"))
+		{
+			
+		}
 	}
 
+	// Á½ÖÖÇé¿ö£¬Ö±Á¬/½»»»»ú
+	// Ö±Á¬, ÏÔÊ¾Á½¸öÉè±¸¼äËùÓĞĞé»ØÂ·
+	QList<VirtualCircuit*> inVtList = m_circuitConfig->GetAllVirtualCircuitListByIEDPair(iedName1, iedName2);
+	QList<VirtualCircuit*> outVtList = m_circuitConfig->GetAllVirtualCircuitListByIEDPair(iedName2, iedName1);
+	QList<VirtualCircuit*> totalVtList = inVtList + outVtList;
+
+	if (totalVtList.isEmpty())
+	{
+		// ÓĞ¹âÏË»ØÂ·ÎŞĞé»ØÂ·£¬½âÎö³ö´í
+		return;
+	}
+	Q_UNUSED(totalVtList);
+	
+	//m_secWidget = new SecWidget();
+	
+	//m_secWidget->displayCircuit(iedName1, iedName2);
+	//m_secWidget->show();
+	//m_secWidget->activateWindow();
 
 }
 
 void InteractiveSvgMapItem::paintLine(QPainter* painter, const MapLine& line, bool isHighLight) const
 {
 	if(line.isBlinking && !m_blinkOn) {
-		// é—ªçƒçŠ¶æ€ä¸”å½“å‰ä¸ºéšè—å‘¨æœŸï¼Œä¸ç»˜åˆ¶
+		// ÉÁË¸×´Ì¬ÇÒµ±Ç°ÎªÒş²ØÖÜÆÚ£¬²»»æÖÆ
 		return;
 	}
 	QColor stroke = colorForLine(line);
@@ -359,13 +487,13 @@ void InteractiveSvgMapItem::paintLine(QPainter* painter, const MapLine& line, bo
 	for (int j = 1; j < line.points.size(); ++j)
 		painter->drawLine(line.points[j - 1], line.points[j]);
 
-	// ç”»æ­¤å›è·¯çš„ç®­å¤´
+	// »­´Ë»ØÂ·µÄ¼ıÍ·
 	for (int k = 0; k < line.arrows.size(); ++k) {
 		const ArrowHead& ah = line.arrows[k];
 		if (ah.points.size() < 3) continue;
 
 		QPen apen(pen.color());
-		// é«˜äº®æ—¶ç®­å¤´ç¬”å®½ä¸çº¿è·¯ä¸€è‡´ï¼›å¦åˆ™ç”¨åŸºç¡€å®½
+		// ¸ßÁÁÊ±¼ıÍ·±Ê¿íÓëÏßÂ·Ò»ÖÂ£»·ñÔòÓÃ»ù´¡¿í
 		int aw = (isHighLight)
 			? w
 			: qMax(1, int(line.style.strokeWidth));
@@ -374,10 +502,10 @@ void InteractiveSvgMapItem::paintLine(QPainter* painter, const MapLine& line, bo
 		apen.setJoinStyle(Qt::MiterJoin);
 		painter->setPen(apen);
 
-		// é«˜äº®æ—¶å¡«å……åŒè‰²ï¼Œæœªé«˜äº®ä¿æŒç©ºå¿ƒ
+		// ¸ßÁÁÊ±Ìî³äÍ¬É«£¬Î´¸ßÁÁ±£³Ö¿ÕĞÄ
 		if (isHighLight) {
 			QColor fill = apen.color();
-			fill.setAlpha(255); // ç¡®ä¿ä¸é€æ˜
+			fill.setAlpha(255); // È·±£²»Í¸Ã÷
 			painter->setBrush(fill);
 		}
 		else {
@@ -387,32 +515,33 @@ void InteractiveSvgMapItem::paintLine(QPainter* painter, const MapLine& line, bo
 		QPolygonF poly;
 		for (int pi = 0; pi < ah.points.size(); ++pi) poly << ah.points[pi];
 
-		// ä½¿ç”¨ WindingFill ä»¥é¿å…å¤æ‚ç®­å¤´è¾¹ç•Œçš„ç©ºæ´é—®é¢˜
+		// Ê¹ÓÃ WindingFill ÒÔ±ÜÃâ¸´ÔÓ¼ıÍ·±ß½çµÄ¿Õ¶´ÎÊÌâ
 		painter->drawPolygon(poly, Qt::WindingFill);
 	}
 }
 
 QColor InteractiveSvgMapItem::colorForLine(const MapLine& line) const
 {
-	// åŸºäº ref çš„å…³è”ï¼šä»»ä¸€å…³è”å‹æ¿é closed åˆ™ç°è‰²ï¼Œå…¨éƒ¨ closed åˆ™ç»¿è‰²ï¼›æ— å…³è”åˆ™ç”¨åŸå§‹è‰²
-	if (line.type == LineType_Logic && line.attrs.isNull())
+	// »ùÓÚ ref µÄ¹ØÁª£ºÈÎÒ»¹ØÁªÑ¹°å·Ç closed Ôò»ÒÉ«£¬È«²¿ closed ÔòÂÌÉ«£»ÎŞ¹ØÁªÔòÓÃÔ­Ê¼É«
+	if (line.type == LineType_Logic)
 		return QColor::fromRgba(line.style.strokeRgb);
 	if (line.type == LineType_Optical)
 	{
-		// å…‰çº¤é“¾è·¯çŠ¶æ€è‰²
-		// è¿æ¥ï¼šç»¿è‰² 
-		// æ–­å¼€ï¼šçº¢è‰²
-		// å‘Šè­¦ï¼šé»„è‰²
-		const MapLine::OpticalAttrs* oa = static_cast<const MapLine::OpticalAttrs*>(line.attrs.data());
-
+		// ¹âÏËÁ´Â·×´Ì¬É«
+		// Á¬½Ó£ºÂÌÉ« 
+		// ¶Ï¿ª£ººìÉ«
+		// ¸æ¾¯£º»ÆÉ«
+		//const MapLine::OpticalAttrs* attrs = static_cast<const MapLine::OpticalAttrs*>(line.attrs.data());
+		return line.status == Status_Connected ? QColor(Qt::green) :
+			(line.status == Status_Alarm ? QColor(Qt::yellow) : QColor(Qt::red));
 	}
 	if (line.type == LineType_Virtual)
 	{
-		// è™šå›è·¯çŠ¶æ€è‰²ï¼Œæ–­å¼€ä¼˜å…ˆçº§é«˜äºå‹æ¿
-		// è¿æ¥ï¼šç»¿è‰² 
-		// æ–­å¼€ï¼šçº¢è‰²
-		// å‘Šè­¦ï¼šé»„è‰²
-		// å‹æ¿æ–­å¼€ï¼šç°è‰²
+		// Ğé»ØÂ·×´Ì¬É«£¬¶Ï¿ªÓÅÏÈ¼¶¸ßÓÚÑ¹°å
+		// Á¬½Ó£ºÂÌÉ« 
+		// ¶Ï¿ª£ººìÉ«
+		// ¸æ¾¯£º»ÆÉ«
+		// Ñ¹°å¶Ï¿ª£º»ÒÉ«
 		const MapLine::VirtualAttrs* va = static_cast<const MapLine::VirtualAttrs*>(line.attrs.data());
 		bool hasAny = false;
 		if (line.status == Status_Disconnected)
@@ -421,7 +550,8 @@ QColor InteractiveSvgMapItem::colorForLine(const MapLine& line) const
 		}
 		if (va) {
 			if (!va->srcSoftPlateRef.isEmpty()) {
-				QMap<QString, PlateItem*>::const_iterator it = m_plateMap.find(va->srcSoftPlateRef);
+				QMap<QString, PlateItem*>::const_iterator it = m_plateMap.find(va->srcSoftPlateCode);
+				const PlateItem* plateItem = it.value();
 				if (it != m_plateMap.end() && it.value())
 				{
 					hasAny = true;
@@ -429,7 +559,7 @@ QColor InteractiveSvgMapItem::colorForLine(const MapLine& line) const
 				}
 			}
 			if (!va->destSoftPlateRef.isEmpty()) {
-				QMap<QString, PlateItem*>::const_iterator it = m_plateMap.find(va->destSoftPlateRef);
+				QMap<QString, PlateItem*>::const_iterator it = m_plateMap.find(va->destSoftPlateCode);
 				if (it != m_plateMap.end() && it.value())
 				{
 					hasAny = true;
@@ -444,31 +574,47 @@ QColor InteractiveSvgMapItem::colorForLine(const MapLine& line) const
 
 void InteractiveSvgMapItem::Clean()
 {
-    // é€šçŸ¥åœºæ™¯è¯¥ Item çš„å‡ ä½•å¯èƒ½æ”¹å˜ï¼ˆboundingRect ä¼šå˜ä¸º 0x0ï¼‰
+    // Í¨ÖªÍ¼ĞÎÊÓÍ¼ Item µÄ¼¸ºÎ¿ÉÄÜ¸Ä±ä£¨boundingRect ±äÎª 0x0£©
     prepareGeometryChange();
 
-    // é‡ç½®å†…éƒ¨æ•°æ®
-    m_bgPixmap = QPixmap();      // ç©º pixmapï¼ŒboundingRect å˜ä¸º 0
+    m_bgPixmap = QPixmap();
+    m_svgCache.clear();
+    m_svgCache.squeeze();
+    m_svgSourcePath.clear();
+    m_baseRasterSize = QSize();
+    m_itemSize = QSizeF();
+    m_pixmapScaleFactor = 1.0;
+
     m_allLines.clear();
     m_allPlates.clear();
-    m_highlightedLineIdx = -1;
+    m_plateMap.clear();
+    m_svLineIdByCode.clear();
+	m_gseLineIdByCode.clear();
+    m_valuePairs.clear();
 
-    update(); // è§¦å‘é‡ç»˜
+    m_highlightedLineIdx = -1;
+    m_hoverPlateIdx = -1;
+    m_dragging = false;
+
+    update();
 }
 
 void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
 {
     QFile file(svgPath);
-    if (!file.open(QIODevice::ReadOnly)) { qWarning("SVGæ–‡ä»¶æ‰“å¼€å¤±è´¥"); return; }
+    if (!file.open(QIODevice::ReadOnly)) { qWarning("SVGÎÄ¼ş´ò¿ªÊ§°Ü"); return; }
     QByteArray svgData = file.readAll();
+	m_svgSourcePath = svgPath;
 	pugi::xml_document doc;
-	if (!doc.load_buffer(svgData.data(), svgData.size())) { qWarning("SVGåŠ è½½å¤±è´¥"); return; }
-	// é‡Šæ”¾åŸå§‹ SVG å­—èŠ‚ä»¥é™ä½å³°å€¼å†…å­˜
+	if (!doc.load_buffer(svgData.data(), svgData.size())) { qWarning("SVG¼ÓÔØÊ§°Ü"); return; }
+	m_svgCache = svgData;
+	m_svgCache.detach();
+	// ÊÍ·ÅÔ­Ê¼ SVG ×Ö½ÚÒÔ½µµÍ·åÖµÄÚ´æ
 	svgData.clear(); svgData.squeeze();
 
-	// å…ˆæ ¹æ® root svg çš„ viewBox è®¡ç®—æ–‡æ¡£åæ ‡åˆ°åƒç´ åæ ‡çš„åŸºç¡€å˜æ¢ï¼š
-	// è‹¥ viewBox = [minX, minY, width, height]ï¼Œæˆ‘ä»¬å¯ä»¥é™åˆ¶èƒŒæ™¯ pixmap çš„æœ€å¤§è¾¹ï¼Œ
-	// å¹¶æŠŠç›¸åŒçš„ç¼©æ”¾åˆå…¥ m_docToPixï¼Œä¿è¯å åŠ å›¾å…ƒä¸åº•å›¾ä¸€è‡´ã€‚
+	// ÏÈ¸ù¾İ root svg µÄ viewBox ¼ÆËãÎÄµµ×ø±êµ½ÏñËØ×ø±êµÄ»ù´¡±ä»»£º
+	// Èô viewBox = [minX, minY, width, height]£¬ÎÒÃÇ¿ÉÒÔÏŞÖÆ±³¾° pixmap µÄ×î´ó±ß£¬
+	// ²¢°ÑÏàÍ¬µÄËõ·ÅºÏÈë m_docToPix£¬±£Ö¤µş¼ÓÍ¼ÔªÓëµ×Í¼Ò»ÖÂ¡£
 	double vbMinX = 0.0, vbMinY = 0.0, vbW = 0.0, vbH = 0.0;
 	double viewScale = 1.0;
 	{
@@ -476,7 +622,7 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
 		if (!root) root = doc.document_element();
 		const char* vb = root.attribute("viewBox").value();
 		if (vb && *vb) {
-			// è§£æ viewBox: "minX minY width height"
+			// ½âÎö viewBox: "minX minY width height"
 			QStringList parts = QString::fromLatin1(vb).simplified().split(' ');
 			if (parts.size() >= 4) {
 				vbMinX = parts[0].toDouble();
@@ -488,8 +634,8 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
 				vbMinY = parts[1].toDouble();
 			}
 		}
-		// èƒŒæ™¯æœ€å¤§è¾¹é™åˆ¶ï¼Œé˜²æ­¢å ç”¨è¿‡å¤šå†…å­˜
-		const int kMaxBgDim = 4096; // å¯æŒ‰éœ€è¦è°ƒæ•´ï¼Œä¾‹å¦‚ 3072/4096
+		// ±³¾°×î´ó±ßÏŞÖÆ£¬·ÀÖ¹Õ¼ÓÃ¹ı¶àÄÚ´æ
+		const int kMaxBgDim = SVG_PIXMAP_REGEN_MAX_DIM;
 		if (vbW > 0.0 && vbH > 0.0) {
 			if (vbW > kMaxBgDim || vbH > kMaxBgDim) {
 				viewScale = qMin(double(kMaxBgDim) / vbW, double(kMaxBgDim) / vbH);
@@ -499,8 +645,8 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
 		if (viewScale != 1.0) m_docToPix.scale(viewScale, viewScale);
 	}
 
-	// è§£ææ—¶éšè—é“¾è·¯åŠç®­å¤´çš„åº•å›¾æ˜¾ç¤º
-	m_lineIdByCode.clear();
+	// ½âÎöÊ±Òş²ØÁ´Â·¼°¼ıÍ·µÄµ×Í¼ÏÔÊ¾
+	clearLineIdMap();
     if (svgPath.contains("virtual")) {
 	parseVirtualSvg(doc);
         m_svgType = LineType_Virtual;
@@ -517,16 +663,20 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
 	const std::string s = oss.str();
 	QByteArray modifiedSvg(s.data(), int(s.size()));
 
-   // ä¿®æ”¹åçš„å†…å­˜ SVG æ¸²æŸ“åˆ°åº•å›¾
+   // ĞŞ¸ÄºóµÄÄÚ´æ SVG äÖÈ¾µ½µ×Í¼
 	QSvgRenderer renderer;
 	if (!renderer.load(modifiedSvg)) {
-		// å¦‚æœå†…å­˜åŠ è½½å¤±è´¥ï¼Œå›é€€åˆ°åŸæ–‡ä»¶
+		// Èç¹ûÄÚ´æ¼ÓÔØÊ§°Ü£¬»ØÍËµ½Ô­ÎÄ¼ş
 		renderer.load(svgPath);
 	}
-	// é‡Šæ”¾ä¸­é—´ç¼“å†²
+	else {
+		m_svgCache = modifiedSvg;
+		m_svgCache.detach();
+	}
+	// ÊÍ·ÅÖĞ¼ä»º³å
 	modifiedSvg.clear(); modifiedSvg.squeeze();
 
-	// åŸºäº viewBox ä¸ç¼©æ”¾è®¡ç®—èƒŒæ™¯å›¾å°ºå¯¸
+	// »ùÓÚ viewBox ÓëËõ·Å¼ÆËã±³¾°Í¼³ß´ç
 	QRectF viewBox = renderer.viewBoxF();
 	QSize imageSize;
 	if (viewBox.isValid()) {
@@ -546,13 +696,19 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
     painter.end();
 
     prepareGeometryChange();
+    m_baseRasterSize = pixmap.size();
+    m_itemSize = QSizeF(pixmap.width(), pixmap.height());
+    m_pixmapScaleFactor = 1.0;
     m_bgPixmap = pixmap;
 }
 
 void InteractiveSvgMapItem::parseSvgAndInit(const QByteArray& svgBytes)
 {
+	m_svgSourcePath.clear();
 	pugi::xml_document doc;
-	if (!doc.load_buffer(svgBytes.constData(), svgBytes.size())) { qWarning("SVGåŠ è½½å¤±è´¥"); return; }
+	if (!doc.load_buffer(svgBytes.constData(), svgBytes.size())) { qWarning("SVG¼ÓÔØÊ§°Ü"); return; }
+	m_svgCache = svgBytes;
+	m_svgCache.detach();
 
 	double vbMinX = 0.0, vbMinY = 0.0, vbW = 0.0, vbH = 0.0;
 	double viewScale = 1.0;
@@ -565,7 +721,7 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QByteArray& svgBytes)
 			if (parts.size() >= 4) { vbMinX = parts[0].toDouble(); vbMinY = parts[1].toDouble(); vbW = parts[2].toDouble(); vbH = parts[3].toDouble(); }
 			else if (parts.size() >= 2) { vbMinX = parts[0].toDouble(); vbMinY = parts[1].toDouble(); }
 		}
-		const int kMaxBgDim = 4096;
+		const int kMaxBgDim = SVG_PIXMAP_REGEN_MAX_DIM;
 		if (vbW > 0.0 && vbH > 0.0) {
 			if (vbW > kMaxBgDim || vbH > kMaxBgDim) {
 				viewScale = qMin(double(kMaxBgDim) / vbW, double(kMaxBgDim) / vbH);
@@ -575,9 +731,8 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QByteArray& svgBytes)
 		if (viewScale != 1.0) m_docToPix.scale(viewScale, viewScale);
 	}
 
-	// ç±»å‹è¯†åˆ«ï¼šæ ¹æ® type èŠ‚ç‚¹é€‰æ‹©åˆ†æ”¯
-	m_lineIdByCode.clear();
-	// è¿™é‡Œä¸ä¾èµ–æ–‡ä»¶åï¼Œç›´æ¥æ¢æµ‹æ–‡æ¡£ä¸­çš„ç±»å‹
+	// ÀàĞÍÊ¶±ğ£º¸ù¾İ type ½ÚµãÑ¡Ôñ·ÖÖ§
+	clearLineIdMap();
 	if (!doc.select_nodes("//g[@type='virtual']").empty()) {
 		parseVirtualSvg(doc); m_svgType = LineType_Virtual;
 	} else if (!doc.select_nodes("//g[@type='logic']").empty()) {
@@ -590,14 +745,24 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QByteArray& svgBytes)
 	doc.save(oss, "", pugi::format_raw, pugi::encoding_utf8);
 	const std::string s = oss.str();
 	QByteArray modifiedSvg(s.data(), int(s.size()));
-
+#ifdef _DEBUG
+	//if (m_svgType == LineType_Optical)
+	//{
+	//	QFile f("./debug_svg.svg");
+	//	f.open(QIODevice::WriteOnly);
+	//	f.write(modifiedSvg);
+	//	f.close();
+	//}
+#endif
 	QSvgRenderer renderer;
 	if (!renderer.load(modifiedSvg)) {
-		// çº¯å†…å­˜å¤±è´¥åˆ™ç›´æ¥è¿”å›
-		qWarning("QSvgRenderer å†…å­˜åŠ è½½å¤±è´¥");
+		// ´¿ÄÚ´æÊ§°ÜÔòÖ±½Ó·µ»Ø
+		qWarning("QSvgRenderer ÄÚ´æ¼ÓÔØÊ§°Ü");
 		return;
 	}
 
+	m_svgCache = modifiedSvg;
+	m_svgCache.detach();
 	QRectF viewBox = renderer.viewBoxF();
 	QSize imageSize;
 	if (viewBox.isValid()) {
@@ -617,16 +782,19 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QByteArray& svgBytes)
 	painter.end();
 
 	prepareGeometryChange();
+	m_baseRasterSize = pixmap.size();
+	m_itemSize = QSizeF(pixmap.width(), pixmap.height());
+	m_pixmapScaleFactor = 1.0;
 	m_bgPixmap = pixmap;
 }
 
 void InteractiveSvgMapItem::parseVirtualSvg(const pugi::xml_document& doc)
 {
-	// å…ˆè§£æå›è·¯
+	// ÏÈ½âÎö»ØÂ·
 	m_allLines += parseCircuitLines(doc, "virtual");
 	m_allLines.squeeze();
 
-	// è§£æå‹æ¿ï¼ˆä»… virtual å­˜åœ¨ï¼‰
+	// ½âÎöÑ¹°å£¨½ö virtual ´æÔÚ£©
 	QMap<QString, PlateItem> plateMap;
 	pugi::xpath_node_set plateNodeSet = doc.select_nodes("//g[@type='plate-component' or @type='plate']");
 	for (int i = 0; i < plateNodeSet.size(); ++i) {
@@ -634,17 +802,34 @@ void InteractiveSvgMapItem::parseVirtualSvg(const pugi::xml_document& doc)
 		QString plate_id = plateNode.attribute("id").as_string();
 		PlateItem& p = plateMap[plate_id];
 		p.svgGrpId = plate_id;
-		if (p.rect.isNull()) p.isClosed = true; // é»˜è®¤ç½®åˆ
+		if (p.rect.isNull()) p.isClosed = true; // Ä¬ÈÏÖÃºÏ
 
 
 		if (strcmp(plateNode.attribute("type").value(), "plate") == 0) {
-			// è¯»å– plate çš„è¯­ä¹‰å±æ€§
+			// ¶ÁÈ¡ plate µÄÓïÒåÊôĞÔ
+			const char* plateCode = plateNode.attribute("plate-code").value();
+			const char* iedName = plateNode.attribute("ied-name").value();
 			const char* refAttr  = plateNode.attribute("plate-ref").value();
 			const char* descAttr = plateNode.attribute("plate-desc").value();
 			const char* idAttr  = plateNode.attribute("id").value();
+			if (iedName && *iedName) p.attrs.iedName = iedName;
 			if (refAttr && *refAttr)  p.attrs.ref  = refAttr;
 			if (descAttr && *descAttr) p.attrs.desc = QString::fromUtf8(descAttr);
 			if (idAttr && *idAttr)  p.attrs.id  = idAttr;
+			if (plateCode && *plateCode) p.attrs.code = QString::fromUtf8(plateCode);
+			stuRtdbStatus* plateEle = m_rtdb.getRyb(p.attrs.code.toULongLong());
+			if (plateEle)
+			{
+				// Ñ¹°åÖµÎª¿ÕÊ±£¬ÊÓÎªÖÃ·Ö
+				int value = plateEle->val[0] != '\0' ? atoi(plateEle->val) : 0;
+				p.isClosed = (value != 0);
+			}
+			else
+			{
+				// Ä£ĞÍÀïÃ»ÕÒµ½Ñ¹°å£¬Ä¬ÈÏÖÃºÏ
+				p.isClosed = true;
+			}
+			//p.isClosed = true;
 			QRectF bbox;
 			if (utils::computePathBoundingRect(plateNode, m_docToPix, bbox)) {
 				p.rect = bbox;
@@ -654,16 +839,16 @@ void InteractiveSvgMapItem::parseVirtualSvg(const pugi::xml_document& doc)
 			if (pathNode) {
 				const char* strokeAttr = plateNode.attribute("stroke").value();
 				const char* fillAttr   = plateNode.attribute("fill").value();
-				// 1) å¤–éƒ¨çŸ©å½¢ï¼ˆè¦†ç›–å›è·¯ï¼‰ï¼šfill="#233f4f" + stroke="#ffffff"
+				// 1) Íâ²¿¾ØĞÎ£¨¸²¸Ç»ØÂ·£©£ºfill="#233f4f" + stroke="#ffffff"
 				if (fillAttr && qstrcmp(fillAttr, "#233f4f") == 0 && strokeAttr && qstrcmp(strokeAttr, "#ffffff") == 0) {
 					QRectF bbox;
 					if (utils::computePathBoundingRect(plateNode, m_docToPix, bbox)) p.outerRect = bbox;
 				}
-				// 2) å†…éƒ¨çŸ©å½¢ç»„ä»¶ï¼šé»‘è‰²æè¾¹
+				// 2) ÄÚ²¿¾ØĞÎ×é¼ş£ººÚÉ«Ãè±ß
 				else if (strokeAttr && qstrcmp(strokeAttr, "#000000") == 0) {
 					p.rects = parsePlateRects(plateNode);
 				}
-				// 3) åœ†ç»„ä»¶ï¼šç»¿è‰²æè¾¹
+				// 3) Ô²×é¼ş£ºÂÌÉ«Ãè±ß
 				else if (strokeAttr && qstrcmp(strokeAttr, "#00ff00") == 0) {
 					p.circles = parsePlateCircles(plateNode);
 				}
@@ -673,23 +858,25 @@ void InteractiveSvgMapItem::parseVirtualSvg(const pugi::xml_document& doc)
 		}
 	}
 
-	// æ”¶é›†å‹æ¿
+	// ÊÕ¼¯Ñ¹°å
 	m_allPlates = plateMap.values().toVector();
-	// å‹ç¼©å†…éƒ¨å®¹å™¨å®¹é‡ä»¥èŠ‚çœå†…å­˜
+	// Ñ¹ËõÄÚ²¿ÈİÆ÷ÈİÁ¿ÒÔ½ÚÊ¡ÄÚ´æ
 	for (int i = 0; i < m_allPlates.size(); ++i) {
 		m_allPlates[i].circles.squeeze();
 		m_allPlates[i].lines.squeeze();
 		m_allPlates[i].rects.squeeze();
 	}
 	m_allPlates.squeeze();
-	// ref -> PlateItem* æ˜ å°„
+	// ref -> PlateItem* Ó³Éä
 	m_plateMap.clear();
 	for (int i = 0; i < m_allPlates.size(); ++i) {
 		PlateItem& p = m_allPlates[i];
-		if (!p.attrs.ref.isEmpty()) m_plateMap.insert(p.attrs.ref, &p);
+		//QString key = QString("%1/%2").arg(p.attrs.iedName).arg(p.attrs.ref);
+		QString key = p.attrs.code;
+		if (!p.attrs.ref.isEmpty()) m_plateMap.insert(key, &p);
 	}
 
-	// è§£æè™šæ‹Ÿæ•°å€¼æ–‡æœ¬æ¡†
+	// ½âÎöĞéÄâÊıÖµÎÄ±¾¿ò
 	parseVirtualValueBoxes(doc);
 }
 
@@ -713,7 +900,7 @@ QVector<MapLine> InteractiveSvgMapItem::parseCircuitLines(const pugi::xml_docume
 	pugi::xpath_node_set groups = doc.select_nodes(xPath.toLocal8Bit());
 	for (int i = 0; i < groups.size(); ++i) {
 		pugi::xml_node g = groups[i].node();
-		// èšåˆè¯¥ç»„å†…çš„æ‰€æœ‰ polyline æ®µï¼Œä½œä¸ºåŒä¸€æ¡å›è·¯
+		// ¾ÛºÏ¸Ã×éÄÚµÄËùÓĞ polyline ¶Î£¬×÷ÎªÍ¬Ò»Ìõ»ØÂ·
 		MapLine line;
 		line.isBlinking = false;
 		if (qstrcmp(type, "optical") == 0)
@@ -724,7 +911,7 @@ QVector<MapLine> InteractiveSvgMapItem::parseCircuitLines(const pugi::xml_docume
 			line.type = LineType_Virtual;
 		line.style = parseLineStyle(g);
 
-	// ç»Ÿä¸€åº”ç”¨ï¼šæ–‡æ¡£->åƒç´  ä»¥åŠ èŠ‚ç‚¹è‡ªèº« transform
+	// Í³Ò»Ó¦ÓÃ£ºÎÄµµ->ÏñËØ ÒÔ¼° ½Úµã×ÔÉí transform
 	QTransform tf = m_docToPix * utils::parseTransformMatrix(g);
 		bool hasAnyPolyline = false;
 		for (pugi::xml_node polyline = g.child("polyline"); polyline; polyline = polyline.next_sibling("polyline")) {
@@ -733,13 +920,13 @@ QVector<MapLine> InteractiveSvgMapItem::parseCircuitLines(const pugi::xml_docume
 			QVector<QPointF> pts = utils::parsePointsAttr(QString::fromLatin1(ptsAttr));
 			for (int pi = 0; pi < pts.size(); ++pi) {
 				QPointF mapped = tf.map(pts[pi]);
-				if (!line.points.isEmpty() && line.points.last() == mapped) continue; // å»é‡ç›¸é‚»é‡å¤ç‚¹
+				if (!line.points.isEmpty() && line.points.last() == mapped) continue; // È¥ÖØÏàÁÚÖØ¸´µã
 				line.points.append(mapped);
 			}
 			hasAnyPolyline = hasAnyPolyline || !pts.isEmpty();
 			g.attribute("stroke-opacity").set_value(0);
 		}
-		// å…¼å®¹æå°‘æ•° polyline ç›´æ¥ä½œä¸ºç»„çš„æƒ…å†µ
+		// ¼æÈİ¼«ÉÙÊı polyline Ö±½Ó×÷Îª×éµÄÇé¿ö
 		if (!hasAnyPolyline && QString::fromLatin1(g.name()) == "polyline") {
 			const char* ptsAttr = g.attribute("points").value();
 			if (ptsAttr && *ptsAttr) {
@@ -750,14 +937,14 @@ QVector<MapLine> InteractiveSvgMapItem::parseCircuitLines(const pugi::xml_docume
 		}
 		if (!hasAnyPolyline || line.points.size() < 2) continue;
 
-		// ç®€åŒ–å¹¶æ”¶ç¼©ç‚¹é›†ï¼ŒæŒ‰åƒç´ å®¹å·®ï¼ˆä¸çº¿å®½ç›¸å…³ï¼‰
+		// ¼ò»¯²¢ÊÕËõµã¼¯£¬°´ÏñËØÈİ²î£¨ÓëÏß¿íÏà¹Ø£©
 		{
 			qreal tol = qMax<qreal>(0.5, 0.25 * qreal(line.style.strokeWidth));
 			utils::simplifyPolyline(line.points, tol);
 			line.points.squeeze();
 		}
 
-		// å¤åˆ¶å¹¶æ ‡å‡†åŒ–ç»„ä¸Šçš„å…ƒä¿¡æ¯å±æ€§ï¼Œå¤ç”¨ basemodel é”®å
+		// ¸´ÖÆ²¢±ê×¼»¯×éÉÏµÄÔªĞÅÏ¢ÊôĞÔ£¬¸´ÓÃ basemodel ¼üÃû
 		normalizeAttrsForBaseModel(line, g);
 		int grp_id = g.attribute("id").as_int();
 		line.svgGrpId = grp_id;
@@ -766,9 +953,9 @@ QVector<MapLine> InteractiveSvgMapItem::parseCircuitLines(const pugi::xml_docume
 			for (int ai = 0; ai < arr.size(); ++ai) line.arrows.append(arr[ai]);
 		}
 
-		// è®°å½• code -> id æ˜ å°„ï¼ˆè‹¥å¯ç”¨ï¼‰
+		// ¼ÇÂ¼ code -> id Ó³Éä£¨Èô¿ÉÓÃ£©
 		if (!line.code.isEmpty()) {
-			m_lineIdByCode.insert(line.code, grp_id);
+			lineIdMapByType(static_cast<MapLine::VirtualAttrs*>(line.attrs.data())->circuitType).insert(line.code, grp_id);
 		}
 		linesOut.append(line);
 	}
@@ -778,7 +965,7 @@ QVector<MapLine> InteractiveSvgMapItem::parseCircuitLines(const pugi::xml_docume
 void InteractiveSvgMapItem::parseVirtualValueBoxes(const pugi::xml_document& doc)
 {
 	m_valuePairs.clear();
-	// é€‰æ‹©æ‰€æœ‰è™šæ‹Ÿæ•°å€¼ç»„ï¼Œæ¯ä¸ªç»„å†…åŒ…å«ä¸¤ä¾§çš„ç©ºçŸ©å½¢
+	// Ñ¡ÔñËùÓĞĞéÄâÊıÖµ×é£¬Ã¿¸ö×éÄÚ°üº¬Á½²àµÄ¿Õ¾ØĞÎ
 	pugi::xpath_node_set groups = doc.select_nodes("//g[@type='virtual-value']");
 	for (int i = 0; i < groups.size(); ++i) {
 		pugi::xml_node g = groups[i].node();
@@ -788,52 +975,50 @@ void InteractiveSvgMapItem::parseVirtualValueBoxes(const pugi::xml_document& doc
 	QTransform gtf = m_docToPix * utils::parseTransformMatrix(g);
 		QVector<QRectF> rects;
 
-		// ç›´æ¥ rect å…ƒç´ 
-		for (pugi::xml_node rn = g.child("rect"); rn; rn = rn.next_sibling("rect")) {
-			double x = rn.attribute("x").as_double(0.0);
-			double y = rn.attribute("y").as_double(0.0);
-			double w = rn.attribute("width").as_double(0.0);
-			double h = rn.attribute("height").as_double(0.0);
-			QRectF lr(x, y, w, h);
-			// å­èŠ‚ç‚¹å¯èƒ½ä¹Ÿæœ‰ transform
-			QTransform rtf = gtf * utils::parseTransformMatrix(rn);
-			rects.append(rtf.mapRect(lr));
-		}
-		// å…¼å®¹ path ç”»çŸ©å½¢çš„æƒ…å†µï¼šå– path çš„åŒ…å›´ç›’ï¼Œå¹¶åº”ç”¨çˆ¶ç»„ä¸è‡ªèº«å˜æ¢
-		for (pugi::xml_node pn = g.child("path"); pn; pn = pn.next_sibling("path")) {
-			const char* d = pn.attribute("d").value();
-			if (!d || !*d) continue;
-			QVector<QPointF> local = utils::parseSvgPathToPolyline(QString::fromLatin1(d));
-			if (local.isEmpty()) continue;
-			double minX = 1e100, minY = 1e100, maxX = -1e100, maxY = -1e100;
-			for (int i2 = 0; i2 < local.size(); ++i2) {
-				const QPointF& p = local[i2];
-				if (p.x() < minX) minX = p.x(); if (p.x() > maxX) maxX = p.x();
-				if (p.y() < minY) minY = p.y(); if (p.y() > maxY) maxY = p.y();
-			}
-			if (minX <= maxX && minY <= maxY) {
-				QRectF lr(QPointF(minX, minY), QPointF(maxX, maxY));
-				QTransform ptf = gtf * utils::parseTransformMatrix(pn);
-				rects.append(ptf.mapRect(lr));
-			}
-		}
+		// Ö±½Ó rect ÔªËØ
+		//for (pugi::xml_node rn = g.child("rect"); rn; rn = rn.next_sibling("rect")) {
+		//	double x = rn.attribute("x").as_double(0.0);
+		//	double y = rn.attribute("y").as_double(0.0);
+		//	double w = rn.attribute("width").as_double(0.0);
+		//	double h = rn.attribute("height").as_double(0.0);
+		//	QRectF lr(x, y, w, h);
+		//	// ×Ó½Úµã¿ÉÄÜÒ²ÓĞ transform
+		//	QTransform rtf = gtf * utils::parseTransformMatrix(rn);
+		//	rects.append(rtf.mapRect(lr));
+		//}
+		//// ¼æÈİ path »­¾ØĞÎµÄÇé¿ö£ºÈ¡ path µÄ°üÎ§ºĞ£¬²¢Ó¦ÓÃ¸¸×éÓë×ÔÉí±ä»»
+		//for (pugi::xml_node pn = g.child("path"); pn; pn = pn.next_sibling("path")) {
+		//	const char* d = pn.attribute("d").value();
+		//	if (!d || !*d) continue;
+		//	QVector<QPointF> local = utils::parseSvgPathToPolyline(QString::fromLatin1(d));
+		//	if (local.isEmpty()) continue;
+		//	double minX = 1e100, minY = 1e100, maxX = -1e100, maxY = -1e100;
+		//	for (int i2 = 0; i2 < local.size(); ++i2) {
+		//		const QPointF& p = local[i2];
+		//		if (p.x() < minX) minX = p.x(); if (p.x() > maxX) maxX = p.x();
+		//		if (p.y() < minY) minY = p.y(); if (p.y() > maxY) maxY = p.y();
+		//	}
+		//	if (minX <= maxX && minY <= maxY) {
+		//		QRectF lr(QPointF(minX, minY), QPointF(maxX, maxY));
+		//		QTransform ptf = gtf * utils::parseTransformMatrix(pn);
+		//		rects.append(ptf.mapRect(lr));
+		//	}
+		//}
+		float x = g.attribute("x").as_float();
+		float y = g.attribute("y").as_float();
+		float w = g.attribute("w").as_float();
+		float h = g.attribute("h").as_float();
+		QString textType = g.attribute("textType").as_string();
+		QRectF rect(x, y, w, h);
+		QTransform rectTransform = gtf * utils::parseTransformMatrix(g);
+		rects.append(rectTransform.mapRect(rect));
 
 		if (rects.isEmpty()) continue;
 
-		// é€‰æ‹© x å±…ä¸­æœ€å°å’Œæœ€å¤§è€…ä¸ºå·¦å³æ¡†ï¼ˆé¿å…ä½¿ç”¨ C++11 lambdaï¼‰
-		int leftIdx = 0, rightIdx = 0;
-		double minCx = 1e100, maxCx = -1e100;
-		for (int ri = 0; ri < rects.size(); ++ri) {
-			double cx = rects[ri].center().x();
-			if (cx < minCx) { minCx = cx; leftIdx = ri; }
-			if (cx > maxCx) { maxCx = cx; rightIdx = ri; }
-		}
-		QRectF leftR = rects[leftIdx];
-		QRectF rightR = rects[rightIdx];
-
-		ValuePair vp;
-		if (!leftR.isNull()) { vp.hasLeft = true; vp.left.rect = leftR; }
-		if (!rightR.isNull() && rightIdx != leftIdx) { vp.hasRight = true; vp.right.rect = rightR; }
+		//ValuePair vp;
+		ValuePair& vp = m_valuePairs[lineId];
+		if (textType == "out") { vp.out.rect = rect; }
+		if (textType == "in") { vp.in.rect = rect; }
 		m_valuePairs.insert(lineId, vp);
 	}
 }
@@ -858,30 +1043,31 @@ QVector<ArrowHead> InteractiveSvgMapItem::parseArrowHeadsForGroup(const pugi::xm
 				arrows.append(a);
 			}
 		}
-		// éšè—åº•å›¾ç®­å¤´ç»„
+		// Òş²Øµ×Í¼¼ıÍ·×é
 		gnode.attribute("stroke-opacity").set_value(0);
 		gnode.attribute("fill-opacity").set_value(0);
 	}
 	return arrows;
 }
 
-// ç»Ÿä¸€é”®ååˆ° basemodel ç›¸å…³ï¼š
+// Í³Ò»¼üÃûµ½ basemodel Ïà¹Ø£º
 // optical: src-ied/src-port/dest-ied/dest-port/code/status/remote-id
 // logic:   src-iedname/src-cbname/dest-iedname/circuit-code
 // virtual: srcIedName/destIedName/srcSoftPlateDesc/destSoftPlateDesc/srcSoftPlateRef/destSoftPlateRef/remoteId/remoteSigId_A/remoteSigId_B/virtual-type
 void InteractiveSvgMapItem::normalizeAttrsForBaseModel(MapLine& line, const pugi::xml_node& g) const
 {
-	// å¡«å……ç±»å‹åŒ–å±æ€§ï¼ˆæƒ°æ€§åˆ†é…ï¼Œä»…å ç”¨ä¸€ç§ï¼‰
+	// Ìî³äÀàĞÍ»¯ÊôĞÔ£¨¶èĞÔ·ÖÅä£¬½öÕ¼ÓÃÒ»ÖÖ£©
 	if (line.type == LineType_Optical) {
 		if (line.attrs.isNull()) line.attrs = QSharedPointer<MapLine::AttrBase>(new MapLine::OpticalAttrs);
 		MapLine::OpticalAttrs* a = static_cast<MapLine::OpticalAttrs*>(line.attrs.data());
-		if (g.attribute("src-ied"))   a->srcIed   = g.attribute("src-ied").value();
-		if (g.attribute("dest-ied"))  a->destIed  = g.attribute("dest-ied").value();
-		if (g.attribute("src-port"))  a->srcPort  = g.attribute("src-port").value();
-		if (g.attribute("dest-port")) a->destPort = g.attribute("dest-port").value();
-		if (g.attribute("code"))      { a->code = g.attribute("code").value(); line.code = a->code; }
-		if (g.attribute("status"))    a->status   = g.attribute("status").value();
-		if (g.attribute("remote-id")) a->remoteId = g.attribute("remote-id").value();
+		if (g.attribute("src-ied"))			a->srcIed   = g.attribute("src-ied").value();
+		if (g.attribute("dest-ied"))		a->destIed  = g.attribute("dest-ied").value();
+		if (g.attribute("src-port"))		a->srcPort  = g.attribute("src-port").value();
+		if (g.attribute("dest-port"))		a->destPort = g.attribute("dest-port").value();
+		if (g.attribute("loopCode"))		a->loopCode = g.attribute("loopCode").value();
+		if (g.attribute("code"))			line.code	= g.attribute("code").value();
+		//if (g.attribute("status"))    a->status   = g.attribute("status").value();
+		//if (g.attribute("remote-id")) a->remoteId = g.attribute("remote-id").value();
 	} else if (line.type == LineType_Logic) {
 		if (line.attrs.isNull()) line.attrs = QSharedPointer<MapLine::AttrBase>(new MapLine::LogicAttrs);
 		MapLine::LogicAttrs* a = static_cast<MapLine::LogicAttrs*>(line.attrs.data());
@@ -892,40 +1078,131 @@ void InteractiveSvgMapItem::normalizeAttrsForBaseModel(MapLine& line, const pugi
 	} else { // LineType_Virtual
 		if (line.attrs.isNull()) line.attrs = QSharedPointer<MapLine::AttrBase>(new MapLine::VirtualAttrs);
 		MapLine::VirtualAttrs* a = static_cast<MapLine::VirtualAttrs*>(line.attrs.data());
-		if (g.attribute("srcIedName"))        a->srcIedName        = g.attribute("srcIedName").value();
-		if (g.attribute("destIedName"))       a->destIedName       = g.attribute("destIedName").value();
-		if (g.attribute("srcSoftPlateDesc"))  a->srcSoftPlateDesc  = g.attribute("srcSoftPlateDesc").value();
-		if (g.attribute("destSoftPlateDesc")) a->destSoftPlateDesc = g.attribute("destSoftPlateDesc").value();
-		if (g.attribute("srcSoftPlateRef"))   a->srcSoftPlateRef   = g.attribute("srcSoftPlateRef").value();
-		if (g.attribute("destSoftPlateRef"))  a->destSoftPlateRef  = g.attribute("destSoftPlateRef").value();
-		if (g.attribute("remoteId"))          a->remoteId          = g.attribute("remoteId").value();
-		if (g.attribute("remoteSigId_A"))     a->remoteSigId_A     = g.attribute("remoteSigId_A").value();
-		if (g.attribute("remoteSigId_B"))     a->remoteSigId_B     = g.attribute("remoteSigId_B").value();
-		if (g.attribute("virtual-type"))      a->virtualType       = g.attribute("virtual-type").value();
-		// å¦‚æœè™šå›è·¯ä¹Ÿæä¾›äº† code å­—æ®µï¼Œåˆ™è®°å½•
-		if (g.attribute("code"))              line.code            = g.attribute("code").value();
+		if (g.attribute("srcIedName"))        a->srcIedName				= g.attribute("srcIedName").value();
+		if (g.attribute("destIedName"))       a->destIedName			= g.attribute("destIedName").value();
+		if (g.attribute("srcSoftPlateCode"))   a->srcSoftPlateCode		= g.attribute("srcSoftPlateCode").value();
+		if (g.attribute("destSoftPlateCode"))	a->destSoftPlateCode	= g.attribute("destSoftPlateCode").value();
+		if (g.attribute("srcSoftPlateDesc"))  a->srcSoftPlateDesc		= g.attribute("srcSoftPlateDesc").value();
+		if (g.attribute("destSoftPlateDesc")) a->destSoftPlateDesc		= g.attribute("destSoftPlateDesc").value();
+		if (g.attribute("srcSoftPlateRef") && *g.attribute("srcSoftPlateRef").value())   
+			a->srcSoftPlateRef = QString("%1/%2").arg(a->srcIedName).arg(g.attribute("srcSoftPlateRef").value());
+		if (g.attribute("destSoftPlateRef") && *g.attribute("destSoftPlateRef").value())  
+			a->destSoftPlateRef = QString("%1/%2").arg(a->destIedName).arg(g.attribute("destSoftPlateRef").value());
+		//if (g.attribute("remoteId"))          a->remoteId          = g.attribute("remoteId").value();
+		if (g.attribute("remoteSigId_A"))     a->remoteSigId_A			= g.attribute("remoteSigId_A").value();
+		if (g.attribute("remoteSigId_B"))     a->remoteSigId_B			= g.attribute("remoteSigId_B").value();
+		if (g.attribute("virtual-type"))
+		{
+			QString vtype = g.attribute("virtual-type").value();
+			a->circuitType = (vtype == "gse") ? CircuitType_GSE : CircuitType_SV;
+		}
+		// Èç¹ûĞé»ØÂ·Ò²Ìá¹©ÁË code ×Ö¶Î£¬Ôò¼ÇÂ¼
+		if (g.attribute("code"))              line.code					= g.attribute("code").value();
+		if (g.attribute("circuitDesc"))		  a->circuitDesc			= QString::fromUtf8(g.attribute("circuitDesc").value());
 	}
 }
 
-void InteractiveSvgMapItem::setVirtualValuesByCode(const QString& lineCode, double value, int precision)
+void InteractiveSvgMapItem::setVirtualValuesByCode(const MapLine& line, double value, int precision)
 {
-	QMap<QString, int>::const_iterator it = m_lineIdByCode.find(lineCode);
-	if (it == m_lineIdByCode.end()) return;
+	QMap<QString, int> lineIdMap = lineIdMapByType(static_cast<MapLine::VirtualAttrs*>(line.attrs.data())->circuitType);
+	QMap<QString, int>::const_iterator it = lineIdMap.find(line.code);
+	if (it == lineIdMap.end()) return;
 	setVirtualValues(it.value(), value, value, precision);
 }
 
-void InteractiveSvgMapItem::setLeftVirtualValue(const QString& lineCode, double value, int precision)
+void InteractiveSvgMapItem::setOutVirtualValue(const MapLine& line, double value, int precision)
 {
-	QMap<QString, int>::const_iterator it = m_lineIdByCode.find(lineCode);
-	if (it == m_lineIdByCode.end()) return;
+	QMap<QString, int> lineIdMap = lineIdMapByType(static_cast<MapLine::VirtualAttrs*>(line.attrs.data())->circuitType);
+	QMap<QString, int>::const_iterator it = lineIdMap.find(line.code);
+	if (it == lineIdMap.end()) return;
 	setVirtualValue(it.value(), true, value, precision);
 }
 
-void InteractiveSvgMapItem::setRightVirtualValue(const QString& lineCode, double value, int precision)
+void InteractiveSvgMapItem::setInVirtualValue(const MapLine& line, double value, int precision)
 {
-	QMap<QString, int>::const_iterator it = m_lineIdByCode.find(lineCode);
-	if (it == m_lineIdByCode.end()) return;
+	QMap<QString, int> lineIdMap = lineIdMapByType(static_cast<MapLine::VirtualAttrs*>(line.attrs.data())->circuitType);
+	QMap<QString, int>::const_iterator it = lineIdMap.find(line.code);
+	if (it == lineIdMap.end()) return;
 	setVirtualValue(it.value(), false, value, precision);
+}
+
+void InteractiveSvgMapItem::updatePlateStatuses()
+{
+	for (QVector<PlateItem>::iterator it = m_allPlates.begin(); it != m_allPlates.end(); ++it)
+	{
+		PlateItem& p = *it;
+		if (p.attrs.code.isEmpty()) continue;
+		stuRtdbStatus* plateEle = m_rtdb.getRyb(p.attrs.code.toULongLong());
+		if (plateEle)
+		{
+			int value = plateEle->val[0] != '\0' ? atoi(plateEle->val) : 0;
+			p.isClosed = (value != 0);
+		}
+	}
+}
+
+void InteractiveSvgMapItem::updateLineStatuses()
+{
+	for (QVector<MapLine>::iterator it = m_allLines.begin(); it != m_allLines.end(); ++it)
+	{
+		MapLine& line = *it;
+		if (line.type == LineType_Virtual)
+		{
+			// Ğé»ØÂ·×´Ì¬¸üĞÂ
+			UpdateVirtualCircuitStatus(line);
+		}
+		else if (line.type == LineType_Optical)
+		{
+			// ¹âÏË»ØÂ·×´Ì¬¸üĞÂ
+			UpdateOpticalCircuitStatus(line);
+		}
+	}
+}
+
+void InteractiveSvgMapItem::UpdateOpticalCircuitStatus(MapLine& line)
+{
+	MapLine::OpticalAttrs* attrs = static_cast<MapLine::OpticalAttrs*>(line.attrs.data());
+	stuRtdbRealCircuit* realCircuit = m_rtdb.getRealCircuit(line.code.toULongLong());
+	if (!realCircuit || !realCircuit->m_pLinkChl) return;
+	if (realCircuit->m_pLinkChl->eType == CODE_TYPE_STATUS)
+	{
+		stuRtdbStatus* statusChl = static_cast<stuRtdbStatus*>(realCircuit->m_pLinkChl);
+		int v = utils::toInt(statusChl->val);
+		line.status = (v == 0) ? Status_Disconnected : Status_Connected;
+	}
+}
+
+void InteractiveSvgMapItem::UpdateVirtualCircuitStatus(const MapLine& line)
+{
+	MapLine::VirtualAttrs* attrs = static_cast<MapLine::VirtualAttrs*>(line.attrs.data());
+	if (attrs->circuitType == CircuitType_GSE)
+	{
+		stuRtdbStatus* inChl = NULL, * outChl = NULL;
+		stuRtdbGseCircuit* gseCircuit = m_rtdb.getGseCircuit(line.code.toULongLong());
+		if (gseCircuit)
+		{
+			inChl = static_cast<stuRtdbStatus*>(gseCircuit->m_pInChl);
+			outChl = static_cast<stuRtdbStatus*>(gseCircuit->m_pOutChl);
+		}
+		if (outChl)
+			setOutVirtualValue(line, utils::toDouble(outChl->val), 0);
+		if (inChl)
+			setInVirtualValue(line, utils::toDouble(inChl->val), 0);
+	}
+	else
+	{
+		stuRtdbAnalog* inChl = NULL, * outChl = NULL;
+		stuRtdbSvCircuit* svCircuit = m_rtdb.getSvCircuit(line.code.toULongLong());
+		if (svCircuit)
+		{
+			inChl = static_cast<stuRtdbAnalog*>(svCircuit->m_pInChl);
+			outChl = static_cast<stuRtdbAnalog*>(svCircuit->m_pOutChl);
+		}
+		if (outChl)
+			setOutVirtualValue(line, utils::toDouble(outChl->val), 0);
+		if (inChl)
+			setInVirtualValue(line, utils::toDouble(inChl->val), 0);
+	}
 }
 
 void InteractiveSvgMapItem::drawPlateIcon(QPainter* painter, const QPointF& center) const
@@ -948,14 +1225,14 @@ void InteractiveSvgMapItem::drawPlateIcon(QPainter* painter, const QPointF& cent
         painter->restore();
 }
 
-// drawArrows å·²å†…èšåˆ° paint ä¸­ per-line ç»˜åˆ¶
+// drawArrows ÒÑÄÚ¾Ûµ½ paint ÖĞ per-line »æÖÆ
 
 QVector<PlateCircleItem> InteractiveSvgMapItem::parsePlateCircles(const pugi::xml_node& plateCircleNode)
 {
 	QVector<PlateCircleItem> circles;
-	// å¤„ç†å‹æ¿ç»„ä»¶ç»„
+	// ´¦ÀíÑ¹°å×é¼ş×é
 	SvgNodeStyle style = parseNodeStyle(plateCircleNode);
-	// ç»Ÿä¸€ä¸ computePathBoundingRect çš„é¡ºåºï¼šå…ˆèŠ‚ç‚¹å˜æ¢ï¼Œå†æ–‡æ¡£åˆ°åƒç´ 
+	// Í³Ò»Óë computePathBoundingRect µÄË³Ğò£ºÏÈ½Úµã±ä»»£¬ÔÙÎÄµµµ½ÏñËØ
 	QTransform transform = m_docToPix * utils::parseTransformMatrix(plateCircleNode);
 
 	// d="
@@ -984,7 +1261,7 @@ QVector<PlateCircleItem> InteractiveSvgMapItem::parsePlateCircles(const pugi::xm
 
 		PlateCircleItem c;
 		c.center = transform.map(QPointF(cx, cy));
-		// ä¸ºäº†æ­£ç¡®å¤„ç†ç¼©æ”¾ï¼Œæˆ‘ä»¬å˜æ¢åœ†ä¸Šçš„ä¸€ä¸ªç‚¹æ¥è®¡ç®—æ–°çš„åŠå¾„
+		// ÎªÁËÕıÈ·´¦ÀíËõ·Å£¬ÎÒÃÇ±ä»»Ô²ÉÏµÄÒ»¸öµãÀ´¼ÆËãĞÂµÄ°ë¾¶
 		QPointF edgePoint = transform.map(QPointF(cx + rx, cy));
 		c.radius = QLineF(c.center, edgePoint).length();
 		c.style = style;
@@ -998,12 +1275,12 @@ QVector<PlateLineItem> InteractiveSvgMapItem::parsePlateLines(const pugi::xml_no
 {
 	QVector<PlateLineItem> lines;
 	SvgNodeStyle style = parseNodeStyle(plateLineNode);
-	// ç»Ÿä¸€é¡ºåºï¼šå…ˆèŠ‚ç‚¹å˜æ¢ï¼Œå†æ–‡æ¡£åˆ°åƒç´ 
+	// Í³Ò»Ë³Ğò£ºÏÈ½Úµã±ä»»£¬ÔÙÎÄµµµ½ÏñËØ
 	QTransform transform = m_docToPix * utils::parseTransformMatrix(plateLineNode);
 
 	for (pugi::xml_node polyline = plateLineNode.child("polyline"); polyline; polyline = polyline.next_sibling("polyline"))
 	{
-		// æœ¬åœ°è§£æ pointsï¼ˆä¸ä½¿ç”¨ parsePointsAttrï¼Œé¿å…é‡å¤åº”ç”¨ m_docToPixï¼‰
+		// ±¾µØ½âÎö points£¨²»Ê¹ÓÃ parsePointsAttr£¬±ÜÃâÖØ¸´Ó¦ÓÃ m_docToPix£©
 		QVector<QPointF> points;
 		const char* ptsAttr = polyline.attribute("points").as_string();
 		if (ptsAttr && *ptsAttr) {
@@ -1030,7 +1307,7 @@ QVector<PlateRectItem> InteractiveSvgMapItem::parsePlateRects(const pugi::xml_no
 	QVector<PlateRectItem> rects;
 	SvgNodeStyle style = parseNodeStyle(plateRectNode);
 	//style.fill = 
-	// ç»Ÿä¸€ä¸ computePathBoundingRect çš„é¡ºåºï¼šå…ˆèŠ‚ç‚¹å˜æ¢ï¼Œå†æ–‡æ¡£åˆ°åƒç´ 
+	// Í³Ò»Óë computePathBoundingRect µÄË³Ğò£ºÏÈ½Úµã±ä»»£¬ÔÙÎÄµµµ½ÏñËØ
 	QTransform transform = m_docToPix * utils::parseTransformMatrix(plateRectNode);
 
 	for (pugi::xml_node path = plateRectNode.child("path"); path; path = path.next_sibling("path"))
@@ -1134,7 +1411,7 @@ SvgNodeStyle InteractiveSvgMapItem::parseNodeStyle(const pugi::xml_node& node)
 {
     SvgNodeStyle style;
     
-    // è§£ææ ·å¼å±æ€§
+    // ½âÎöÑùÊ½ÊôĞÔ
     const char* strokeAttr = node.attribute("stroke").value();
     style.strokeWidth = node.attribute("stroke-width").as_int(1);
     style.strokeOpacity = node.attribute("stroke-opacity").as_double(1.0);
@@ -1142,7 +1419,7 @@ SvgNodeStyle InteractiveSvgMapItem::parseNodeStyle(const pugi::xml_node& node)
     style.fillOpacity = node.attribute("fill-opacity").as_double(1.0);
     style.dashArray = node.attribute("stroke-dasharray").as_string("");
     
-    // è§£æé¢œè‰²
+    // ½âÎöÑÕÉ«
 	style.stroke = utils::parseColor(strokeAttr, style.strokeOpacity);
 	style.fill = utils::parseColor(fillAttr, style.fillOpacity);
     
@@ -1159,9 +1436,44 @@ LineStyle InteractiveSvgMapItem::parseLineStyle(const pugi::xml_node& node)
 	return ls;
 }
 
+QString InteractiveSvgMapItem::buildLineTooltip(const MapLine& line) const
+{
+	QString ret = "";
+	if (line.type == LineType_Virtual)
+	{
+		const MapLine::VirtualAttrs* attrs = static_cast<MapLine::VirtualAttrs*>(line.attrs.data());
+		QStringList parts;
+		QString outRef;
+		QString inRef;
+		if (attrs->circuitType == CircuitType_GSE)
+		{
+			stuRtdbGseCircuit* pGseCircuit = m_rtdb.getGseCircuit(line.code.toULongLong());
+			if (pGseCircuit)
+			{
+				outRef = QString::fromLocal8Bit(m_rtdb.getDesc(pGseCircuit->m_pOutChl));
+				inRef = QString::fromLocal8Bit(m_rtdb.getDesc(pGseCircuit->m_pInChl));
+			}
+		}
+		else if (attrs->circuitType == CircuitType_SV)
+		{
+			stuRtdbSvCircuit* pSvCircuit = m_rtdb.getSvCircuit(line.code.toULongLong());
+			if (pSvCircuit)
+			{
+				outRef = QString::fromLocal8Bit(m_rtdb.getDesc(pSvCircuit->m_pOutChl));
+				inRef = QString::fromLocal8Bit(m_rtdb.getDesc(pSvCircuit->m_pInChl));
+			}
+		}
+		parts << QString::fromLocal8Bit("Ô´IED:") << attrs->srcIedName << "\n";
+		parts << QString::fromLocal8Bit("Ä¿µÄIED:") << attrs->destIedName << "\n";
+		parts << QString::fromLocal8Bit("Êä³öÂ·¾¶:") << outRef << "\n";
+		parts << QString::fromLocal8Bit("ÊäÈëÂ·¾¶:") << inRef;
+		ret = parts.join("");
+	}
+	return ret;
+}
+
 void InteractiveSvgMapItem::paintPlates(QPainter* painter)
 {
-	// åˆ†ä¸¤æ­¥ï¼šå…ˆé“º outerRect èƒŒæ™¯è¦†ç›–å›è·¯ï¼Œå†ç»˜åˆ¶ç»„ä»¶ä¸è¾¹æ¡†
 	for (int i = 0; i < m_allPlates.size(); ++i) {
 		const PlateItem& plate = m_allPlates[i];
 		if (!plate.outerRect.isNull()) {
@@ -1186,9 +1498,9 @@ void InteractiveSvgMapItem::paintPlates(QPainter* painter)
 
 void InteractiveSvgMapItem::paintSinglePlate(QPainter* painter, const PlateItem& plate)
 {
-	// å†…éƒ¨ç»„ä»¶
+	// ÄÚ²¿×é¼ş
 	if (!plate.isClosed) {
-		// ç½®åˆ†ï¼šçº¿éšè—ã€åœ†çº¢è‰²ç©ºå¿ƒï¼ŒçŸ©å½¢ç…§å¸¸
+		// ÖÃ·Ö£ºÏßÒş²Ø¡¢Ô²ºìÉ«¿ÕĞÄ£¬¾ØĞÎÕÕ³£
 		//drawPlateRects(painter, plate.rects);
 		if (!plate.circles.isEmpty()) {
 			QVector<PlateCircleItem> red = plate.circles;
@@ -1204,7 +1516,7 @@ void InteractiveSvgMapItem::paintSinglePlate(QPainter* painter, const PlateItem&
 		drawPlateCircles(painter, plate.circles);
 	}
 
-	// å¤–æ¡†ï¼ˆç™½è‰²è™šçº¿ï¼‰ç»˜åˆ¶åœ¨æœ€ä¸Šå±‚
+	// Íâ¿ò£¨°×É«ĞéÏß£©»æÖÆÔÚ×îÉÏ²ã
 	//const QRectF frameRect = !plate.outerRect.isNull() ? plate.outerRect : plate.rect;
 	//if (!frameRect.isNull()) {
 	//	QPen framePen(Qt::white);
@@ -1225,51 +1537,44 @@ void InteractiveSvgMapItem::paintVirtualValues(QPainter* painter)
 	if (m_valuePairs.isEmpty()) return;
 	painter->save();
 	QFont font = painter->font();
-	// ç¨å¾®å¤§ä¸€ç‚¹ï¼Œä¾¿äºæŸ¥çœ‹ï¼›å¯æ ¹æ®éœ€è¦è°ƒæ•´
 	font.setPointSize(qMax(10, font.pointSize()));
 	painter->setFont(font);
 	painter->setPen(Qt::white);
+	QFontMetricsF fm(font);
+	//QRectF
+	QMap<int, ValuePair>::iterator it = m_valuePairs.begin();
+	for (; it != m_valuePairs.end(); ++it) {
+		ValuePair& vp = it.value();
+		vp.in.rect.setHeight(fm.height());
+		vp.in.rect.setWidth(fm.width(vp.in.text));
+		painter->drawText(vp.in.rect, Qt::AlignCenter, vp.in.text);
 
-	QMap<int, ValuePair>::const_iterator it = m_valuePairs.constBegin();
-	for (; it != m_valuePairs.constEnd(); ++it) {
-		const ValuePair& vp = it.value();
-		if (vp.hasLeft) {
-			painter->drawText(vp.left.rect, Qt::AlignCenter, vp.left.text);
-		}
-		if (vp.hasRight) {
-			painter->drawText(vp.right.rect, Qt::AlignCenter, vp.right.text);
-		}
+		vp.out.rect.setHeight(fm.height());
+		vp.out.rect.setWidth(fm.width(vp.out.text));
+		painter->drawText(vp.out.rect, Qt::AlignCenter, vp.out.text);
 	}
 	painter->restore();
 }
 
-void InteractiveSvgMapItem::setVirtualValues(int lineId, double leftValue, double rightValue, int precision)
+void InteractiveSvgMapItem::setVirtualValues(int lineId, double inVal, double outVal, int precision)
 {
 	QMap<int, ValuePair>::iterator it = m_valuePairs.find(lineId);
 	if (it == m_valuePairs.end()) return;
 	ValuePair& vp = it.value();
-	if (vp.hasLeft)  vp.left.text  = QString::number(leftValue, 'f', precision);
-	if (vp.hasRight) vp.right.text = QString::number(rightValue, 'f', precision);
+	vp.in.text  = QString::number(inVal, 'f', precision);
+	vp.out.text = QString::number(outVal, 'f', precision);
 	update();
 }
 
-void InteractiveSvgMapItem::setVirtualValue(int lineId, bool isLeft, double value, int precision)
+void InteractiveSvgMapItem::setVirtualValue(int lineId, bool isOut, double value, int precision)
 {
 	QMap<int, ValuePair>::iterator it = m_valuePairs.find(lineId);
 	if (it == m_valuePairs.end()) return;
 	ValuePair& vp = it.value();
-	if (isLeft && vp.hasLeft) vp.left.text = QString::number(value, 'f', precision);
-	if (!isLeft && vp.hasRight) vp.right.text = QString::number(value, 'f', precision);
+	if (isOut) 
+		vp.out.text = QString::number(value, 'f', precision);
+	else
+		vp.in.text = QString::number(value, 'f', precision);
+	auto map = m_valuePairs.toStdMap();
 	update();
-}
-
-bool InteractiveSvgMapItem::getVirtualValueRects(int lineId, QRectF& leftRect, QRectF& rightRect) const
-{
-	QMap<int, ValuePair>::const_iterator it = m_valuePairs.find(lineId);
-	if (it == m_valuePairs.end()) return false;
-	const ValuePair& vp = it.value();
-	bool ok = true;
-	if (vp.hasLeft) leftRect = vp.left.rect; else ok = false;
-	if (vp.hasRight) rightRect = vp.right.rect; else ok = false;
-	return ok;
 }

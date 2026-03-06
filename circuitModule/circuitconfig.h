@@ -88,13 +88,19 @@ public:
 	// 函数参数:	QString file
 	// 返回值:		bool
 	//************************************
-	bool LoadCimeFile(/*QString file*/);
+	bool LoadCimeFile(QString file = QString());
 	bool LoadGseCimeFile(QString file);
 	bool LoadSvCimeFile(QString file);
 
 	bool LoadIedCimeFile(QString file);
 	// 加载实时库内容
 	bool LoadRTDB();
+	bool LoadIedFromRtdb();
+	bool LoadGseFromRtdb();
+	bool LoadSvFromRtdb();
+	bool LoadOpticalFromRtdb();
+
+	const CRtdbEleModelStation* StationModel() const { return m_stationModel; }
 
 	//************************************
 	// 函数名称:	LoadOpticalCimeFile
@@ -105,6 +111,8 @@ public:
 	// 返回值:		bool
 	//************************************
 	bool LoadOpticalCimeFile(QString file);
+
+	const QString& CimeDirectory() const { return m_cimeDir; }
 
 	//************************************
 	// 函数名称:	SaveConfigFile
@@ -174,14 +182,28 @@ public:
 		return m_outLogicCircuitHash.values(iedName);
 	}
 
-	QList<LogicCircuit*> GetAllLogicCircuitListByIedName(const QString& iedName)
+	QList<LogicCircuit*> GetAllLogicCircuitListByIEDName(const QString& iedName)
 	{
 		return m_inLogicCircuitHash.values(iedName) + m_outLogicCircuitHash.values(iedName);
 	}
 
-	QList<VirtualCircuit*> GetAllVirtualCircuitListByIedName(const QString& iedName)
+	QList<VirtualCircuit*> GetAllVirtualCircuitListByIEDName(const QString& iedName)
 	{
 		return m_inVirtualCircuitHash.values(iedName) + m_outVirtualCircuitHash.values(iedName);
+	}	
+
+	QList<VirtualCircuit*> GetAllVirtualCircuitListByIEDPair(const QString& srcIedName, const QString& destIedName)
+	{
+		QList<VirtualCircuit*> result;
+		QMultiHash<QString, VirtualCircuit*>::const_iterator it = m_outVirtualCircuitHash.find(srcIedName);
+		while (it != m_outVirtualCircuitHash.end() && it.key() == srcIedName) {
+			VirtualCircuit* pVC = it.value();
+			if (pVC && pVC->destIedName == destIedName) {
+				result.append(pVC);
+			}
+			++it;
+		}
+		return result;
 	}
 
 	QList<OpticalCircuit*> getOpticalByIeds(const QString& ied_1, const QString& ied_2) {
@@ -193,6 +215,16 @@ public:
 		ret += m_opticalCircuitHash.values(qMakePair(ied_2, ied_1));
 		return ret;
 	}
+
+	//************************************
+	// 函数名称:	getOpticalByCode
+	// 函数全名:	CircuitConfig::getOpticalByCode
+	// 访问权限:	public
+	// 函数说明:	根据光纤链路编号获取光纤链路
+	// 函数参数:	quint64 code
+	// 返回值:	OpticalCircuit*
+	//************************************
+	OpticalCircuit* getOpticalByCode(quint64 code) const;
 
 	// 根据IED名称和交换机名称获取经过该交换机的逻辑链路
 	//QList<LogicCircuit*> getLogicCircuitListByIedNameAndSw(const QString& iedName, const QString& swName)
@@ -329,12 +361,125 @@ protected:
 	}
 
 private:
-	CircuitConfig() {}
+
+	//************************************
+	// 函数名称:	buildOpticalRelation
+	// 函数全名:	CircuitConfig::buildOpticalRelation
+	// 访问权限:	private
+	// 函数说明:	建立虚回路与光纤链路关系
+	// 函数参数:	VirtualCircuit* pVtCircuit
+	// 函数参数:	const IED* pSrcIed
+	// 函数参数:	const IED* pDestIed
+	// 返回值:	void
+	//************************************
+	void buildOpticalRelation(VirtualCircuit* pVtCircuit, const IED* pSrcIed, const IED* pDestIed);
+	CircuitConfig();
+	CircuitConfig(const CircuitConfig&);
+	CircuitConfig& operator=(const CircuitConfig&);
 	~CircuitConfig()
 	{
 		Clear();
 	}
-private:
+	//************************************
+	// 函数名称:	setChlDesc
+	// 函数全名:	CircuitConfig::setChlDesc
+	// 访问权限:	private 
+	// 函数说明:	根据实时库通道元素类型，将其描述写入虚回路源/目的端描述字段。
+	//				isSrc为true时写入pVC->srcDesc，否则写入pVC->destDesc；
+	//				依据pChl->eType进行安全向下转型并读取各派生类型的desc字段。
+	// 函数参数:	VirtualCircuit* pVC			虚回路对象
+	// 函数参数:	stuRtdbEle* pChl			实时库通道元素基类指针（实际类型由eType指示）
+	// 函数参数:	bool isSrc					是否为源端描述（true源/false目的）
+	// 返回值:		void
+	// 备注:		未知类型不处理。
+	//************************************
+	void setChlDesc(VirtualCircuit* pVC, stuRtdbEle* pChl, bool isSrc)
+	{
+		if (!pChl) return;
+		QString& desc = isSrc ? pVC->srcDesc : pVC->destDesc;
+		switch (pChl->eType)
+		{
+		case CODE_TYPE_SECTOR:
+		{
+			stuRtdbSector* pSector = static_cast<stuRtdbSector*>(pChl);
+			desc = QString::fromLocal8Bit(pSector->desc);
+			break;
+		}
+		case CODE_TYPE_SETTING:
+		{
+			stuRtdbSetting* pSetting = static_cast<stuRtdbSetting*>(pChl);
+			desc = QString::fromLocal8Bit(pSetting->desc);
+			break;
+		}
+		case CODE_TYPE_ANALOG:
+		{
+			stuRtdbAnalog* pAnalog = static_cast<stuRtdbAnalog*>(pChl);
+			desc = QString::fromLocal8Bit(pAnalog->desc);
+			break;
+		}
+		case CODE_TYPE_STATUS:
+		{
+			stuRtdbStatus* pStatus = static_cast<stuRtdbStatus*>(pChl);
+			desc = QString::fromLocal8Bit(pStatus->desc);
+			break;
+		}
+		case CODE_TYPE_DETAIL:
+		{
+			stuRtdbDetail* pDetail = static_cast<stuRtdbDetail*>(pChl);
+			desc = QString::fromLocal8Bit(pDetail->desc);
+			break;
+		}
+		}
+	}
+
+	//************************************
+	// 函数名称:	buildCircuitRelations
+	// 函数全名:	CircuitConfig::buildCircuitRelations
+	// 访问权限:	private 
+	// 函数说明:	将单条虚回路与对应逻辑回路建立关联；若目标逻辑回路不存在则创建。
+	//				维护IED互联关系、入/出逻辑链路与虚回路的多重映射，以及全局链路列表。
+	//				当源/目的IED不存在时，记录错误并释放pVtCircuit。
+	// 函数参数:	VirtualCircuit* pVtCircuit
+	// 函数参数:	QHash<QString, LogicCircuit*>& logicCircuitHash
+	// 返回值:		void
+	//************************************
+	void buildCircuitRelations(VirtualCircuit* pVtCircuit, QHash<QString, LogicCircuit*>& logicCircuitHash)
+	{
+		QString key = QString("%1:%2:%3").arg(pVtCircuit->destIedName).arg(pVtCircuit->srcCbName).arg(pVtCircuit->srcIedName);
+		IED* pSrcIed = m_iedHash.value(pVtCircuit->srcIedName, NULL);
+		IED* pDestIed = m_iedHash.value(pVtCircuit->destIedName, NULL);
+		if (pSrcIed && pDestIed)
+		{
+			// 记录跨交换机的设备
+			pSrcIed->connectedIedNameSet.insert(pDestIed->name);
+			pDestIed->connectedIedNameSet.insert(pSrcIed->name);
+			buildOpticalRelation(pVtCircuit, pSrcIed, pDestIed);
+		}
+		else
+		{
+			m_errMsg += QString("VirtualCircuit %1:%2 not found in IED list").arg(pVtCircuit->srcIedName).arg(pVtCircuit->destIedName);
+			delete pVtCircuit;
+			return;
+		}
+		LogicCircuit* pLogicCircuit = logicCircuitHash.value(key, NULL);
+		if (!pLogicCircuit)
+		{
+			pLogicCircuit = new LogicCircuit;
+			pLogicCircuit->type = pVtCircuit->type;
+			pLogicCircuit->pSrcIed = m_iedHash.value(pVtCircuit->srcIedName, NULL);
+			pLogicCircuit->pDestIed = m_iedHash.value(pVtCircuit->destIedName, NULL);
+			pLogicCircuit->cbName = pVtCircuit->srcCbName;
+			m_logicCircuitList.append(pLogicCircuit);
+			logicCircuitHash.insert(key, pLogicCircuit);
+			m_inLogicCircuitHash.insertMulti(pVtCircuit->destIedName, pLogicCircuit);
+			m_outLogicCircuitHash.insertMulti(pVtCircuit->srcIedName, pLogicCircuit);
+		}
+		pVtCircuit->pLogicCircuit = pLogicCircuit;
+		m_inVirtualCircuitHash.insertMulti(pVtCircuit->destIedName, pVtCircuit);
+		m_outVirtualCircuitHash.insertMulti(pVtCircuit->srcIedName, pVtCircuit);
+		pLogicCircuit->circuitList.append(pVtCircuit);
+		m_virtualCircuitList.append(pVtCircuit);
+	}
 	// 用于解析物理连接节点信息 name1:port1_name2:port2
 	struct CableInfo
 	{
@@ -399,137 +544,12 @@ private:
 
 		return result;
 	}
-	//// 遍历指定链路列表，找指定srcIedName且端口号为空的不完整链路
-	//Circuit* GetUnComplishedCircuitBySrcIedName(QList<LogicCircuit*>& logicCircuitList, QString& srcIedName)
-	//{
-	//	for (QList<LogicCircuit*>::const_iterator it = logicCircuitList.begin(); it != logicCircuitList.end(); ++it)
-	//	{
-	//		if ((*it)->parent->pSrcIed->name == srcIedName)
-	//		{
-	//			foreach(Circuit * pCircuit, (*it)->circuitList)
-	//			{
-	//				if (pCircuit->srcEnd.port.isEmpty())
-	//					return pCircuit;
-	//			}
-	//		}
-	//	}
-	//	return NULL;
-	//}
-
-private:
-	// 数据集关系解析，关系存储分两种。第一种分级映射，用于根据数据路径查找具体数据；第二种数据集映射表，用于判断数据集所属控制块关系
-	// =======================================================================================================================
-	// 数据分级映射 查询指定数据方法：IED - LDevice[ldInst] - LN[lnClass, lnInst, prefix] - DOI[name] - DAI[name]，从左到右由优先级排列
-	// 类型命名规则：key_value_hash
-	//typedef QMultiHash<QString, Data*> da_data_mhash;			// <DAI name> - Data
-	//typedef QHash<QString, da_data_mhash> do_da_hash;	// <DOI name> - DaNameHash
-	//typedef QHash<QString, do_da_hash> lnPrefix_do_hash;	// <LN prefix> - DoNameHash		
-	//typedef QHash<QString, lnPrefix_do_hash> lnInst_lnPrefix_hash;	// <LN inst> - PrefixHash		该属性可能为空
-	//typedef QHash<QString, lnInst_lnPrefix_hash> lnClass_lnPrefix_hash;	// <LN class> - LnInstHash
-	//typedef QHash<QString, lnClass_lnPrefix_hash> ldInst_lnClass_hash;	// <LDevice inst> - LnClassHash
-	//typedef QHash<QString, ldInst_lnClass_hash> ied_ldInst_hash;		// IEDName - LdInstHash
-
-	//void InsertPathData(QString iedName, Data* pData)
-	//{
-	//	// 按地址逐级插入数据
-	//	// 确保IED存在
-	//	if (!m_dataPathHash.contains(iedName))
-	//		m_dataPathHash.insert(iedName, ldInst_lnClass_hash());
-	//	ldInst_lnClass_hash& ldInstHash = m_dataPathHash[iedName];
-
-	//	InsertPathData(ldInstHash, pData);
-	//}
-
-	//************************************
-	// 函数名称:	InsertPathData
-	// 函数全名:	CircuitConfig::InsertPathData
-	// 访问权限:	private 
-	// 函数说明:	按地址插入数据映射，确保地址映射存在
-	// 函数参数:	ldInst_lnClass_hash ldeviceHash
-	// 函数参数:	Data * pData
-	// 返回值:		void
-	//************************************
-	//void InsertPathData(ldInst_lnClass_hash ldeviceHash, Data* pData)
-	//{
-	//	// 确保LDevice存在
-	//	if (!ldeviceHash.contains(pData->ldInst))
-	//		ldeviceHash.insert(pData->ldInst, lnClass_lnPrefix_hash());
-	//	lnClass_lnPrefix_hash& lnClassHash = ldeviceHash[pData->ldInst];
-
-	//	// LN class
-	//	if (!lnClassHash.contains(pData->lnClass))
-	//		lnClassHash.insert(pData->lnClass, lnInst_lnPrefix_hash());
-	//	lnInst_lnPrefix_hash& lnInstHash = lnClassHash[pData->lnClass];
-
-	//	// LN inst
-	//	if (!lnInstHash.contains(pData->lnInst))
-	//		lnInstHash.insert(pData->lnInst, lnPrefix_do_hash());
-	//	lnPrefix_do_hash& lnPrefixHash = lnInstHash[pData->lnInst];
-
-	//	// LN prefix
-	//	if (!lnPrefixHash.contains(pData->prefix))
-	//		lnPrefixHash.insert(pData->prefix, do_da_hash());
-	//	do_da_hash& doHash = lnPrefixHash[pData->prefix];
-
-	//	// DOI
-	//	if (!doHash.contains(pData->doName))
-	//		doHash.insert(pData->doName, da_data_mhash());
-	//	da_data_mhash& daMultiHash = doHash[pData->doName];
-
-	//	// DAI
-	//	daMultiHash.insertMulti(pData->daName, pData);
-	//}
-
-	// =======================================================================================================================
-	// 数据集映射表，由于不同LDevice下存在同名DataSet，所以需要分级查找，查询方法：IED - LDevice[inst] - DataSet[name]
-	//typedef QHash<QString, DataSet*> NameDataSetHash;		// <DataSet name - DataSet*>
-	//typedef QHash<QString, NameDataSetHash> LdInstDataSetHash;	// <LDevice inst - DataSetNameHash>
-	//typedef QHash<QString, LdInstDataSetHash> DataSetHash;		// <IED name - LdInstDataSetHash>
-	//************************************
-	// 函数名称:	GetNameDataSetHashByldInst
-	// 函数全名:	CircuitConfig::GetNameDataSetHashByldInst
-	// 访问权限:	private 
-	// 函数说明:	获取指定IED，LDevice下的DataSet映射表，若不存在则返回空表
-	// 函数参数:	QString ldInst
-	// 返回值:		CircuitConfig::NameDataSetHash
-	//************************************
-	//NameDataSetHash GetNameDataSetHashByldInst(QString iedName, QString ldInst) { return m_dataSetHash.value(iedName).value(ldInst, NameDataSetHash()); }
-	//************************************
-	// 函数名称:	GetDataSetByLdInstAndDataSetName
-	// 函数全名:	CircuitConfig::GetDataSetByLdInstAndDataSetName
-	// 访问权限:	private 
-	// 函数说明:	根据指定的IED，LDevice inst和DataSet name，获取DataSet
-	// 函数参数:	QString ldInst
-	// 函数参数:	QString iedName
-	// 函数参数:	QString name
-	// 返回值:		DataSet*
-	//************************************
-	//DataSet* GetDataSet(QString iedName, QString ldInst, QString datSetName) { return m_dataSetHash.value(iedName).value(ldInst).value(datSetName, NULL); }
-	//************************************
-	// 函数名称:	InsertDataSet
-	// 函数全名:	CircuitConfig::InsertDataSet
-	// 访问权限:	private 
-	// 函数说明:	插入dataset到数据集映射表，若指定ied和ldinst下不存在映射表则创建
-	// 函数参数:	QString iedName
-	// 函数参数:	DataSet * pDataSet
-	// 返回值:		void
-	//************************************
-	//void InsertDataSet(QString iedName, DataSet* pDataSet) 
-	//{ 
-	//	QString ldInst = pDataSet->ldInst;
-	//	if (ldInst.isEmpty())
-	//		qDebug() << __FILE__ << __LINE__ << "DataSet ldInst is empty";
-	//	if (!m_dataSetHash.contains(iedName))
-	//		m_dataSetHash.insert(iedName, LdInstDataSetHash());
-	//	if (!m_dataSetHash.value(iedName).contains(ldInst))
-	//		m_dataSetHash[iedName].insert(ldInst, NameDataSetHash());
-
-	//	m_dataSetHash[iedName][ldInst][pDataSet->name] = pDataSet;
-	//}
 
 private:
 	QString m_errMsg;
-	RtdbClient m_rtdb;
+	QString m_cimeDir;
+	RtdbClient& m_rtdb;
+	const CRtdbEleModelStation* m_stationModel;
 	// =======================================================================================================================
 	// 数据源，参与内存管理
 	QList<IED*> m_iedList;

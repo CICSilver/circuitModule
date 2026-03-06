@@ -321,6 +321,8 @@ struct VirtualCircuitLine : public BaseCircuitLine
 
 struct PlateRect
 {
+	QString iedName;	// 软压板所属IED名称
+	quint64 code;	// 软压板ID
 	QRect rect;			// 软压板矩形
 	QString ref;		// 软压板路径引用，PL2205NAPROT/PTRC1.TrStrp
 	QString desc;		// 软压板名称
@@ -335,7 +337,6 @@ struct VirtualSvg : public LogicSvg
 	//QList<QRect> plateRectList;			// 软压板矩形列表
 	QHash<QString, PlateRect> plateRectHash;	// 软压板矩形列表，key为软压板路径
 };
-
 // 完整虚实回路svg图
 struct WholeCircuitSvg : public LogicSvg
 {

@@ -1,13 +1,14 @@
 # QMake project file for Qt 4.8 + GCC 4.9.2 (MinGW) build
 
-TEMPLATE = app
+TEMPLATE = lib
 TARGET = circuitModule
 DESTDIR = $$PWD/bin
 # Qt modules (Qt4 style)
 QT += core gui svg xml
 
 # Warnings and RTTI/exceptions (defaults in most mkspecs, kept explicit)
-CONFIG += warn_on exceptions rtti
+CONFIG += warn_on exceptions rtti dll
+DEFINES += CIRCUITMODULE_LIBRARY
 
 # Generated code/output directories
 MOC_DIR = GeneratedFiles
@@ -33,6 +34,8 @@ HEADERS += \
     svgmodel.h \
     SvgTransformer.h \
     SvgUtils.h \
+    CircuitModuleApi.h \
+    circuitmodule_global.h \
     include/cime/cime.h \
     include/rtdb/rtdb_dll_def.h \
     include/rtdb/rtdb_dll.h \
@@ -48,11 +51,11 @@ FORMS += \
 RESOURCES += \
     mainwindow.qrc
 
-# Application sources (module)
+# Library sources
 SOURCES += \
     circuitconfig.cpp \
     InteractiveSvgItem.cpp \
-    main.cpp \
+    CircuitModuleApi.cpp \
     mainwindow.cpp \
     RtdbClient.cpp \
     SvgTransformer.cpp \
@@ -75,4 +78,3 @@ win32:CONFIG -= console
 
 # Optional: tune linker flags if needed
 # win32:LIBS += -lws2_32 -lwinmm -liphlpapi
-

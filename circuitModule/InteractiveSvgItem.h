@@ -1,9 +1,12 @@
-ï»¿#ifndef INTERACTIVESVGMAPITEM_H
+#ifndef INTERACTIVESVGMAPITEM_H
 #define INTERACTIVESVGMAPITEM_H
 
 #include <QGraphicsItem>
 #include <QObject>
 #include <QPixmap>
+#include <QByteArray>
+#include <QSize>
+#include <QSizeF>
 #include <QVector>
 #include <QPointF>
 #include <QString>
@@ -12,13 +15,15 @@
 #include <QTransform>
 #include <QMap>
 #include <QSharedPointer>
+#include <QPointer>
 #include <circuitconfig.h>
+#include "RtdbClient.h"
 class QGraphicsSceneHoverEvent;
 class QGraphicsSceneContextMenuEvent;
 class QGraphicsSceneMouseEvent;
 class QGraphicsSceneWheelEvent;
 class QScrollBar;
-
+class SecWidget;
 struct SvgNodeStyle
 {
     QColor stroke;
@@ -33,8 +38,8 @@ struct SvgNodeStyle
 
 struct LineStyle
 {
-	QRgb strokeRgb;         // åªå­˜é¢œè‰²å€¼ï¼Œç»˜åˆ¶æ—¶ç»„è£… QColor
-	unsigned short strokeWidth; // çº¿å®½ï¼ˆåƒç´ ï¼‰
+	QRgb strokeRgb;         // Ö»´æÑÕÉ«Öµ£¬»æÖÆÊ±×é×° QColor
+	unsigned short strokeWidth; // Ïß¿í£¨ÏñËØ£©
 	LineStyle() : strokeRgb(0), strokeWidth(1) {}
 };
 
@@ -61,64 +66,69 @@ struct PlateRectItem
 
 struct PlateItem
 {
-	QString svgGrpId;              // plate èŠ‚ç‚¹ idï¼Œç”¨äºå’Œè™šå›è·¯å…³è”
-	bool isClosed;           // true=ç½®åˆï¼Œfalse=ç½®åˆ†
-	QRectF rect;             // plate èŠ‚ç‚¹ä¸­çš„ rectï¼ˆç”¨äºå‘½ä¸­/é€»è¾‘ï¼‰
-	QRectF outerRect;        // plate-component ä¸­çš„å¤–éƒ¨çŸ©å½¢ï¼ˆè¦†ç›–å›è·¯ç”¨ï¼‰
-	QVector<PlateCircleItem> circles;	// å‹æ¿çš„ä¸¤ä¸ªåœ†
-	QVector<PlateLineItem> lines;			// å‹æ¿çš„ä¸¤æ¡çº¿
+	QString svgGrpId;              // plate ½Úµã id£¬ÓÃÓÚºÍĞé»ØÂ·¹ØÁª
+	bool isClosed;           // true=ÖÃºÏ£¬false=ÖÃ·Ö
+	QRectF rect;             // plate ½ÚµãÖĞµÄ rect£¨ÓÃÓÚÃüÖĞ/Âß¼­£©
+	QRectF outerRect;        // plate-component ÖĞµÄÍâ²¿¾ØĞÎ£¨¸²¸Ç»ØÂ·ÓÃ£©
+	QVector<PlateCircleItem> circles;	// Ñ¹°åµÄÁ½¸öÔ²
+	QVector<PlateLineItem> lines;			// Ñ¹°åµÄÁ½ÌõÏß
 	QVector<PlateRectItem> rects;
 
-	// å‹æ¿çš„è¯­ä¹‰å±æ€§
+	// Ñ¹°åµÄÓïÒåÊôĞÔ
 	struct Attrs {
-		QString ref;   // è½¯å‹æ¿å¼•ç”¨ï¼Œä½œä¸ºå…³è”é”®
+		QString code;
+		QString iedName;
+		QString ref;   // ÈíÑ¹°åÒıÓÃ£¬×÷Îª¹ØÁª¼ü
 		QString desc;
 		QString id;
 		Attrs() {}
 	} attrs;
 };
 
-// ç®­å¤´å¤šè¾¹å½¢æ•°æ®
+// ¼ıÍ·¶à±ßĞÎÊı¾İ
 struct ArrowHead
 {
-	QVector<QPointF> points;   // è§£æè‡ª path d çš„ç‚¹ï¼ˆå˜æ¢åï¼‰
+	QVector<QPointF> points;   // ½âÎö×Ô path d µÄµã£¨±ä»»ºó£©
 };
 
-// å›è·¯ç±»å‹ï¼Œæ›¿ä»£ QStringï¼Œæ˜¾è‘—å‡å°å†…å­˜
 enum LineType
 {
     LineType_Virtual = 0,
     LineType_Logic   = 1,
     LineType_Optical = 2
 };
+enum CircuitType
+{
+	CircuitType_GSE = 0,
+	CircuitType_SV  = 1
+};
 
 enum LineStatus
 {
-	Status_Disconnected = 0,	// æ–­å¼€
-	Status_Connected = 1,		// è¿æ¥
-	Status_Alarm = 2			// å‘Šè­¦
+	Status_Disconnected = 0,	// ¶Ï¿ª
+	Status_Connected = 1,		// Á¬½Ó
+	Status_Alarm = 2			// ¸æ¾¯
 };
 
 struct MapLine
 {
 	QVector<QPointF> points;
-	LineType type; // ç±»å‹æ ‡è®°ï¼ˆè™š/é€»/å…‰ï¼‰
-	LineStyle style;					// çº¿æ¡æ ·å¼
-	QVector<ArrowHead> arrows;			// ç®­å¤´å¤šè¾¹å½¢
-	int svgGrpId;						// æ¥è‡ªç»„çš„ idï¼Œç”¨äºä¸è™šæ‹Ÿæ•°å€¼æ¡†å…³è”
-	QString code;						// ç»Ÿä¸€çš„çº¿è·¯ codeï¼ˆoptical: code; logic: circuit-code; virtual: code å¦‚æœ‰ï¼‰
-	LineStatus status;					// çº¿è·¯çŠ¶æ€
-	bool isBlinking;					// æ˜¯å¦é—ªçƒ
-	// æ˜¾å¼å›è·¯å±æ€§ï¼ˆæŒ‰ç±»å‹åˆ’åˆ†ï¼‰ï¼Œä»…ä¿ç•™ä¸€ç±»ï¼›ä½¿ç”¨å•ä¸€å¤šæ€æŒ‡é’ˆä»¥å‡å°å†…å­˜
+	LineType type; // ÀàĞÍ±ê¼Ç£¨Ğé/Âß/¹â£©
+	LineStyle style;					// ÏßÌõÑùÊ½
+	QVector<ArrowHead> arrows;			// ¼ıÍ·¶à±ßĞÎ
+	int svgGrpId;						// À´×Ô×éµÄ id£¬ÓÃÓÚÓëĞéÄâÊıÖµ¿ò¹ØÁª
+	QString code;						// Í³Ò»µÄÏßÂ· code£¨optical: code; logic: circuit-code; virtual: code ÈçÓĞ£©
+	LineStatus status;					// ÏßÂ·×´Ì¬
+	bool isBlinking;					// ÊÇ·ñÉÁË¸
+	// ÏÔÊ½»ØÂ·ÊôĞÔ£¨°´ÀàĞÍ»®·Ö£©£¬½ö±£ÁôÒ»Àà£»Ê¹ÓÃµ¥Ò»¶àÌ¬Ö¸ÕëÒÔ¼õĞ¡ÄÚ´æ
 	struct AttrBase { virtual ~AttrBase() {} };
 	struct OpticalAttrs : AttrBase {
 		QString srcIed;
 		QString destIed;
 		QString srcPort;
 		QString destPort;
-		QString code;       // ä¸ basemodel::OpticalCircuit::code å¯¹åº”ï¼ŒåŸä¸ºæ•°å€¼ï¼Œè¿™é‡Œä¿ç•™å­—ç¬¦ä¸²ï¼Œå¤–éƒ¨å¯å†è½¬
-		QString status;     // true/false
-		QString remoteId;   // åŸä¸ºæ•´æ•°
+		QString loopCode;	// »ØÂ·±àºÅ#ºó²¿·Ö£¬Í¬¹âÏË»ØÂ·LoopCodeÏàÍ¬
+		QString remoteId;   // Ô­ÎªÕûÊı
 		OpticalAttrs() {}
 	};
 	struct LogicAttrs : AttrBase {
@@ -129,21 +139,24 @@ struct MapLine
 		LogicAttrs() {}
 	};
 	struct VirtualAttrs : AttrBase {
+		QString srcSoftPlateCode;
+		QString destSoftPlateCode;
 		QString srcIedName;
 		QString destIedName;
 		QString srcSoftPlateDesc;
 		QString destSoftPlateDesc;
 		QString srcSoftPlateRef;
 		QString destSoftPlateRef;
+		QString circuitDesc;
 		QString remoteId;
 		QString remoteSigId_A;
 		QString remoteSigId_B;
-		QString virtualType; // virtual-type: gse/sv
+		CircuitType circuitType;
 		VirtualAttrs() {}
 	};
-	QSharedPointer<AttrBase> attrs; // ä»…åˆ†é…ä¸€ç§å±æ€§ç»“æ„
+	QSharedPointer<AttrBase> attrs; // ½ö·ÖÅäÒ»ÖÖÊôĞÔ½á¹¹
 
-	MapLine() : type(LineType_Virtual), svgGrpId(-1) {}
+	MapLine() : type(LineType_Virtual), svgGrpId(-1), status(Status_Connected) {}
 };
 
 static QVector<double> extractNumbers(const QString& d) {
@@ -176,7 +189,7 @@ class InteractiveSvgMapItem : public QGraphicsObject
 	Q_OBJECT
 public:
 	InteractiveSvgMapItem(const QString& svgPath);
-	// ä»å†…å­˜ SVG å­—èŠ‚æ„é€ ï¼ˆä¸æ–‡ä»¶ç‰ˆé€»è¾‘ä¸€è‡´ï¼‰
+	// ´ÓÄÚ´æ SVG ×Ö½Ú¹¹Ôì£¨ÓëÎÄ¼ş°æÂß¼­Ò»ÖÂ£©
 	InteractiveSvgMapItem(const QByteArray& svgBytes);
 
 	QRectF boundingRect() const;
@@ -184,20 +197,31 @@ public:
 
 	void setHighlightedLine(int idx);
 
-	// åŠ¨æ€è®¾ç½®æŸæ¡çº¿è·¯ï¼ˆæŒ‰ç»„ idï¼‰çš„å·¦å³è™šæ‹Ÿæ•°å€¼ï¼ˆdouble -> æ–‡æœ¬ï¼Œé»˜è®¤ä¿ç•™ 3 ä½å°æ•°ï¼‰
+	// ¶¯Ì¬ÉèÖÃÄ³ÌõÏßÂ·£¨°´×é id£©µÄ×óÓÒĞéÄâÊıÖµ£¨double -> ÎÄ±¾£¬Ä¬ÈÏ±£Áô 3 Î»Ğ¡Êı£©
 	void setVirtualValues(int lineId, double leftValue, double rightValue, int precision = 3);
-	// ä»…è®¾ç½®ä¸€ä¾§ï¼šisLeft=true è®¾ç½®å·¦ä¾§ï¼›false è®¾ç½®å³ä¾§
+	// ½öÉèÖÃÒ»²à£ºisLeft=true ÉèÖÃ×ó²à£»false ÉèÖÃÓÒ²à
 	void setVirtualValue(int lineId, bool isLeft, double value, int precision = 3);
-	// æŸ¥è¯¢è¯¥çº¿è·¯å¯¹åº”çš„å·¦å³æ–‡æœ¬æ¡†çŸ©å½¢ï¼Œè¿”å›æ˜¯å¦æ‰¾åˆ°
-	bool getVirtualValueRects(int lineId, QRectF& leftRect, QRectF& rightRect) const;
 
-	// åŸºäºçº¿è·¯ code çš„ä¾¿æ·æ¥å£ï¼š
-	// åŒæ—¶å°†å·¦å³æ–‡æœ¬è®¾ç½®ä¸ºåŒä¸€ä¸ªæ•°å€¼
-	void setVirtualValuesByCode(const QString& lineCode, double value, int precision = 3);
-	// ä»…è®¾ç½®å·¦ä¾§/å³ä¾§æ–‡æœ¬
-	void setLeftVirtualValue(const QString& lineCode, double value, int precision = 3);
-	void setRightVirtualValue(const QString& lineCode, double value, int precision = 3);
-
+	QMap<QString, int>& lineIdMapByType(CircuitType type)
+	{
+		return type == CircuitType_SV ? m_svLineIdByCode :
+			   type == CircuitType_GSE ? m_gseLineIdByCode :
+			m_svLineIdByCode;
+	}
+	void clearLineIdMap()
+	{
+		m_svLineIdByCode.clear();
+		m_gseLineIdByCode.clear();
+	}
+	// Í¬Ê±½«×óÓÒÎÄ±¾ÉèÖÃÎªÍ¬Ò»¸öÊıÖµ
+	void setVirtualValuesByCode(const MapLine& line, double value, int precision = 3);
+	// ½öÉèÖÃ×ó²à/ÓÒ²àÎÄ±¾
+	void setOutVirtualValue(const MapLine& line, double value, int precision = 3);
+	void setInVirtualValue(const MapLine& line, double value, int precision = 3);
+	void updatePlateStatuses();
+	void updateLineStatuses();
+	void UpdateOpticalCircuitStatus(MapLine& line);
+	void UpdateVirtualCircuitStatus(const MapLine& line);
 protected:
 	void hoverMoveEvent(QGraphicsSceneHoverEvent* event);
 	void hoverLeaveEvent(QGraphicsSceneHoverEvent* event);
@@ -210,6 +234,8 @@ protected:
 
 protected slots:
 	void onBlinkTimeout();
+	void onTooltipTimeout();
+	void onStatusTimeout();
 
 private:
 	void initCommon();
@@ -219,70 +245,93 @@ private:
 	void parseVirtualSvg(const pugi::xml_document& doc);
 	void parseLogicSvg(const pugi::xml_document& doc);
 	void parseOpticalSvg(const pugi::xml_document& doc);
-	// è§£æ type="virtual-value" çš„æ–‡æœ¬æ¡†ï¼ŒæŒ‰ç»„ id å½’å¹¶ä¸ºå·¦å³ä¸€å¯¹
+	// ½âÎö type="virtual-value" µÄÎÄ±¾¿ò£¬°´×é id ¹é²¢Îª×óÓÒÒ»¶Ô
 	void parseVirtualValueBoxes(const pugi::xml_document& doc);
-	// é€šç”¨å›è·¯ä¸ç®­å¤´è§£æ
+	// Í¨ÓÃ»ØÂ·Óë¼ıÍ·½âÎö
 	QVector<MapLine> parseCircuitLines(const pugi::xml_document& doc, const char* type);
 	QVector<ArrowHead> parseArrowHeadsForGroup(const pugi::xml_document& doc, const int grp_id);
-	// å°† SVG çš„å±æ€§é”®åè§„æ•´ä¸º basemodel å¯ç›´æ¥å¤ç”¨çš„é”®åï¼ˆå¹¶ä¿ç•™åŸå§‹é”®ï¼‰
+	// ½« SVG µÄÊôĞÔ¼üÃû¹æÕûÎª basemodel ¿ÉÖ±½Ó¸´ÓÃµÄ¼üÃû£¨²¢±£ÁôÔ­Ê¼¼ü£©
 	void normalizeAttrsForBaseModel(MapLine& line, const pugi::xml_node& g) const;
-	// æ ¹æ®å½“å‰å‹æ¿çŠ¶æ€ï¼Œå†³å®šå›è·¯çº¿æ¡é¢œè‰²
+	// ¸ù¾İµ±Ç°Ñ¹°å×´Ì¬£¬¾ö¶¨»ØÂ·ÏßÌõÑÕÉ«
 	QColor colorForLine(const MapLine& line) const;
-	// å‘½ä¸­æµ‹è¯•ï¼šè¿”å›ç‚¹å‡»å‘½ä¸­çš„å‹æ¿ç´¢å¼•ï¼Œæœªå‘½ä¸­è¿”å› -1
+	// ÃüÖĞ²âÊÔ£º·µ»Øµã»÷ÃüÖĞµÄÑ¹°åË÷Òı£¬Î´ÃüÖĞ·µ»Ø -1
 	int hitTestPlate(const QPointF& pos) const;
     void drawPlateIcon(QPainter* painter, const QPointF& center) const;
 	QString buildPlateTooltip(const PlateItem& plate) const;
 
-	/// è·³è½¬
+	/// Ìø×ª
 	void showOpticalRelatedCircuits(const MapLine& line);
 
-	/// ç»˜åˆ¶çº¿è·¯
+	/// »æÖÆÏßÂ·
 	void paintLine(QPainter* painter, const MapLine& line, bool isHighLight) const;
 
-	//// è§£æå‹æ¿ç›¸å…³ä¿¡æ¯
-	// è§£æsvgä¸­åœ†çš„è´å¡å°”è¿‘ä¼¼æè¿°
+	//// ½âÎöÑ¹°åÏà¹ØĞÅÏ¢
+	// ½âÎösvgÖĞÔ²µÄ±´Èû¶û½üËÆÃèÊö
 	QVector<PlateCircleItem> parsePlateCircles(const pugi::xml_node& plateCircleNode);
 	QVector<PlateLineItem> parsePlateLines(const pugi::xml_node& plateLineNode);
 	QVector<PlateRectItem> parsePlateRects(const pugi::xml_node& plateRectNode);
-	// ç»˜åˆ¶å‹æ¿çš„åœ†
+	// »æÖÆÑ¹°åµÄÔ²
 	void drawPlateCircles(QPainter* p, const QVector<PlateCircleItem>& cs);
-	// ç»˜åˆ¶å‹æ¿çš„çº¿
+	// »æÖÆÑ¹°åµÄÏß
 	void drawPlateLines(QPainter* p, const QVector<PlateLineItem>& ls);
-	// ç»˜åˆ¶å‹æ¿çš„çŸ©å½¢
+	// »æÖÆÑ¹°åµÄ¾ØĞÎ
 	void drawPlateRects(QPainter* p, const QVector<PlateRectItem>& rs);
 
-	// ç»˜åˆ¶å‹æ¿ï¼ˆä» paint ä¸­æŠ½ç¦»ï¼‰ï¼Œä¿è¯åœ¨å›è·¯ä¹‹åç»˜åˆ¶
+	// »æÖÆÑ¹°å£¨´Ó paint ÖĞ³éÀë£©£¬±£Ö¤ÔÚ»ØÂ·Ö®ºó»æÖÆ
 	void paintPlates(QPainter* painter);
 	void paintSinglePlate(QPainter* painter, const PlateItem& plate);
 	void paintVirtualValues(QPainter* painter);
-
 	void fitToViewIfPossible();
+	// ½âÎö½ÚµãµÄÍ¨ÓÃÑùÊ½ÊôĞÔ
+	SvgNodeStyle parseNodeStyle(const pugi::xml_node& node);
+	LineStyle parseLineStyle(const pugi::xml_node& node);
 
+	// ´´½¨ÏßÂ·ÃèÊö
+	QString buildLineTooltip(const MapLine& line) const;
+
+private:
+	enum HoverPart
+	{
+		Hover_None = 0,
+		Hover_Line = 1,
+		Hover_Plate = 2
+	};
+	HoverPart m_currentHoverPart;
 	QTimer* m_blinkTimer;
+	QTimer* m_statusTimer;
 	bool m_blinkOn;
 	QPixmap m_bgPixmap;
+	QByteArray m_svgCache;
+	QString m_svgSourcePath;
+	QSize m_baseRasterSize;
+	QSizeF m_itemSize;
+	double m_pixmapScaleFactor;
 	QVector<MapLine> m_allLines;
     QVector<PlateItem> m_allPlates;
 	QMap<QString, PlateItem*> m_plateMap; // plateRef -> PlateItem*
-	QMap<QString, int> m_lineIdByCode;    // çº¿è·¯ code -> ç»„ id
-	// æ¯æ¡çº¿è·¯ï¼ˆç»„ idï¼‰å¯¹åº”ä¸¤ä¾§æ•°å€¼æ¡†
+	QMap<QString, int> m_svLineIdByCode;    // ÏßÂ· code -> ×é id
+	QMap<QString, int> m_gseLineIdByCode;    // ÏßÂ· code -> ×é id
+	// Ã¿ÌõÏßÂ·£¨×é id£©¶ÔÓ¦Á½²àÊıÖµ¿ò
 	struct ValueBox { QRectF rect; QString text; };
-	struct ValuePair { bool hasLeft; bool hasRight; ValueBox left; ValueBox right; ValuePair():hasLeft(false),hasRight(false){} };
+	struct ValuePair { ValueBox out; ValueBox in; ValuePair() {} };
 	QMap<int, ValuePair> m_valuePairs; // lineId -> {left,right}
+	//QVector<ValueBox> m_circuitDescBoxes; // ÏßÂ·ÃèÊöÎÄ±¾¿ò
 	int m_highlightedLineIdx;
-	int m_hoverPlateIdx; // å½“å‰æ‚¬åœçš„å‹æ¿ç´¢å¼•ï¼Œ-1 è¡¨ç¤ºæ— 
+	int m_hoverPlateIdx; // µ±Ç°ĞüÍ£µÄÑ¹°åË÷Òı£¬-1 ±íÊ¾ÎŞ
 	bool m_dragging;
 	QPoint m_lastViewPos;
 	bool m_fittedOnce;
 	double m_minScale;
 	double m_maxScale;
-	LineType m_svgType;		// å½“å‰ SVG çš„ç±»å‹ï¼ˆè™š/é€»/å…‰ï¼‰ï¼Œç”¨äºèœå•é€»è¾‘
-	// å°†æ–‡æ¡£åæ ‡ç³»æ˜ å°„ä¸ºåƒç´ åæ ‡ç³»ï¼ˆå½“ viewBox.x/y é 0 æ—¶ç”¨äºæ•´ä½“å¹³ç§»ï¼‰
+	LineType m_svgType;		// µ±Ç° SVG µÄÀàĞÍ£¨Ğé/Âß/¹â£©£¬ÓÃÓÚ²Ëµ¥Âß¼­
+	// ½«ÎÄµµ×ø±êÏµÓ³ÉäÎªÏñËØ×ø±êÏµ£¨µ± viewBox.x/y ·Ç 0 Ê±ÓÃÓÚÕûÌåÆ½ÒÆ£©
 	QTransform m_docToPix;
-    // è§£æèŠ‚ç‚¹çš„é€šç”¨æ ·å¼å±æ€§
-    SvgNodeStyle parseNodeStyle(const pugi::xml_node& node);
-	LineStyle parseLineStyle(const pugi::xml_node& node);
+	QTimer* m_tooltipTimer;
+	QString m_tooltipText;
+	QPoint m_tooltipPos;
 	CircuitConfig* m_circuitConfig;
+	RtdbClient& m_rtdb;
+	//SecWidget* m_secWidget;
 };
 
 #endif // INTERACTIVESVGMAPITEM_H

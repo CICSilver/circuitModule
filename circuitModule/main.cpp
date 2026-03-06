@@ -1,12 +1,13 @@
-ï»¿#include "pugixml/pugixml.hpp"
+#include "pugixml/pugixml.hpp"
 #include "circuitconfig.h"
 #include "mainwindow.h"
 #include "math.h"
 #include "SvgTransformer.h"
 #include "basemodel.h"
 #include "InteractiveSvgItem.h"
+#include "directwidget.h"
 #include "RtdbClient.h"
-
+#include "../CircuitModuleApi.h"
 
 #include <QApplication>
 #include <QDir>
@@ -22,29 +23,33 @@
 #include <QGraphicsSvgItem>
 #include <QSvgRenderer>
 #include <QMouseEvent>
+
 #ifdef _WIN32
 #include <windows.h>
 #endif
 using std::string;
 
-// ç®€å•çš„ RTDB è¯»å–æµ‹è¯•ï¼šæ¼”ç¤ºå¦‚ä½•æ‰“å¼€å®æ—¶åº“å¹¶è¯»å–ä¸€ä¸ªæ¨¡æ‹Ÿé‡é€šé“
+// ¼òµ¥µÄ RTDB ¶ÁÈ¡²âÊÔ£ºÑİÊ¾ÈçºÎ´ò¿ªÊµÊ±¿â²¢¶ÁÈ¡Ò»¸öÄ£ÄâÁ¿Í¨µÀ
 static void RunRtdbReadTest()
 {
-	RtdbClient client;
-	// ä»¥åªè¯»æ–¹å¼æ‰“å¼€å®æ—¶åº“
-	if (!client.open(RTDB_OPEN_RO)) {
-		qWarning() << "RTDB open failed";
+	RtdbClient& client = RtdbClient::Instance();
+	// ÒÔÖ»¶Á·½Ê½´ò¿ªÊµÊ±¿â
+	if (!client.refresh()) {
+		qWarning() << "RTDB refresh failed";
 		return;
 	}
-
-	UINT64 code = 0x1060b0001; // ç¤ºä¾‹ç¼–ç 
-	const qulonglong kDemoAnalogCode = code;
-
-	double val = 0.0;
-	if (client.getAnalog(code, val, false)) {
-		qDebug() << QString::fromLocal8Bit("RTDB æ¨¡æ‹Ÿé‡è¯»å–æˆåŠŸ code=") << QString::number(code) << ", value=" << val;
-	} else {
-		qWarning() << QString::fromLocal8Bit("RTDB æ¨¡æ‹Ÿé‡è¯»å–å¤±è´¥ code=") << QString::number(code);
+	const CRtdbEleModelStation* station = client.stationModel();
+	foreach(CRtdbEleModelVoltLevel * pVoltLevel, station->m_listVoltLevel)
+	{
+		qDebug() << "[Volt Level] " << pVoltLevel->m_pVoltInfo->levelDesc;
+		foreach(CRtdbEleModelBay * pBay, pVoltLevel->m_listBay)
+		{
+			qDebug() << "\t[Bay] " << pBay->m_pBayInfo->bayName;
+			foreach(CRtdbEleModelIed * pIed, pBay->m_listIed)
+			{
+				qDebug() << "\t\t[IED] " << pIed->m_pIedHead->iedName;
+			}
+		}
 	}
 }
 
@@ -68,65 +73,84 @@ void showSingleSvg(const QString& svgPath) {
 	view->show();
 }
 
+void generateSvg()
+{
+	//SVG Éú³É
+	CircuitConfig* pCircuitConfig = CircuitConfig::Instance();
+	SvgTransformer transformer;
+	QList<QString> pathList;
+	pathList
+		<< QCoreApplication::applicationDirPath() + "/logic"
+		<< QCoreApplication::applicationDirPath() + "/optical"
+		<< QCoreApplication::applicationDirPath() + "/virtual";
+	// << QCoreApplication::applicationDirPath() + "/whole";		
+	foreach(QString path, pathList)
+	{
+		QDir dir(path);
+		if (!dir.exists())
+		{
+			dir.mkpath(path);
+		}
+	}
+	foreach(IED * pIed, pCircuitConfig->GetIedList())
+	{
+		QString path;
+		if (pIed->name.contains("SW"))
+			continue;
+		transformer.GenerateLogicSvg(pIed, pathList.at(0) + "/" + pIed->name + "_logic_circuit.svg");
+		transformer.GenerateOpticalSvg(pIed, pathList.at(1) + "/" + pIed->name + "_optical_circuit.svg");
+		transformer.GenerateVirtualSvg(pIed, pathList.at(2) + "/" + pIed->name + "_virtual_circuit.svg");
+		//transformer.GenerateWholeCircuitSvg(pIed, pathList.at(3) + "/" + pIed->name + "_whole_circuit.svg");
+	}
+	qDebug() << "SVG files generated successfully.";
+}
+
 int main(int argc, char* argv[]) {
 	QApplication app(argc, argv);
-	QString iedName = "IMT2201L1";
-	//QString scdPath = QCoreApplication::applicationDirPath() + "/scd_test.scd";
-	//QString configPath = QCoreApplication::applicationDirPath() + "/circuit_config.csv";
-	//QElapsedTimer timer;
-
-	CircuitConfig* pCircuitConfig = CircuitConfig::Instance();
-	pCircuitConfig->LoadCimeFile();
-	SvgTransformer transformer;
-	//transformer.GenerateSvgByIedName(iedName);
-
-	 //å®æ—¶åº“æµ‹è¯•
-	//RunRtdbReadTest();
-
-	// SVG ç”Ÿæˆ
-	//QList<QString> pathList;
-	//pathList
-	//	<< QCoreApplication::applicationDirPath() + "/logic"		
-	//	<< QCoreApplication::applicationDirPath() + "/optical"		
-	//	<< QCoreApplication::applicationDirPath() + "/virtual";	
-	//	// << QCoreApplication::applicationDirPath() + "/whole";		
-	//foreach(QString path, pathList)
-	//{
-	//	QDir dir(path);
-	//	if (!dir.exists())
-	//	{
-	//		dir.mkpath(path);
-	//	}
-	//}
-	//foreach(IED * pIed, pCircuitConfig->GetIedList())
-	//{
-	//	QString path;
-	//	if (pIed->name.contains("SW"))
-	//		continue;
-	//	transformer.GenerateLogicSvg(pIed, pathList.at(0) + "/" + pIed->name + "_logic_circuit.svg");
-	//	transformer.GenerateOpticalSvg(pIed, pathList.at(1) + "/" + pIed->name + "_optical_circuit.svg");
-	//	transformer.GenerateVirtualSvg(pIed, pathList.at(2) + "/" + pIed->name + "_virtual_circuit.svg");
-	//	//transformer.GenerateWholeCircuitSvg(pIed, pathList.at(3) + "/" + pIed->name + "_whole_circuit.svg");
-	//}
-	//qDebug() << "SVG files generated successfully.";
+	QString iedName = "MIB5012A";
 
 
-
-	//QString svgPath = QCoreApplication::applicationDirPath() + "/PT2202A_virtual_circuit.svg";
-	//showSingleSvg(svgPath);
-
-
-	QGraphicsScene* scene = new QGraphicsScene();
-	MainWindow mainWindow(true);
-	if (QGraphicsView* opticalView = mainWindow.findChild<QGraphicsView*>("opticalView")) {
-		opticalView->setScene(scene);
-		opticalView->setDragMode(QGraphicsView::NoDrag);
-		opticalView->setRenderHint(QPainter::Antialiasing);
-		opticalView->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
-		opticalView->setBackgroundBrush(Qt::black);
+	CircuitConfig* cfg = CircuitConfig::Instance();
+	if (!cfg->LoadRTDB()) {
+		qWarning() << "LoadRTDB failed";
 	}
-	mainWindow.show();
+	DirectWidget* testWidget = new DirectWidget(NULL);
+	SvgTransformer transformer;
 
-	
+	// Ğé»ØÂ·²âÊÔÈë¿Ú
+	VirtualSvg* vsvg = transformer.BuildVirtualModelByIedName(iedName);
+	if (vsvg) {
+		testWidget->ParseFromVirtualSvg(*vsvg);
+		delete vsvg;
+	}
+
+	//// ¹âÏËÁ´Â·²âÊÔÈë¿Ú
+	//OpticalSvg* osvg = transformer.BuildOpticalModelByIedName(iedName);
+	//if (osvg) {
+	//	testWidget->ParseFromOpticalSvg(*osvg);
+	//	delete osvg;
+	//}
+
+	//// Âß¼­Á´Â·²âÊÔÈë¿Ú
+	//LogicSvg* lsvg = transformer.BuildLogicModelByIedName(iedName);
+	//if (lsvg) {
+	//	testWidget->ParseFromLogicSvg(*lsvg);
+	//	delete lsvg;
+	//}
+
+	testWidget->resize(1200, 800);
+	testWidget->show();
+
+	//QGraphicsScene* scene = new QGraphicsScene();
+	//CircuitModuleWidget mainWindow(true);
+	//if (QGraphicsView* opticalView = mainWindow.findChild<QGraphicsView*>("opticalView")) {
+	//	opticalView->setScene(scene);
+	//	opticalView->setDragMode(QGraphicsView::NoDrag);
+	//	opticalView->setRenderHint(QPainter::Antialiasing);
+	//	opticalView->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
+	//	opticalView->setBackgroundBrush(Qt::black);
+	//}
+	//mainWindow.show();
+
 	return app.exec();
 }

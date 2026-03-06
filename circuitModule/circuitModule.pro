@@ -36,6 +36,8 @@ HEADERS += \
     SvgUtils.h \
     CircuitModuleApi.h \
     circuitmodule_global.h \
+    directitems.h \
+    directwidget.h \
     include/cime/cime.h \
     include/rtdb/rtdb_dll_def.h \
     include/rtdb/rtdb_dll.h \
@@ -56,6 +58,8 @@ SOURCES += \
     circuitconfig.cpp \
     InteractiveSvgItem.cpp \
     CircuitModuleApi.cpp \
+    directitems.cpp \
+    directwidget.cpp \
     mainwindow.cpp \
     RtdbClient.cpp \
     SvgTransformer.cpp \

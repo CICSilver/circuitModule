@@ -4,38 +4,15 @@
 #include "circuitconfig.h"
 
 #include <QApplication>
-#include <QCoreApplication>
-#include <QDir>
 #include <QMutex>
 #include <QMutexLocker>
-#include <QString>
 #include <QMessageBox>
+
 namespace
 {
-	CircuitModuleWidget* g_widget = nullptr;
+	CircuitModuleWidget* g_widget = 0;
 	QMutex g_mainWindowMutex;
-	bool g_useSvgBytes = false;
 	bool g_configLoaded = false;
-}
-
-static QString NormalizeCimeDirectory(const QString& directory)
-{
-	QString trimmed = directory.trimmed();
-	if (trimmed.isEmpty())
-	{
-		return QString();
-	}
-
-	QString cleaned = QDir::fromNativeSeparators(trimmed);
-	QDir dir(cleaned);
-	if (dir.isAbsolute())
-	{
-		return QDir::cleanPath(dir.absolutePath());
-	}
-
-	QDir base(QCoreApplication::applicationDirPath());
-	QString absolute = base.absoluteFilePath(cleaned);
-	return QDir::cleanPath(absolute);
 }
 
 static void ResetMainWindow()
@@ -47,7 +24,7 @@ static void ResetMainWindow()
 
 	g_widget->clear();
 	delete g_widget;
-	g_widget = nullptr;
+	g_widget = 0;
 }
 
 static bool EnsureCircuitConfigLoaded()
@@ -69,18 +46,11 @@ static bool EnsureCircuitConfigLoaded()
 
 static CircuitModuleWidget* EnsureMainWindow(bool useSvgBytes, QWidget* parent)
 {
+	Q_UNUSED(useSvgBytes);
+
 	if (!g_widget)
 	{
-		g_widget = new CircuitModuleWidget(useSvgBytes, parent);
-		g_useSvgBytes = useSvgBytes;
-		return g_widget;
-	}
-
-	if (g_useSvgBytes != useSvgBytes)
-	{
-		ResetMainWindow();
-		g_widget = new CircuitModuleWidget(useSvgBytes, parent);
-		g_useSvgBytes = useSvgBytes;
+		g_widget = new CircuitModuleWidget(parent);
 		return g_widget;
 	}
 
@@ -89,7 +59,6 @@ static CircuitModuleWidget* EnsureMainWindow(bool useSvgBytes, QWidget* parent)
 		g_widget->setParent(parent);
 	}
 
-	g_useSvgBytes = useSvgBytes;
 	return g_widget;
 }
 
@@ -97,11 +66,11 @@ extern "C" CIRCUITMODULE_API QWidget* CM_CreateModuleWidget(bool useSvgBytes, QW
 {
 	if (!QApplication::instance())
 	{
-		return nullptr;
+		return 0;
 	}
 	if (!EnsureCircuitConfigLoaded())
 	{
-		QMessageBox::critical(nullptr, QObject::tr("Error"), QObject::tr("ÊµÊ±¿â¶ÁÈ¡Ê§°Ü"));
+		QMessageBox::critical(0, QObject::tr("Error"), QObject::tr("RTDB load failed"));
 	}
 	QMutexLocker locker(&g_mainWindowMutex);
 	return EnsureMainWindow(useSvgBytes, parent);
@@ -125,6 +94,9 @@ extern "C" CIRCUITMODULE_API void CM_Destroy()
 
 CIRCUITMODULE_API bool CM_Refresh()
 {
-	g_widget->Refresh();
-	return true;
+	if (!g_widget)
+	{
+		return false;
+	}
+	return g_widget->Refresh();
 }

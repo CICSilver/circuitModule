@@ -302,10 +302,12 @@ private:
 	QVector<QPointF> m_points;
 	QPoint m_startPoint;
 	QPoint m_endPoint;
-	QString m_topPort;
-	QString m_bottomPort;
-	bool m_topIsSwitch;
-	bool m_bottomIsSwitch;
+	QString m_startPort;
+	QString m_endPort;
+	bool m_startIsSwitch;
+	bool m_endIsSwitch;
+	bool m_startAtTop;
+	bool m_endAtTop;
 	int m_underRectY;
 	quint8 m_arrowState;
 	quint16 m_lineCode;

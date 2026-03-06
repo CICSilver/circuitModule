@@ -1,9 +1,6 @@
 #include "mainwindow.h"
-#include "InteractiveSvgItem.h"
 #include "SvgTransformer.h"
-#include <QSvgRenderer>
-#include <QScrollBar>
-#include <QWheelEvent>
+#include "directwidget.h"
 #include <QCoreApplication>
 #include <QDir>
 #include <QDebug>
@@ -11,13 +8,77 @@
 #include <QStandardItem>
 #include <QMessageBox>
 #include <QVariant>
-#include <list>
+#include <QLayout>
+
+namespace
+{
+	enum TreeNodeType
+	{
+		TreeNodeType_Unknown = 0,
+		TreeNodeType_Station,
+		TreeNodeType_Bay,
+		TreeNodeType_Ied
+	};
+
+	const int TREE_NODE_TYPE_ROLE = Qt::UserRole + 1;
+}
+
+static DirectWidget* CreateDirectWidget(QWidget* containerWidget, QWidget* placeholderWidget, const char* objectName)
+{
+	if (!containerWidget)
+	{
+		return NULL;
+	}
+
+	QLayout* layout = containerWidget->layout();
+	DirectWidget* directWidget = new DirectWidget(containerWidget);
+	directWidget->setObjectName(objectName);
+
+	if (placeholderWidget)
+	{
+		if (layout)
+		{
+			layout->removeWidget(placeholderWidget);
+		}
+		placeholderWidget->hide();
+	}
+
+	if (layout)
+	{
+		layout->addWidget(directWidget);
+	}
+	else
+	{
+		directWidget->setGeometry(containerWidget->rect());
+	}
+	return directWidget;
+}
+
+static void ReleaseDirectWidget(QWidget* containerWidget, DirectWidget*& directWidget)
+{
+	if (!directWidget)
+	{
+		return;
+	}
+
+	QLayout* layout = containerWidget ? containerWidget->layout() : NULL;
+	if (layout)
+	{
+		layout->removeWidget(directWidget);
+	}
+	delete directWidget;
+	directWidget = NULL;
+}
+
 CircuitModuleWidget::CircuitModuleWidget(QWidget *parent)
 	: QWidget(parent)
 	, m_circuitConfig(CircuitConfig::Instance())
 	, m_iedListModel(new QStringListModel(this))
 	, m_stationModel(new QStandardItemModel(this))
 	, m_useSvgBytes(false)
+	, m_directLogicWidget(NULL)
+	, m_directOpticalWidget(NULL)
+	, m_directVirtualWidget(NULL)
 {
 	InitializeWindow();
 }
@@ -28,6 +89,9 @@ CircuitModuleWidget::CircuitModuleWidget(bool useSvgBytes, QWidget* parent)
 	, m_iedListModel(new QStringListModel(this))
 	, m_stationModel(new QStandardItemModel(this))
 	, m_useSvgBytes(useSvgBytes)
+	, m_directLogicWidget(NULL)
+	, m_directOpticalWidget(NULL)
+	, m_directVirtualWidget(NULL)
 {
 	InitializeWindow();
 }
@@ -39,17 +103,10 @@ void CircuitModuleWidget::InitializeWindow()
 {
 	ui.setupUi(this);
 	setObjectName("MainWindow");
+	InitializeDirectWidgets();
 	UpdateConnectionData();
 
 	this->resize(1920, 1080);
-
-	ui.logicView->viewport()->installEventFilter(this);
-	ui.opticalView->viewport()->installEventFilter(this);
-	ui.wholeView->viewport()->installEventFilter(this);
-
-	ui.logicView->setFocusPolicy(Qt::WheelFocus);
-	ui.opticalView->setFocusPolicy(Qt::WheelFocus);
-	ui.wholeView->setFocusPolicy(Qt::WheelFocus);
 
 	connect(ui.stationTree, SIGNAL(clicked(const QModelIndex&)), this, SLOT(onStationTreeItemClicked(const QModelIndex&)));
 }
@@ -58,10 +115,7 @@ void CircuitModuleWidget::clear()
 {
 	ui.stationTree->setModel(NULL);
 	m_stationModel->clear();
-	m_svgByteCache.clear();
-	ui.logicView->setScene(NULL);
-	ui.opticalView->setScene(NULL);
-	ui.wholeView->setScene(NULL);
+	ResetDirectWidgets();
 }
 
 bool CircuitModuleWidget::UpdateConnectionData()
@@ -71,12 +125,10 @@ bool CircuitModuleWidget::UpdateConnectionData()
 	ui.stationTree->setModel(m_stationModel);
 
 #ifdef _BUILD_IN_EXE
-	// 仅在打包成单文件时使用
-	// 打包为动态库时，实时库加载由接口部分实现
 	m_circuitConfig->Clear();
 	if (!m_circuitConfig->LoadRTDB())
 	{
-		QMessageBox::warning(this, QString::fromLocal8Bit("提示"), QString::fromLocal8Bit("实时库加载失败"));
+		QMessageBox::warning(this, QString("Warning"), QString("RTDB load failed"));
 		return false;
 	}
 #endif
@@ -96,7 +148,7 @@ bool CircuitModuleWidget::Refresh()
 {
 	if (!m_circuitConfig->LoadRTDB())
 	{
-		QMessageBox::warning(this, QString::fromLocal8Bit("提示"), QString::fromLocal8Bit("实时库刷新失败"));
+		QMessageBox::warning(this, QString("Warning"), QString("RTDB refresh failed"));
 		return false;
 	}
 	return true;
@@ -129,52 +181,14 @@ void CircuitModuleWidget::InitView()
 
 void CircuitModuleWidget::InitSvg()
 {
-	if (!m_useSvgBytes)
-	{
-		return;
-	}
-
-	m_svgByteCache.clear();
-
-	SvgTransformer transformer;
-	const QList<IED*> iedList = m_circuitConfig->GetIedList();
-	foreach(IED* pIed ,iedList)
-	{
-		if (!pIed)
-		{
-			continue;
-		}
-
-		const QString iedName = pIed->name.trimmed();
-		if (iedName.isEmpty())
-		{
-			continue;
-		}
-
-		if (iedName.contains("SW", Qt::CaseInsensitive))
-		{
-			continue;
-		}
-
-		if (m_svgByteCache.contains(iedName))
-		{
-			continue;
-		}
-
-		SvgByteData data;
-		data.logic = transformer.GenerateLogicSvgBytes(iedName);
-		data.optical = transformer.GenerateOpticalSvgBytes(iedName);
-		data.virtualCircuit = transformer.GenerateVirtualSvgBytes(iedName);
-		m_svgByteCache.insert(iedName, data);
-	}
 }
-
 
 bool CircuitModuleWidget::eventFilter(QObject* watched, QEvent* event)
 {
-	if (event->type() == QEvent::Wheel) {
-			return false;
-		//}
+	Q_UNUSED(watched);
+	if (event->type() == QEvent::Wheel)
+	{
+		return false;
 	}
 	return QWidget::eventFilter(watched, event);
 }
@@ -183,17 +197,17 @@ void CircuitModuleWidget::InitTree()
 {
 	ui.stationTree->setEditTriggers(QAbstractItemView::NoEditTriggers);
 	m_stationModel->clear();
-	m_stationModel->setHorizontalHeaderLabels(QStringList() << QString::fromLocal8Bit("变电站"));
+	m_stationModel->setHorizontalHeaderLabels(QStringList() << QString("Station"));
 	ui.stationTree->setModel(m_stationModel);
 
 	const CRtdbEleModelStation* station = m_circuitConfig->StationModel();
 	if (!station)
 	{
-		QMessageBox::warning(this, QString::fromLocal8Bit("提示"), QString::fromLocal8Bit("未找到变电站模型"));
+		QMessageBox::warning(this, QString("Warning"), QString("Station model not found"));
 		return;
 	}
 
-	QString stationName = QString::fromLocal8Bit("变电站");
+	QString stationName = QString("Station");
 	if (station->m_pStationInfo && station->m_pStationInfo->stationDesc[0] != '\0')
 	{
 		stationName = QString::fromLocal8Bit(station->m_pStationInfo->stationDesc);
@@ -201,6 +215,8 @@ void CircuitModuleWidget::InitTree()
 
 	QStandardItem* stationItem = new QStandardItem(stationName);
 	stationItem->setEditable(false);
+	stationItem->setData(stationName, Qt::UserRole);
+	stationItem->setData(TreeNodeType_Station, TREE_NODE_TYPE_ROLE);
 	m_stationModel->appendRow(stationItem);
 
 	QStringList iedNameList;
@@ -214,7 +230,7 @@ void CircuitModuleWidget::InitTree()
 			continue;
 		}
 
-		QString voltText = QString::fromLocal8Bit("电压等级");
+		QString voltText = QString("Level");
 		if (volt->m_pVoltInfo)
 		{
 			if (volt->m_pVoltInfo->levelDesc[0] != '\0')
@@ -227,7 +243,7 @@ void CircuitModuleWidget::InitTree()
 			}
 			else if (volt->m_pVoltInfo->volt != 0)
 			{
-				voltText = QString::number(volt->m_pVoltInfo->volt) + QString::fromLocal8Bit("kV");
+				voltText = QString::number(volt->m_pVoltInfo->volt) + QString("kV");
 			}
 		}
 
@@ -244,9 +260,14 @@ void CircuitModuleWidget::InitTree()
 				continue;
 			}
 
-			QString bayText = QString::fromLocal8Bit("间隔");
+			QString bayText = QString("Bay");
+			QString bayName = bayText;
 			if (bay->m_pBayInfo)
 			{
+				if (bay->m_pBayInfo->bayName[0] != '\0')
+				{
+					bayName = QString::fromLocal8Bit(bay->m_pBayInfo->bayName);
+				}
 				if (bay->m_pBayInfo->bayDesc[0] != '\0')
 				{
 					bayText = QString::fromLocal8Bit(bay->m_pBayInfo->bayDesc);
@@ -259,6 +280,8 @@ void CircuitModuleWidget::InitTree()
 
 			QStandardItem* bayItem = new QStandardItem(bayText);
 			bayItem->setEditable(false);
+			bayItem->setData(bayName, Qt::UserRole);
+			bayItem->setData(TreeNodeType_Bay, TREE_NODE_TYPE_ROLE);
 			voltItem->appendRow(bayItem);
 
 			for (std::list<CRtdbEleModelIed*>::const_iterator iedIt = bay->m_listIed.begin();
@@ -291,6 +314,7 @@ void CircuitModuleWidget::InitTree()
 				QStandardItem* iedItem = new QStandardItem(iedName);
 				iedItem->setEditable(false);
 				iedItem->setData(iedName, Qt::UserRole);
+				iedItem->setData(TreeNodeType_Ied, TREE_NODE_TYPE_ROLE);
 				bayItem->appendRow(iedItem);
 				iedNameList << iedName;
 			}
@@ -316,8 +340,29 @@ void CircuitModuleWidget::onStationTreeItemClicked(const QModelIndex& index)
 		return;
 	}
 
-	const QString iedName = data.toString();
-	DisplayIed(iedName);
+	const int nodeType = index.data(TREE_NODE_TYPE_ROLE).toInt();
+	const QString nodeKey = data.toString();
+	if (nodeType == TreeNodeType_Station)
+	{
+		DisplayStationOptical();
+		ReleaseDirectWidget(ui.tab, m_directLogicWidget);
+		m_directLogicWidget = CreateDirectWidget(ui.tab, ui.logicView, "directLogicWidget");
+		ReleaseDirectWidget(ui.tab_3, m_directVirtualWidget);
+		m_directVirtualWidget = CreateDirectWidget(ui.tab_3, ui.wholeView, "directVirtualWidget");
+		ui.tabWidget->setCurrentWidget(ui.tab_2);
+		return;
+	}
+	if (nodeType == TreeNodeType_Bay)
+	{
+		DisplayBayOptical(nodeKey);
+		ReleaseDirectWidget(ui.tab, m_directLogicWidget);
+		m_directLogicWidget = CreateDirectWidget(ui.tab, ui.logicView, "directLogicWidget");
+		ReleaseDirectWidget(ui.tab_3, m_directVirtualWidget);
+		m_directVirtualWidget = CreateDirectWidget(ui.tab_3, ui.wholeView, "directVirtualWidget");
+		ui.tabWidget->setCurrentWidget(ui.tab_2);
+		return;
+	}
+	DisplayIed(nodeKey);
 }
 
 void CircuitModuleWidget::DisplayIed(const QString& iedName)
@@ -328,83 +373,133 @@ void CircuitModuleWidget::DisplayIed(const QString& iedName)
 		return;
 	}
 
-	if (!m_useSvgBytes)
+	DisplayLogicIed(key);
+	DisplayOpticalIed(key);
+	DisplayVirtualIed(key);
+}
+
+void CircuitModuleWidget::InitializeDirectWidgets()
+{
+	if (!m_directLogicWidget)
 	{
-		InitInteractiveView(ui.logicView,   logicSvgPath(key));
-		InitInteractiveView(ui.opticalView, opticalSvgPath(key));
-		InitInteractiveView(ui.wholeView,   virtualSvgPath(key));
+		m_directLogicWidget = CreateDirectWidget(ui.tab, ui.logicView, "directLogicWidget");
+	}
+	if (!m_directOpticalWidget)
+	{
+		m_directOpticalWidget = CreateDirectWidget(ui.tab_2, ui.opticalView, "directOpticalWidget");
+	}
+	if (!m_directVirtualWidget)
+	{
+		m_directVirtualWidget = CreateDirectWidget(ui.tab_3, ui.wholeView, "directVirtualWidget");
+	}
+}
+
+void CircuitModuleWidget::ResetDirectWidgets()
+{
+	ReleaseDirectWidget(ui.tab, m_directLogicWidget);
+	ReleaseDirectWidget(ui.tab_2, m_directOpticalWidget);
+	ReleaseDirectWidget(ui.tab_3, m_directVirtualWidget);
+	InitializeDirectWidgets();
+}
+
+void CircuitModuleWidget::DisplayLogicIed(const QString& iedName)
+{
+	if (!m_directLogicWidget)
+	{
+		InitializeDirectWidgets();
+	}
+
+	SvgTransformer transformer;
+	LogicSvg* logicSvg = transformer.BuildLogicModelByIedName(iedName);
+	if (!logicSvg)
+	{
+		ReleaseDirectWidget(ui.tab, m_directLogicWidget);
+		m_directLogicWidget = CreateDirectWidget(ui.tab, ui.logicView, "directLogicWidget");
 		return;
 	}
 
-	SvgByteData data;
-	const QHash<QString, SvgByteData>::const_iterator cacheIt = m_svgByteCache.constFind(key);
-	if (cacheIt != m_svgByteCache.constEnd())
-	{
-		data = *cacheIt;
-	}
-	else
-	{
-		SvgTransformer transformer;
-		data.logic = transformer.GenerateLogicSvgBytes(key);
-		data.optical = transformer.GenerateOpticalSvgBytes(key);
-		data.virtualCircuit = transformer.GenerateVirtualSvgBytes(key);
-		m_svgByteCache.insert(key, data);
-	}
-
-	if (!data.logic.isEmpty())
-	{
-		InitInteractiveView(ui.logicView, data.logic);
-	}
-	else
-	{
-		clearView(ui.logicView);
-	}
-
-	if (!data.optical.isEmpty())
-	{
-		InitInteractiveView(ui.opticalView, data.optical);
-	}
-	else
-	{
-		clearView(ui.opticalView);
-	}
-
-	if (!data.virtualCircuit.isEmpty())
-	{
-		InitInteractiveView(ui.wholeView, data.virtualCircuit);
-	}
-	else
-	{
-		clearView(ui.wholeView);
-	}
+	m_directLogicWidget->ParseFromLogicSvg(*logicSvg);
+	delete logicSvg;
 }
 
-void CircuitModuleWidget::clearView(QGraphicsView* view)
+void CircuitModuleWidget::DisplayOpticalIed(const QString& iedName)
 {
-	if (!view)
+	if (!m_directOpticalWidget)
 	{
+		InitializeDirectWidgets();
+	}
+
+	SvgTransformer transformer;
+	OpticalSvg* opticalSvg = transformer.BuildOpticalModelByIedName(iedName);
+	if (!opticalSvg)
+	{
+		ReleaseDirectWidget(ui.tab_2, m_directOpticalWidget);
+		m_directOpticalWidget = CreateDirectWidget(ui.tab_2, ui.opticalView, "directOpticalWidget");
 		return;
 	}
-	QGraphicsScene* scene = view->scene();
-	if (scene)
+
+	m_directOpticalWidget->ParseFromOpticalSvg(*opticalSvg);
+	delete opticalSvg;
+}
+
+void CircuitModuleWidget::DisplayVirtualIed(const QString& iedName)
+{
+	if (!m_directVirtualWidget)
 	{
-		view->setScene(NULL);
-		scene->deleteLater();
+		InitializeDirectWidgets();
 	}
+
+	SvgTransformer transformer;
+	VirtualSvg* virtualSvg = transformer.BuildVirtualModelByIedName(iedName);
+	if (!virtualSvg)
+	{
+		ReleaseDirectWidget(ui.tab_3, m_directVirtualWidget);
+		m_directVirtualWidget = CreateDirectWidget(ui.tab_3, ui.wholeView, "directVirtualWidget");
+		return;
+	}
+
+	m_directVirtualWidget->ParseFromVirtualSvg(*virtualSvg);
+	delete virtualSvg;
 }
 
+void CircuitModuleWidget::DisplayStationOptical()
+{
+	if (!m_directOpticalWidget)
+	{
+		InitializeDirectWidgets();
+	}
 
-void CircuitModuleWidget::InitInteractiveView(QGraphicsView* view, const QString& svgPath)
-{
-	if (!view) return;
-	InteractiveSvgMapItem* item = new InteractiveSvgMapItem(svgPath);
-	SetupInteractiveView(view, item);
+	SvgTransformer transformer;
+	OpticalSvg* opticalSvg = transformer.BuildOpticalModelByStation();
+	if (!opticalSvg)
+	{
+		ReleaseDirectWidget(ui.tab_2, m_directOpticalWidget);
+		m_directOpticalWidget = CreateDirectWidget(ui.tab_2, ui.opticalView, "directOpticalWidget");
+		return;
+	}
+
+	m_directOpticalWidget->ParseFromOpticalSvg(*opticalSvg);
+	delete opticalSvg;
 }
-void CircuitModuleWidget::InitInteractiveView(QGraphicsView* view, const QByteArray& svgBytes)
+
+void CircuitModuleWidget::DisplayBayOptical(const QString& bayName)
 {
-	if (!view) return;
-	InteractiveSvgMapItem* item = new InteractiveSvgMapItem(svgBytes);
-	SetupInteractiveView(view, item);
+	if (!m_directOpticalWidget)
+	{
+		InitializeDirectWidgets();
+	}
+
+	SvgTransformer transformer;
+	OpticalSvg* opticalSvg = transformer.BuildOpticalModelByBayName(bayName);
+	if (!opticalSvg)
+	{
+		ReleaseDirectWidget(ui.tab_2, m_directOpticalWidget);
+		m_directOpticalWidget = CreateDirectWidget(ui.tab_2, ui.opticalView, "directOpticalWidget");
+		return;
+	}
+
+	m_directOpticalWidget->ParseFromOpticalSvg(*opticalSvg);
+	delete opticalSvg;
 }
 
 bool CircuitModuleWidget::InitializeCircuitData(const QString& cimeDirectory)
@@ -426,27 +521,3 @@ bool CircuitModuleWidget::InitializeCircuitData(const QString& cimeDirectory)
 	m_circuitConfig->Clear();
 	return m_circuitConfig->LoadCimeFile(targetPath);
 }
-
-void CircuitModuleWidget::SetupInteractiveView(QGraphicsView* view, InteractiveSvgMapItem* item)
-{
-	if (!view || !item) return;
-	QGraphicsScene* old = view->scene();
-	if (old) {
-		view->setScene(NULL);
-		old->deleteLater();
-	}
-
-	QGraphicsScene* scene = new QGraphicsScene(view);
-	scene->addItem(item);
-	scene->setSceneRect(item->boundingRect());
-	view->setScene(scene);
-	view->setRenderHint(QPainter::Antialiasing);
-	view->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
-	view->setBackgroundBrush(Qt::black);
-	view->setDragMode(QGraphicsView::NoDrag); // 由 Item 自己通过滚动条实现平移
-	view->resetTransform(); // 初始缩放为 1.0
-	if (view->verticalScrollBar()) view->verticalScrollBar()->setValue(0);
-	if (view->horizontalScrollBar()) view->horizontalScrollBar()->setValue(0);
-}
-
-

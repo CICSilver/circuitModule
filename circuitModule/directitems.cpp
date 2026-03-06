@@ -93,9 +93,9 @@ static QPoint direct_get_arrow_pt(const QPoint& pt, int arrowLen, int conn_r, do
 	return QPoint(pt.x() + direction * totalOffset * cos(rad), pt.y() - direction * totalOffset * sin(rad));
 }
 
-static void direct_draw_port_text(QPainter* painter, const QPoint& startPoint, const QPoint& endPoint, bool topIsSwitch, bool bottomIsSwitch, const QString& topPort, const QString& bottomPort, int conn_r)
+static void direct_draw_single_port_text(QPainter* painter, const QPoint& connPoint, bool isTopSide, bool isSwitch, const QString& port, int conn_r)
 {
-	if (topPort.isEmpty() && bottomPort.isEmpty()) return;
+	if (port.isEmpty()) return;
 	int offset = conn_r * 2 + 10;
 	QPen pen;
 	pen.setColor(Qt::white);
@@ -103,21 +103,40 @@ static void direct_draw_port_text(QPainter* painter, const QPoint& startPoint, c
 	font.setPointSize(12);
 	painter->setPen(pen);
 	painter->setFont(font);
-	QPoint topPoint = startPoint.y() < endPoint.y() ? startPoint : endPoint;
-	QPoint bottomPoint = startPoint.y() < endPoint.y() ? endPoint : startPoint;
-	int topPtY = topIsSwitch ? topPoint.y() - offset : topPoint.y() + offset;
-	int bottomPtY = bottomIsSwitch ? bottomPoint.y() + offset : bottomPoint.y() - offset;
+	int portPtY = 0;
+	if (isTopSide)
+	{
+		portPtY = isSwitch ? connPoint.y() - offset : connPoint.y() + offset;
+	}
+	else
+	{
+		portPtY = isSwitch ? connPoint.y() + offset : connPoint.y() - offset;
+	}
 	QFontMetrics fm(painter->font());
-	int topWidth = fm.width(topPort);
-	int bottomWidth = fm.width(bottomPort);
-	QPoint topPort_lt_pt(topPoint.x() - topWidth / 2, topPtY - 5);
-	QPoint topPort_rb_pt(topPoint.x() + topWidth / 2, topPtY + fm.height());
-	QPoint bottomPort_lt_pt(bottomPoint.x() - bottomWidth / 2, bottomPtY - 5);
-	QPoint bottomPort_rb_pt(bottomPoint.x() + bottomWidth / 2, bottomPtY + fm.height());
-	painter->drawText(QRect(topPort_lt_pt, topPort_rb_pt), topPort);
-	painter->drawText(QRect(bottomPort_lt_pt, bottomPort_rb_pt), bottomPort);
+	int textWidth = fm.width(port);
+	QPoint port_lt_pt(connPoint.x() - textWidth / 2, portPtY - 5);
+	QPoint port_rb_pt(connPoint.x() + textWidth / 2, portPtY + fm.height());
+	painter->drawText(QRect(port_lt_pt, port_rb_pt), port);
 }
 
+static bool direct_is_top_anchor(const QPoint& point, const IedRect* rect)
+{
+	if (!rect)
+	{
+		return true;
+	}
+	int topDistance = qAbs(point.y() - (int)rect->y);
+	int bottomDistance = qAbs(point.y() - (int)(rect->y + rect->height));
+	return topDistance <= bottomDistance;
+}
+
+static void direct_draw_port_text(QPainter* painter, const QPoint& startPoint, const QPoint& endPoint,
+	bool startAtTop, bool endAtTop, bool startIsSwitch, bool endIsSwitch,
+	const QString& startPort, const QString& endPort, int conn_r)
+{
+	direct_draw_single_port_text(painter, startPoint, startAtTop, startIsSwitch, startPort, conn_r);
+	direct_draw_single_port_text(painter, endPoint, endAtTop, endIsSwitch, endPort, conn_r);
+}
 
 
 IedItem::IedItem(QGraphicsItem* parent)
@@ -589,8 +608,10 @@ void DirectVirtualLineItem::setValueVisible(bool visible)
 }
 
 DirectOpticalLineItem::DirectOpticalLineItem(QGraphicsItem* parent)
-	: m_topIsSwitch(false)
-	, m_bottomIsSwitch(false)
+	: m_startIsSwitch(false)
+	, m_endIsSwitch(false)
+	, m_startAtTop(true)
+	, m_endAtTop(false)
 	, m_underRectY(0)
 	, m_arrowState(Arrow_None)
 	, m_lineCode(0)
@@ -643,8 +664,8 @@ void DirectOpticalLineItem::paint(QPainter* painter, const QStyleOptionGraphicsI
 	painter->drawPolyline(poly);
 	QPoint upPoint = m_startPoint.y() < m_endPoint.y() ? m_startPoint : m_endPoint;
 	QPoint downPoint = m_startPoint.y() < m_endPoint.y() ? m_endPoint : m_startPoint;
-	direct_draw_conn_circle(painter, upPoint, CONN_R, true);
-	direct_draw_conn_circle(painter, downPoint, CONN_R, false);
+	direct_draw_conn_circle(painter, m_startPoint, CONN_R, m_startAtTop);
+	direct_draw_conn_circle(painter, m_endPoint, CONN_R, m_endAtTop);
 	int underRectY = m_underRectY > 0 ? m_underRectY : (upPoint.y() > downPoint.y() ? upPoint.y() : downPoint.y());
 	double outAngle = -90;
 	double inAngle = 90;
@@ -660,7 +681,8 @@ void DirectOpticalLineItem::paint(QPainter* painter, const QStyleOptionGraphicsI
 		QPoint pt2 = direct_get_arrow_pt(downPoint, ARROW_LEN, CONN_R, inAngle, downPoint.y() > underRectY, 0);
 		direct_draw_arrow_outline(painter, pt2, inAngle, m_lineColor, ARROW_LEN, w);
 	}
-	direct_draw_port_text(painter, m_startPoint, m_endPoint, m_topIsSwitch, m_bottomIsSwitch, m_topPort, m_bottomPort, CONN_R);
+	direct_draw_port_text(painter, m_startPoint, m_endPoint, m_startAtTop, m_endAtTop,
+		m_startIsSwitch, m_endIsSwitch, m_startPort, m_endPort, CONN_R);
 }
 
 void DirectOpticalLineItem::hoverEnterEvent(QGraphicsSceneHoverEvent* event)
@@ -706,19 +728,21 @@ void DirectOpticalLineItem::setFromOpticalLine(const OpticalCircuitLine& line)
 	m_endPoint = line.endPoint;
 	m_arrowState = line.arrowState;
 	m_lineCode = line.lineCode;
-	m_topPort.clear();
-	m_bottomPort.clear();
-	m_topIsSwitch = false;
-	m_bottomIsSwitch = false;
+	m_startPort.clear();
+	m_endPort.clear();
+	m_startIsSwitch = false;
+	m_endIsSwitch = false;
+	m_startAtTop = true;
+	m_endAtTop = false;
 	m_underRectY = 0;
 	if (line.pSrcRect && line.pDestRect && line.pOpticalCircuit) {
-		IedRect* topRect = line.pSrcRect->y < line.pDestRect->y ? line.pSrcRect : line.pDestRect;
-		IedRect* bottomRect = line.pSrcRect->y < line.pDestRect->y ? line.pDestRect : line.pSrcRect;
-		m_topIsSwitch = topRect->iedName.contains("SW");
-		m_bottomIsSwitch = bottomRect->iedName.contains("SW");
+		m_startIsSwitch = line.pSrcRect->iedName.contains("SW");
+		m_endIsSwitch = line.pDestRect->iedName.contains("SW");
 		m_underRectY = line.pSrcRect->y > line.pDestRect->y ? line.pSrcRect->y : line.pDestRect->y;
-		m_topPort = line.pSrcRect->y > line.pDestRect->y ? line.pOpticalCircuit->destIedPort : line.pOpticalCircuit->srcIedPort;
-		m_bottomPort = line.pSrcRect->y > line.pDestRect->y ? line.pOpticalCircuit->srcIedPort : line.pOpticalCircuit->destIedPort;
+		m_startPort = line.pOpticalCircuit->srcIedPort;
+		m_endPort = line.pOpticalCircuit->destIedPort;
+		m_startAtTop = direct_is_top_anchor(line.startPoint, line.pSrcRect);
+		m_endAtTop = direct_is_top_anchor(line.endPoint, line.pDestRect);
 	}
 	update();
 }

@@ -475,6 +475,7 @@ void CircuitConfig::Clear()
 	m_dataList.clear();
 	qDeleteAll(m_virtualCircuitList);
 	m_virtualCircuitList.clear();
+	m_opticalVirtualCircuitHash.clear();
 	qDeleteAll(m_opticalCircuitList);
 	m_opticalCircuitList.clear();
 	qDeleteAll(m_logicCircuitList);

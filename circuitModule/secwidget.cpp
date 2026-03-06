@@ -14,7 +14,7 @@ SecWidget::SecWidget(QWidget *parent)
 	, m_view(new QGraphicsView(this))
 	, m_scene(new QGraphicsScene(this))
 {
-	setWindowTitle(tr("IED回路"));
+	setWindowTitle(tr("IED��·"));
 	//setAttribute(Qt::WA_DeleteOnClose, true);
 
 	m_view->setScene(m_scene);
@@ -43,8 +43,8 @@ void SecWidget::displayCircuit(const QString& srcIed, const QString& destIed)
 	}
 
 	m_scene->clear();
-	const QString label = tr("IED回路: %1 ⇄ %2").arg(srcIed.isEmpty() ? tr("未知") : srcIed,
-		destIed.isEmpty() ? tr("未知") : destIed);
+	const QString label = tr("IED��·: %1 - %2").arg(srcIed.isEmpty() ? tr("δ֪") : srcIed,
+		destIed.isEmpty() ? tr("δ֪") : destIed);
 	QGraphicsTextItem* textItem = m_scene->addText(label, QFont("Microsoft YaHei", 16, QFont::Bold));
 	textItem->setDefaultTextColor(Qt::white);
 	textItem->setPos(20, 20);

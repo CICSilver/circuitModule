@@ -129,6 +129,8 @@ public:
 	// 返回值:	OpticalSvg*
 	//************************************
 	OpticalSvg* BuildOpticalModelByIedName(const QString& iedName);
+	OpticalSvg* BuildOpticalModelByStation();
+	OpticalSvg* BuildOpticalModelByBayName(const QString& bayName);
 	//************************************
 	// 函数名称:	BuildVirtualModelByIedName
 	// 函数全名:	SvgTransformer::BuildVirtualModelByIedName

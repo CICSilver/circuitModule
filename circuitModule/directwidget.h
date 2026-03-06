@@ -3,6 +3,7 @@
 #include <QWidget>
 #include <QMap>
 #include <QVector>
+#include <QSet>
 #include <QTimer>
 #include <QGraphicsView>
 #include <QMouseEvent>
@@ -16,6 +17,8 @@ class QGraphicsScene;
 class QGraphicsView;
 class DirectView : public QGraphicsView
 {
+	Q_OBJECT
+
 public:
 	//************************************
 	// 函数名称:	DirectView
@@ -84,9 +87,14 @@ protected:
 	//************************************
 	void mouseDoubleClickEvent(QMouseEvent* event);
 
+signals:
+	void opticalLineClicked(quint64 opticalCode);
+
 private:
 	bool m_dragging;
+	bool m_leftPressed;
 	QPoint m_lastViewPos;
+	QPoint m_pressPos;
 };
 
 class ItemRegistry
@@ -106,6 +114,7 @@ public:
 	void ParseFromOpticalSvg(const OpticalSvg& svg);
 	void ParseFromVirtualSvg();
 	void ParseFromVirtualSvg(const VirtualSvg& svg);
+	void ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64>& circuitCodeSet);
 
 protected:
 	void resizeEvent(QResizeEvent* event);
@@ -141,6 +150,7 @@ private:
 	void UpdateLineStatuses();
 
 private slots:
+	void OnOpticalLineClicked(quint64 opticalCode);
 	//************************************
 	// 函数名称:	OnStatusTimeout
 	// 函数全名:	DirectWidget::OnStatusTimeout
@@ -163,12 +173,13 @@ private slots:
 
 private:
 	QGraphicsScene* m_scene;
-	QGraphicsView* m_view;
+	DirectView* m_view;
 	QMap<QString, DirectPlateItem*> m_plateItems;
 	QVector<DirectVirtualLineItem*> m_virtualLines;
 	RtdbClient& m_rtdb;
 	QTimer* m_statusTimer;
 	QTimer* m_blinkTimer;
 	bool m_blinkOn;
+	QString m_currentIedName;
 };
 

@@ -206,6 +206,15 @@ public:
 		return result;
 	}
 
+	QList<VirtualCircuit*> GetVirtualCircuitListByOpticalCode(quint64 opticalCode) const
+	{
+		if (opticalCode == 0)
+		{
+			return QList<VirtualCircuit*>();
+		}
+		return m_opticalVirtualCircuitHash.values(opticalCode);
+	}
+
 	QList<OpticalCircuit*> getOpticalByIeds(const QString& ied_1, const QString& ied_2) {
 		// 获取指定两端设备的所有光纤链路
 		if (ied_1.isEmpty() || ied_2.isEmpty())
@@ -479,6 +488,15 @@ private:
 		m_outVirtualCircuitHash.insertMulti(pVtCircuit->srcIedName, pVtCircuit);
 		pLogicCircuit->circuitList.append(pVtCircuit);
 		m_virtualCircuitList.append(pVtCircuit);
+		if (pVtCircuit->leftOpticalCode != 0)
+		{
+			m_opticalVirtualCircuitHash.insertMulti(pVtCircuit->leftOpticalCode, pVtCircuit);
+		}
+		if (pVtCircuit->rightOpticalCode != 0 &&
+			pVtCircuit->rightOpticalCode != pVtCircuit->leftOpticalCode)
+		{
+			m_opticalVirtualCircuitHash.insertMulti(pVtCircuit->rightOpticalCode, pVtCircuit);
+		}
 	}
 	// 用于解析物理连接节点信息 name1:port1_name2:port2
 	struct CableInfo
@@ -569,5 +587,6 @@ private:
 	QMultiHash<QString, LogicCircuit*> m_outLogicCircuitHash;		// 对于键的IedName为出链路
 	QMultiHash<QString, VirtualCircuit*> m_inVirtualCircuitHash;	// 输出设备的关联链路
 	QMultiHash<QString, VirtualCircuit*> m_outVirtualCircuitHash;	// 输入设备的关联链路
+	QMultiHash<quint64, VirtualCircuit*> m_opticalVirtualCircuitHash;
 
 };

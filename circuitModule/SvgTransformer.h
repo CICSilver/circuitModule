@@ -10,14 +10,7 @@
 #include <QImage>
 #include <QBuffer>
 
-#define GET_RADIANS(angle) (angle * M_PI / 180)
-// ×Ö·û´®×é·Ö¸ô·û grp = field 0x1F field
-#define GROUP_SEPARATE_CHAR QChar(0x1F)
-// ×Ó´®·Ö¸ô·û field = str 0x1E str
-#define FIELD_SEPARATE_CHAR QChar(0x1E)
-
-#define DEFAULT_FONT_FAMILY "SimSun"
-#define DEFAULT_FONT_WEIGHT 400
+#include "Common/SvgTransformerCommon.h"
 
 namespace utils {
 	inline QString toQString(const QString& str) { return str; }

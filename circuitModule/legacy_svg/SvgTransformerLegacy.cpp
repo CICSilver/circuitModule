@@ -9,9 +9,6 @@
 
 using utils::ColorHelper;
 
-#define OPTICAL_ARROW_EXTRA_OFFSET 5
-#define OPTICAL_DOUBLE_ARROW_GAP_RATIO 2
-
 
 void SvgTransformer::GenerateSvgByIedName(const QString& iedName)
 {

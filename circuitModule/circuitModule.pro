@@ -55,16 +55,21 @@ RESOURCES += \
 
 # Library sources
 SOURCES += \
+    Common/SvgTransformerCommon.cpp \
     circuitconfig.cpp \
     InteractiveSvgItem.cpp \
     CircuitModuleApi.cpp \
     directitems.cpp \
     directwidget.cpp \
     legacy_svg/SvgTransformerLegacy.cpp \
+    Logical/SvgTransformerLogic.cpp \
     mainwindow.cpp \
+    Optical/SvgTransformerOptical.cpp \
     RtdbClient.cpp \
     SvgTransformer.cpp \
     SvgUtils.cpp \
+    Virtual/SvgTransformerVirtual.cpp \
+    Whole/SvgTransformerWhole.cpp \
     include/pugixml/pugixml.cpp \
     include/rtdb/rtdb_dll.cpp
 

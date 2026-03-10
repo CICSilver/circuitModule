@@ -43,11 +43,26 @@
     <ClCompile Include="SvgTransformer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Common\SvgTransformerCommon.cpp">
+      <Filter>Source Files\Common</Filter>
+    </ClCompile>
     <ClCompile Include="legacy_svg\SvgTransformerLegacy.cpp">
       <Filter>Source Files\legacy_svg</Filter>
     </ClCompile>
+    <ClCompile Include="Logical\SvgTransformerLogic.cpp">
+      <Filter>Source Files\Logical</Filter>
+    </ClCompile>
+    <ClCompile Include="Optical\SvgTransformerOptical.cpp">
+      <Filter>Source Files\Optical</Filter>
+    </ClCompile>
     <ClCompile Include="SvgUtils.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Virtual\SvgTransformerVirtual.cpp">
+      <Filter>Source Files\Virtual</Filter>
+    </ClCompile>
+    <ClCompile Include="Whole\SvgTransformerWhole.cpp">
+      <Filter>Source Files\Whole</Filter>
     </ClCompile>
     <ClCompile Include="basemodel.h">
       <Filter>Header Files</Filter>
@@ -120,6 +135,9 @@
     <ClInclude Include="svgmodel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Common\SvgTransformerCommon.h">
+      <Filter>Header Files\Common</Filter>
+    </ClInclude>
     <ClInclude Include="SvgTransformer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -176,13 +194,43 @@
       <Extensions>cpp;cxx;c;def</Extensions>
       <ParseFiles>true</ParseFiles>
     </Filter>
+    <Filter Include="Source Files\Common">
+      <UniqueIdentifier>{A6F1D7E8-A67A-4A4A-8F9E-1F6FCA0B6F01}</UniqueIdentifier>
+      <Extensions>cpp;cxx;c;def</Extensions>
+      <ParseFiles>true</ParseFiles>
+    </Filter>
+    <Filter Include="Source Files\Logical">
+      <UniqueIdentifier>{3F6A44E9-A9A9-45CE-B86D-E7E09A17F361}</UniqueIdentifier>
+      <Extensions>cpp;cxx;c;def</Extensions>
+      <ParseFiles>true</ParseFiles>
+    </Filter>
     <Filter Include="Source Files\legacy_svg">
       <UniqueIdentifier>{6F2DE2D4-4E5D-46E0-B5BD-9D9C11175A12}</UniqueIdentifier>
       <Extensions>cpp;cxx;c;def</Extensions>
       <ParseFiles>true</ParseFiles>
     </Filter>
+    <Filter Include="Source Files\Optical">
+      <UniqueIdentifier>{8D88EE5B-0D07-4B6A-A415-528A92EAF0F3}</UniqueIdentifier>
+      <Extensions>cpp;cxx;c;def</Extensions>
+      <ParseFiles>true</ParseFiles>
+    </Filter>
+    <Filter Include="Source Files\Virtual">
+      <UniqueIdentifier>{2C26027E-1CA0-4ED0-AE39-7A209BD732DA}</UniqueIdentifier>
+      <Extensions>cpp;cxx;c;def</Extensions>
+      <ParseFiles>true</ParseFiles>
+    </Filter>
+    <Filter Include="Source Files\Whole">
+      <UniqueIdentifier>{1F66CC7F-4468-4BD1-B1A8-8A6B509D4558}</UniqueIdentifier>
+      <Extensions>cpp;cxx;c;def</Extensions>
+      <ParseFiles>true</ParseFiles>
+    </Filter>
     <Filter Include="Header Files">
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h</Extensions>
+      <ParseFiles>true</ParseFiles>
+    </Filter>
+    <Filter Include="Header Files\Common">
+      <UniqueIdentifier>{94A9D178-20D7-4AE8-BD89-06D99DCC196D}</UniqueIdentifier>
       <Extensions>h</Extensions>
       <ParseFiles>true</ParseFiles>
     </Filter>

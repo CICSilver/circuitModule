@@ -116,10 +116,15 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="basemodel.h" />
+    <ClCompile Include="Common\SvgTransformerCommon.cpp" />
     <ClCompile Include="CircuitModuleApi.cpp" />
     <ClCompile Include="directitems.cpp" />
     <ClCompile Include="directwidget.cpp" />
+    <ClCompile Include="Logical\SvgTransformerLogic.cpp" />
+    <ClCompile Include="Optical\SvgTransformerOptical.cpp" />
     <ClCompile Include="legacy_svg\SvgTransformerLegacy.cpp" />
+    <ClCompile Include="Virtual\SvgTransformerVirtual.cpp" />
+    <ClCompile Include="Whole\SvgTransformerWhole.cpp" />
     <ClCompile Include="GeneratedFiles\Debug\moc_directwidget.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug_exe|Win32'">true</ExcludedFromBuild>
@@ -264,6 +269,7 @@
     <ClInclude Include="PainterStateGuard.h" />
     <ClInclude Include="RtdbClient.h" />
     <ClInclude Include="RtdbUtils.h" />
+    <ClInclude Include="Common\SvgTransformerCommon.h" />
     <CustomBuild Include="secwidget.h">
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug_exe|Win32'">$(QTDIR)\bin\moc.exe;%(FullPath)</AdditionalInputs>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug_exe|Win32'">Moc%27ing secwidget.h...</Message>

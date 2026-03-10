@@ -21,7 +21,6 @@ static double dw_to_double(const char* val)
 	return (val && val[0] != '\0') ? atof(val) : 0.0;
 }
 
-
 static bool fill_optical_ports(const OpticalCircuit* oc, const QString& iedName, QString& iedPort, QString& swPort, QString& swName)
 {
 	if (!oc) return false;
@@ -218,7 +217,6 @@ void DirectView::mousePressEvent(QMouseEvent* event)
 	QGraphicsView::mousePressEvent(event);
 }
 
-
 void DirectView::mouseMoveEvent(QMouseEvent* event)
 {
 	if (m_leftPressed)
@@ -414,7 +412,6 @@ void DirectWidget::ParseFromOpaticalSvg()
 void DirectWidget::ParseFromVirtualSvg()
 {
 }
-
 
 void DirectWidget::initView()
 {
@@ -712,4 +709,3 @@ void DirectWidget::OnBlinkTimeout()
 		if (line) line->setBlinkOn(m_blinkOn);
 	}
 }
-

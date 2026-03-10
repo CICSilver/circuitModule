@@ -114,7 +114,6 @@ pugi::xml_node CustomSvgItem::GetSvgNodeByPos(const QPointF& pos)
 			}
 		}
 	}
-
 	return pugi::xml_node();
 }
 
@@ -172,7 +171,6 @@ QLineF CustomSvgItem::GetLineFromStr(const QString& str)
 	QString strPoint_2 = str.split(" ")[1];
 	QPointF point_1(strPoint_1.split(",")[0].toFloat(), strPoint_1.split(",")[1].toFloat());
 	QPointF point_2(strPoint_2.split(",")[0].toFloat(), strPoint_2.split(",")[1].toFloat());
-
 	return QLineF(point_1, point_2);
 }
 

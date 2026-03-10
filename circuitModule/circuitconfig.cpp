@@ -18,7 +18,6 @@ CircuitConfig::CircuitConfig()
         m_rtdb.refresh();
 }
 
-
 bool CircuitConfig::LoadCimeFile(QString path)
 {
 	m_errMsg.clear();
@@ -84,7 +83,6 @@ bool CircuitConfig::LoadCimeFile(QString path)
 	}
 	return true;
 }
-
 
 bool CircuitConfig::LoadGseCimeFile(QString file)
 {

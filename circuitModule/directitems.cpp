@@ -50,7 +50,6 @@ static void direct_draw_arrow(QPainter* p, const QPointF& endPoint, double angle
 	p->drawPolygon(points.data(), 4);
 }
 
-
 static void direct_draw_arrow_outline(QPainter* p, const QPointF& endPoint, double angle, const QColor& color, int arrowLen, int penWidth)
 {
 	QPointF leftArrowPoint = endPoint + QPointF(
@@ -81,24 +80,23 @@ static void direct_draw_conn_circle(QPainter* p, const QPoint& pt, int radius, b
 	p->drawEllipse(QPoint(pt.x(), y), radius, radius);
 }
 
-static QPoint direct_get_arrow_pt(const QPoint& pt, int arrowLen, int conn_r, double angle, bool isUnderConnpt, int offset)
+static QPointF direct_build_arrow_point_on_line(const QPointF& connPoint, const QPointF& outwardVec, int conn_r, int arrowLen, int offset)
 {
-	if (qAbs(angle - 90.0) < 0.001 || qAbs(angle + 90.0) < 0.001) {
-		if (isUnderConnpt) {
-			return QPoint(pt.x(), pt.y() + 2 * conn_r + (angle > 0 ? 1 : (2 * arrowLen + 5)) + offset);
-		} else {
-			return QPoint(pt.x(), pt.y() - 2 * conn_r - (angle > 0 ? (2 * arrowLen + 5) : 1) - offset);
-		}
+	qreal vectorLength = qSqrt(outwardVec.x() * outwardVec.x() + outwardVec.y() * outwardVec.y());
+	if (vectorLength < 0.001)
+	{
+		return connPoint;
 	}
-	double rad = direct_angle_to_radians(angle);
-	int direction = isUnderConnpt ? 1 : -1;
-	int totalOffset = 2 * conn_r + arrowLen + offset;
-	return QPoint(pt.x() + direction * totalOffset * cos(rad), pt.y() - direction * totalOffset * sin(rad));
+	qreal totalOffset = conn_r * 2 + arrowLen + offset;
+	return QPointF(
+		connPoint.x() + outwardVec.x() / vectorLength * totalOffset,
+		connPoint.y() + outwardVec.y() / vectorLength * totalOffset);
 }
 
 static void direct_draw_single_port_text(QPainter* painter, const QPoint& connPoint, bool isTopSide, bool isSwitch, const QString& port, int conn_r)
 {
 	if (port.isEmpty()) return;
+	Q_UNUSED(isSwitch);
 	int offset = conn_r * 2 + 10 + DIRECT_PORT_TEXT_OFFSET;
 	QPen pen;
 	pen.setColor(Qt::white);
@@ -106,15 +104,7 @@ static void direct_draw_single_port_text(QPainter* painter, const QPoint& connPo
 	font.setPointSize(12);
 	painter->setPen(pen);
 	painter->setFont(font);
-	int portPtY = 0;
-	if (isTopSide)
-	{
-		portPtY = isSwitch ? connPoint.y() - offset : connPoint.y() + offset;
-	}
-	else
-	{
-		portPtY = isSwitch ? connPoint.y() + offset : connPoint.y() - offset;
-	}
+	int portPtY = isTopSide ? connPoint.y() - offset : connPoint.y() + offset;
 	QFontMetrics fm(painter->font());
 	int textWidth = fm.width(port);
 	QPoint port_lt_pt(connPoint.x() - textWidth / 2, portPtY - 5);
@@ -140,7 +130,6 @@ static void direct_draw_port_text(QPainter* painter, const QPoint& startPoint, c
 	direct_draw_single_port_text(painter, startPoint, startAtTop, startIsSwitch, startPort, conn_r);
 	direct_draw_single_port_text(painter, endPoint, endAtTop, endIsSwitch, endPort, conn_r);
 }
-
 
 IedItem::IedItem(QGraphicsItem* parent)
 	: m_extendHeight(0)
@@ -671,24 +660,30 @@ void DirectOpticalLineItem::paint(QPainter* painter, const QStyleOptionGraphicsI
 	painter->setBrush(Qt::NoBrush);
 	QPolygonF poly(m_points);
 	painter->drawPolyline(poly);
-	QPoint upPoint = m_startPoint.y() < m_endPoint.y() ? m_startPoint : m_endPoint;
-	QPoint downPoint = m_startPoint.y() < m_endPoint.y() ? m_endPoint : m_startPoint;
 	direct_draw_conn_circle(painter, m_startPoint, CONN_R, m_startAtTop);
 	direct_draw_conn_circle(painter, m_endPoint, CONN_R, m_endAtTop);
-	int underRectY = m_underRectY > 0 ? m_underRectY : (upPoint.y() > downPoint.y() ? upPoint.y() : downPoint.y());
-	double outAngle = -90;
-	double inAngle = 90;
+	QPointF startOutwardVec;
+	QPointF endOutwardVec;
+	if (m_points.size() >= 2)
+	{
+		startOutwardVec = m_points[1] - m_points[0];
+		endOutwardVec = m_points[m_points.size() - 2] - m_points[m_points.size() - 1];
+	}
 	if (m_arrowState & Arrow_Out) {
-		QPoint pt1 = direct_get_arrow_pt(upPoint, ARROW_LEN, CONN_R, outAngle, true, DIRECT_ARROW_OFFSET);
-		direct_draw_arrow_outline(painter, pt1, outAngle, m_lineColor, ARROW_LEN, w);
-		QPoint pt2 = direct_get_arrow_pt(downPoint, ARROW_LEN, CONN_R, outAngle, downPoint.y() > underRectY, DIRECT_ARROW_OFFSET);
-		direct_draw_arrow_outline(painter, pt2, outAngle, m_lineColor, ARROW_LEN, w);
+		QPointF startArrowPoint = direct_build_arrow_point_on_line(m_points[0], startOutwardVec, CONN_R, ARROW_LEN, DIRECT_ARROW_OFFSET);
+		double startArrowAngle = direct_angle_by_vec(-startOutwardVec);
+		direct_draw_arrow_outline(painter, startArrowPoint, startArrowAngle, m_lineColor, ARROW_LEN, w);
+		QPointF endArrowPoint = direct_build_arrow_point_on_line(m_points[m_points.size() - 1], endOutwardVec, CONN_R, ARROW_LEN, DIRECT_ARROW_OFFSET);
+		double endArrowAngle = direct_angle_by_vec(-endOutwardVec);
+		direct_draw_arrow_outline(painter, endArrowPoint, endArrowAngle, m_lineColor, ARROW_LEN, w);
 	}
 	if (m_arrowState & Arrow_In) {
-		QPoint pt1 = direct_get_arrow_pt(upPoint, ARROW_LEN, CONN_R, inAngle, true, DIRECT_ARROW_OFFSET);
-		direct_draw_arrow_outline(painter, pt1, inAngle, m_lineColor, ARROW_LEN, w);
-		QPoint pt2 = direct_get_arrow_pt(downPoint, ARROW_LEN, CONN_R, inAngle, downPoint.y() > underRectY, DIRECT_ARROW_OFFSET);
-		direct_draw_arrow_outline(painter, pt2, inAngle, m_lineColor, ARROW_LEN, w);
+		QPointF startArrowPoint = direct_build_arrow_point_on_line(m_points[0], startOutwardVec, CONN_R, ARROW_LEN, DIRECT_ARROW_OFFSET);
+		double startArrowAngle = direct_angle_by_vec(startOutwardVec);
+		direct_draw_arrow_outline(painter, startArrowPoint, startArrowAngle, m_lineColor, ARROW_LEN, w);
+		QPointF endArrowPoint = direct_build_arrow_point_on_line(m_points[m_points.size() - 1], endOutwardVec, CONN_R, ARROW_LEN, DIRECT_ARROW_OFFSET);
+		double endArrowAngle = direct_angle_by_vec(endOutwardVec);
+		direct_draw_arrow_outline(painter, endArrowPoint, endArrowAngle, m_lineColor, ARROW_LEN, w);
 	}
 	direct_draw_port_text(painter, m_startPoint, m_endPoint, m_startAtTop, m_endAtTop,
 		m_startIsSwitch, m_endIsSwitch, m_startPort, m_endPort, CONN_R);
@@ -714,8 +709,6 @@ QPainterPath DirectOpticalLineItem::shape() const
 	stroker.setWidth(w);
 	return stroker.createStroke(path);
 }
-
-
 
 void DirectOpticalLineItem::hoverLeaveEvent(QGraphicsSceneHoverEvent* event)
 {

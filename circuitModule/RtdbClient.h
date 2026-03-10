@@ -75,7 +75,6 @@ public:
     // 返回值:    bool                  true 已打开；false 未打开。
     //************************************
     bool isOpen() const { return m_opened; }
-
     const CRtdbEleModelStation* stationModel() const;
 	const CRtdbEleModelCircuit* circuitModel() const;
 
@@ -127,7 +126,6 @@ public:
 
 	const char* getDesc(stuRtdbEle* ele) const;
 	const char* getVal(stuRtdbEle* ele) const;
-
 
 	// ************************************
     // code 读写操作

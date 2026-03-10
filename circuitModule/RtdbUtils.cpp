@@ -25,5 +25,4 @@ namespace utils
 		return status && status->type == StateRyaban ?
 			status : NULL;
 	}
-
 };

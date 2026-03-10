@@ -79,7 +79,6 @@ public:
 	//************************************
 	//bool LoadScdFile(QString file);
 
-
 	//************************************
 	// 函数名称:	LoadCimeFile
 	// 函数全名:	CircuitConfig::LoadCimeFile
@@ -101,7 +100,6 @@ public:
 	bool LoadOpticalFromRtdb();
 
 	const CRtdbEleModelStation* StationModel() const { return m_stationModel; }
-
 	//************************************
 	// 函数名称:	LoadOpticalCimeFile
 	// 函数全名:	CircuitConfig::LoadOpticalCimeFile
@@ -113,7 +111,6 @@ public:
 	bool LoadOpticalCimeFile(QString file);
 
 	const QString& CimeDirectory() const { return m_cimeDir; }
-
 	//************************************
 	// 函数名称:	SaveConfigFile
 	// 函数全名:	CircuitConfig::SaveConfigFile
@@ -123,7 +120,6 @@ public:
 	// 返回值:		bool
 	//************************************
 	//bool SaveConfigFile(QString &file) const;
-
 
 	//************************************
 	// 函数名称:	SaveConfigAsCIME
@@ -146,7 +142,6 @@ public:
 	//bool ParseIed(pugi::xml_node& sclNode);
 
 	QString GetErrorMsg() { return m_errMsg; }
-
 	//************************************
 	// 函数名称:	GetCircuitListBySrcAndDest
 	// 函数全名:	CircuitConfig::GetCircuitListBySrcAndDest
@@ -256,7 +251,6 @@ public:
 	}
 
 	QList<IED*> GetIedList() { return m_iedList; }
-
 protected:
 	//// 辅助函数组
 
@@ -285,7 +279,6 @@ protected:
 	// 返回值:		void
 	//************************************
 	//void ParsePhysConn(pugi::xml_node& sclNode, Circuit* pCircuit);
-
 
 	//************************************
 	// 函数名称:	CompleteDataDesc
@@ -559,7 +552,6 @@ private:
 		result.leftIedInfo.port = left.at(1);
 		result.rightIedInfo.name = right.at(0);
 		result.rightIedInfo.port = right.at(1);
-
 		return result;
 	}
 
@@ -588,5 +580,4 @@ private:
 	QMultiHash<QString, VirtualCircuit*> m_inVirtualCircuitHash;	// 输出设备的关联链路
 	QMultiHash<QString, VirtualCircuit*> m_outVirtualCircuitHash;	// 输入设备的关联链路
 	QMultiHash<quint64, VirtualCircuit*> m_opticalVirtualCircuitHash;
-
 };

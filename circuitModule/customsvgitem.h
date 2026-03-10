@@ -115,7 +115,6 @@ private:
 	QLineF GetLineFromStr(const QString& str);
 	qreal DegreeToRadians(qreal degree);
 
-
 private:
 	// 解析svg图元位置辅助
 	// 简易svg path解析器，只支持M/L/Z
@@ -141,7 +140,6 @@ private:
 		m_doc.save(writer);
 		return data;
 	}
-
 
 private:
 	bool m_isDragging;

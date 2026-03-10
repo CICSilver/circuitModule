@@ -96,7 +96,6 @@ struct VirtualCircuit
 	stuRtdbGseCircuit* pRtdbCircuit;// 实时库对应的GSE链路指针
 	float val;						// 原始值
 	bool connStatus;				// 通断状态
-	
 };
 
 struct IED

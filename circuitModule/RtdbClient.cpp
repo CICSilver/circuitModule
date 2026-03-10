@@ -67,7 +67,6 @@ bool RtdbClient::refresh(RtdbOpenType eType)
     m_stationModelLoaded = false;
     m_circuitModelLoaded = false;
     m_opened = RTDB_Open(m_lastOpenType);
-    
     return m_opened;
 }
 
@@ -255,7 +254,6 @@ const char* RtdbClient::getStatusVal(stuRtdbEle* ele) const
 	RtdbFieldOffsets off = g_rtdbFieldOffsets[ele->eType];
     return reinterpret_cast<const char*>(ele) + off.val_off;
 }
-
 
 const CRtdbEleModelStation* RtdbClient::stationModel() const
 {

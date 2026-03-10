@@ -28,7 +28,6 @@ namespace utils {
 	inline QString toQString(double value) { return QString::number(value); }
 	inline QString toQString(bool value) { return value ? "true" : "false"; }
 	inline QString toQString(const char* s) { return s ? QString::fromUtf8(s) : QString(); }
-
 	// 信息组合/拆分辅助类
 	class FieldJoiner {
 	public:
@@ -52,7 +51,6 @@ namespace utils {
 		}
 
 		operator QString() const { return buffer; }
-
 	private:
 		QString buffer;
 		QTextStream stream;
@@ -97,14 +95,11 @@ private:
 	inline QString getField(const QList<QStringList>& groups, int groupIndex, int fieldIndex, const QString& defaultValue = "") {
 		if (groupIndex < 0 || groupIndex >= groups.size())
 			return defaultValue;
-
 		const QStringList& fields = groups[groupIndex];
 		if (fieldIndex < 0 || fieldIndex >= fields.size())
 			return defaultValue;
 		return fields[fieldIndex];
 	}
-
-
 
 public:
 	SvgTransformer();
@@ -374,7 +369,6 @@ private:
 		const QString& peerIedName,
 		quint8& lineState);
 
-
 	void SetArrowStateThroughSwitch(const QList<LogicCircuit*>& inList,
 		const QList<LogicCircuit*>& outList,
 		const QString& peerIedName,
@@ -531,7 +525,5 @@ private:
 		TYPE_VirtualCircuit = 140,
 		TYPE_Circuit_Arrow,				// 回路箭头
 		TYPE_Virtual_Value				// 虚回路数值占位标签
-
 	};
 };
-

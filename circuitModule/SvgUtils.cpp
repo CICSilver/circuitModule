@@ -6,7 +6,6 @@
 #include <QPen>
 #include <QPainter>
 namespace utils {
-
 static inline QPointF cubicPoint(const QPointF& p0, const QPointF& p1,
                                  const QPointF& p2, const QPointF& p3, double t)
 {
@@ -50,7 +49,6 @@ static bool readNumber(const QString& s, int& i, double& out)
 {
     skipSep(s, i);
     if (i >= s.size()) return false;
-
     int start = i;
     bool sawDigit = false;
 
@@ -452,5 +450,4 @@ void drawPlateIcon(QPainter* painter, const QPoint& centerPt, bool status, quint
     //painter->drawLine(centerPt + ptList[0], centerPt + ptList[1]);
     //painter->drawLine(centerPt + ptList[2], centerPt + ptList[3]);
 }
-
 } // namespace utils

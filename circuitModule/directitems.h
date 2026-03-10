@@ -71,7 +71,6 @@ public:
 	QString ref() const { return m_ref; }
 	QString desc() const { return m_desc; }
 	quint64 code() const { return m_code; }
-
 private:
 	void rebuildGeometry();
 
@@ -89,7 +88,6 @@ private:
 	QString m_desc;
 	quint64 m_code;
 };
-
 
 class DirectVirtualLineItem : public directItemBase
 {
@@ -227,7 +225,6 @@ public:
 	//************************************
 	void setValueVisible(bool visible);
 
-
 protected:
 	//************************************
 	// º¯ÊýÃû³Æ:	hoverEnterEvent
@@ -268,7 +265,6 @@ private:
 	bool m_blinkOn;
 	bool m_highlighted;
 };
-
 
 class DirectOpticalLineItem : public directItemBase
 {
@@ -333,7 +329,6 @@ private:
 	int m_width;
 };
 
-
 //class DirectPlateItem : public directItemBase
 //{
 //public:
@@ -351,4 +346,3 @@ private:
 //class TextItem : public directItemBase
 //{
 //};
-

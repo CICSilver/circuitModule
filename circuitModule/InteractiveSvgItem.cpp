@@ -220,7 +220,6 @@ void InteractiveSvgMapItem::onStatusTimeout()
 	updateLineStatuses();
 }
 
-
 void InteractiveSvgMapItem::fitToViewIfPossible()
 {
 	if (!scene() || scene()->views().isEmpty()) return;
@@ -370,7 +369,6 @@ void InteractiveSvgMapItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* even
 	event->accept();
 }
 
-
 void InteractiveSvgMapItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
 	if(m_svgType != LineType_Virtual) {
@@ -439,7 +437,6 @@ void InteractiveSvgMapItem::showOpticalRelatedCircuits(const MapLine& line)
 		// 输出设备非交换机，显示该设备与对端设备（若对端为交换机则显示跨交换机的对端设备）间的所有虚回路
 		if (iedName2.contains("SW"))
 		{
-			
 		}
 	}
 
@@ -461,7 +458,6 @@ void InteractiveSvgMapItem::showOpticalRelatedCircuits(const MapLine& line)
 	//m_secWidget->displayCircuit(iedName1, iedName2);
 	//m_secWidget->show();
 	//m_secWidget->activateWindow();
-
 }
 
 void InteractiveSvgMapItem::paintLine(QPainter* painter, const MapLine& line, bool isHighLight) const
@@ -804,7 +800,6 @@ void InteractiveSvgMapItem::parseVirtualSvg(const pugi::xml_document& doc)
 		p.svgGrpId = plate_id;
 		if (p.rect.isNull()) p.isClosed = true; // 默认置合
 
-
 		if (strcmp(plateNode.attribute("type").value(), "plate") == 0) {
 			// 读取 plate 的语义属性
 			const char* plateCode = plateNode.attribute("plate-code").value();
@@ -890,7 +885,6 @@ void InteractiveSvgMapItem::parseOpticalSvg(const pugi::xml_document& doc)
 {
 	m_allLines += parseCircuitLines(doc, "optical");
 	m_allLines.squeeze();
-
 }
 
 QVector<MapLine> InteractiveSvgMapItem::parseCircuitLines(const pugi::xml_document& doc, const char* type)
@@ -1422,7 +1416,6 @@ SvgNodeStyle InteractiveSvgMapItem::parseNodeStyle(const pugi::xml_node& node)
     // 解析颜色
 	style.stroke = utils::parseColor(strokeAttr, style.strokeOpacity);
 	style.fill = utils::parseColor(fillAttr, style.fillOpacity);
-    
     return style;
 }
 

@@ -99,7 +99,6 @@ private:
 
 class ItemRegistry
 {
-
 };
 class DirectWidget  : public QWidget
 {
@@ -170,7 +169,6 @@ private slots:
 	//************************************
 	void OnBlinkTimeout();
 
-
 private:
 	QGraphicsScene* m_scene;
 	DirectView* m_view;
@@ -182,4 +180,3 @@ private:
 	bool m_blinkOn;
 	QString m_currentIedName;
 };
-

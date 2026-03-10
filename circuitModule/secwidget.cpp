@@ -32,7 +32,6 @@ SecWidget::SecWidget(QWidget *parent)
 
 SecWidget::~SecWidget()
 {
-
 }
 
 void SecWidget::displayCircuit(const QString& srcIed, const QString& destIed)
@@ -68,6 +67,5 @@ void SecWidget::displayCircuit(const MapLine& line)
 			RECT_DEFAULT_WIDTH, RECT_DEFAULT_HEIGHT,
 			utils::ColorHelper::ied_border,
 			utils::ColorHelper::ied_underground);
-
 	}
 }

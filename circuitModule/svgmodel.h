@@ -344,6 +344,4 @@ struct WholeCircuitSvg : public LogicSvg
 	~WholeCircuitSvg()
 	{
 	}
-
-
 };

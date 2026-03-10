@@ -35,5 +35,61 @@ Comments
 	// ·µ»ØÖµ:
 	//************************************
 
+Formatting
+- Indentation: TAB, width 4.
+- Braces: Allman style. Opening brace on its own line for functions/classes/namespaces/control blocks.
+- Do not assign inside conditions: no `if (a = b)` / `while (x = y)`. Do assignment on a separate line, then check.
+
+Vertical spacing (strict)
+- Do NOT insert unnecessary blank lines.
+- Never generate multiple consecutive empty lines.
+- Inside function bodies, keep spacing compact.
+- Do NOT add blank lines between simple consecutive statements.
+- At most one empty line between logical blocks, and zero is preferred.
+- Do NOT add blank lines immediately after `{` or before `}`.
+- Do NOT add blank lines between a function signature and its opening brace.
+
+Example of undesirable formatting:
+
+void Foo()
+
+{
+
+	int a = 1;
+
+
+	if (a)
+	{
+
+		doSomething();
+
+	}
+
+}
+
+Correct formatting:
+
+void Foo()
+{
+	int a = 1;
+
+	if (a)
+	{
+		doSomething();
+	}
+}
+
+Code structure
+- Do not introduce helper functions unless they are clearly reused, significantly simplify complex logic, or are explicitly requested.
+- Prefer keeping short local logic inline.
+- Avoid over-decomposition.
+
+Numeric constants
+- Do not scatter magic numbers across multiple functions.
+- If a numeric value affects layout, spacing, rendering, thresholds, retries, or sizing, define it once and reuse it.
+- Prefer existing project macros / enums / named constants for tunable values.
+- If multiple places use the same numeric rule, centralize it.
+- Do not replace an existing macro-based style with repeated literals.
+
 Before writing code
 - Restate constraints in one line: Qt 4.8.6 / C++03 / GB2312 / TAB(4) / Allman braces / Qt containers default / m_ members / no assignment in conditions / Chinese comments.

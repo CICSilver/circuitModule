@@ -58,7 +58,6 @@ static CircuitModuleWidget* EnsureMainWindow(bool useSvgBytes, QWidget* parent)
 	{
 		g_widget->setParent(parent);
 	}
-
 	return g_widget;
 }
 

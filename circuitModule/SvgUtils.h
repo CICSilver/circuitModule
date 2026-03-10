@@ -32,7 +32,6 @@ namespace utils {
 		static const quint32 ied_border = 0x447c9b;
 
 		static const quint32 side_ied_underground = 0x203c32;
-
 	};
 	// 将 SVG path 的 d 解析为“本地坐标”的折线点列(不做任何 QTransform)。
 	// 支持 M/m L/l H/h V/v Z/z；Q/q、C/c 以 curveSegments 份近似；A/a 目前不支持。
@@ -55,7 +54,6 @@ namespace utils {
 	bool computePathBoundingRect(const pugi::xml_node& node, const QTransform& extraTransform, QRectF& outRect);
 
 	void simplifyPolyline(QVector<QPointF>& pts, qreal tol);
-
 
 	// 通用绘图函数
 	void initBaseRect(SvgRect* rect, const quint16 x, const quint16 y, const quint16 width, const quint16 height, const quint32 border_color, const quint32 underground_color);

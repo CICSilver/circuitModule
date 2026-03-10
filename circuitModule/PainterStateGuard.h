@@ -2,7 +2,6 @@
 #include <QPainter>
 
 namespace pst {
-
 struct PainterStateCache {
     QPen pen;
     QBrush brush;
@@ -63,7 +62,6 @@ private:
     QPainter* ptr;
     PainterStateCache cache;
 };
-
 } // namespace pst
 
 #define PST_CONCAT2(a,b) a##b

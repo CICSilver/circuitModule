@@ -183,7 +183,6 @@ static QColor parseColor(const char* s, double opacity = 1.0) {
 	return c;
 }
 
-
 class InteractiveSvgMapItem : public QGraphicsObject
 {
 	Q_OBJECT

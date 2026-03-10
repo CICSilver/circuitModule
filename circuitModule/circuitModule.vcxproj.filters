@@ -43,6 +43,9 @@
     <ClCompile Include="SvgTransformer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="legacy_svg\SvgTransformerLegacy.cpp">
+      <Filter>Source Files\legacy_svg</Filter>
+    </ClCompile>
     <ClCompile Include="SvgUtils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -170,6 +173,11 @@
     </Filter>
     <Filter Include="Source Files">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;cxx;c;def</Extensions>
+      <ParseFiles>true</ParseFiles>
+    </Filter>
+    <Filter Include="Source Files\legacy_svg">
+      <UniqueIdentifier>{6F2DE2D4-4E5D-46E0-B5BD-9D9C11175A12}</UniqueIdentifier>
       <Extensions>cpp;cxx;c;def</Extensions>
       <ParseFiles>true</ParseFiles>
     </Filter>

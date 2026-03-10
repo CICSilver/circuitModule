@@ -119,6 +119,7 @@
     <ClCompile Include="CircuitModuleApi.cpp" />
     <ClCompile Include="directitems.cpp" />
     <ClCompile Include="directwidget.cpp" />
+    <ClCompile Include="legacy_svg\SvgTransformerLegacy.cpp" />
     <ClCompile Include="GeneratedFiles\Debug\moc_directwidget.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug_exe|Win32'">true</ExcludedFromBuild>

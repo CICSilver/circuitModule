@@ -672,7 +672,7 @@ QRectF DirectOpticalLineItem::boundingRect() const
 		if (point.y() > maxY) maxY = point.y();
 	}
 	QFont font = QApplication::font();
-	font.setPointSize(12);
+	font.setPointSize(16);
 	QFontMetrics metrics(font);
 	int maxTextWidth = qMax(metrics.width(m_startPort), metrics.width(m_endPort));
 	qreal padX = qMax((qreal)(qMax(1, m_lineWidth * 3) + CONN_R * 2 + 8), (qreal)(maxTextWidth / 2 + DIRECT_BOUND_MARGIN));

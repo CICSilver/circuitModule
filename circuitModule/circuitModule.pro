@@ -60,6 +60,7 @@ SOURCES += \
     CircuitModuleApi.cpp \
     directitems.cpp \
     directwidget.cpp \
+    legacy_svg/SvgTransformerLegacy.cpp \
     mainwindow.cpp \
     RtdbClient.cpp \
     SvgTransformer.cpp \

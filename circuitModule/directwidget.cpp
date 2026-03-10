@@ -3,7 +3,7 @@
 #include "directitems.h"
 #include "SvgUtils.h"
 #include "circuitconfig.h"
-#include "SvgTransformer.h"
+#include "CircuitDiagramProxy.h"
 #include <QApplication>
 #include <QGraphicsScene>
 #include <QGraphicsView>
@@ -157,15 +157,15 @@ public:
 			}
 		}
 
-		SvgTransformer transformer;
-		VirtualSvg* virtualSvg = transformer.BuildVirtualModelByIedName(displayIedName);
-		if (!virtualSvg)
+		CircuitDiagramProxy diagramProxy;
+		VirtualDiagramModel* virtualDiagram = diagramProxy.BuildVirtualDiagramByIedName(displayIedName);
+		if (!virtualDiagram)
 		{
 			return false;
 		}
 
-		m_directWidget->ParseFromVirtualSvg(*virtualSvg, circuitCodeSet);
-		delete virtualSvg;
+		m_directWidget->ParseFromVirtualSvg(*virtualDiagram, circuitCodeSet);
+		delete virtualDiagram;
 
 		if (peerIedNameSet.size() == 1)
 		{

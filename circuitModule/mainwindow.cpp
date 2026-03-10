@@ -1,5 +1,5 @@
 #include "mainwindow.h"
-#include "SvgTransformer.h"
+#include "CircuitDiagramProxy.h"
 #include "directwidget.h"
 #include <QCoreApplication>
 #include <QDir>
@@ -409,17 +409,17 @@ void CircuitModuleWidget::DisplayLogicIed(const QString& iedName)
 		InitializeDirectWidgets();
 	}
 
-	SvgTransformer transformer;
-	LogicSvg* logicSvg = transformer.BuildLogicModelByIedName(iedName);
-	if (!logicSvg)
+	CircuitDiagramProxy diagramProxy;
+	LogicDiagramModel* logicDiagram = diagramProxy.BuildLogicDiagramByIedName(iedName);
+	if (!logicDiagram)
 	{
 		ReleaseDirectWidget(ui.tab, m_directLogicWidget);
 		m_directLogicWidget = CreateDirectWidget(ui.tab, ui.logicView, "directLogicWidget");
 		return;
 	}
 
-	m_directLogicWidget->ParseFromLogicSvg(*logicSvg);
-	delete logicSvg;
+	m_directLogicWidget->ParseFromLogicSvg(*logicDiagram);
+	delete logicDiagram;
 }
 
 void CircuitModuleWidget::DisplayOpticalIed(const QString& iedName)
@@ -429,17 +429,17 @@ void CircuitModuleWidget::DisplayOpticalIed(const QString& iedName)
 		InitializeDirectWidgets();
 	}
 
-	SvgTransformer transformer;
-	OpticalSvg* opticalSvg = transformer.BuildOpticalModelByIedName(iedName);
-	if (!opticalSvg)
+	CircuitDiagramProxy diagramProxy;
+	OpticalDiagramModel* opticalDiagram = diagramProxy.BuildOpticalDiagramByIedName(iedName);
+	if (!opticalDiagram)
 	{
 		ReleaseDirectWidget(ui.tab_2, m_directOpticalWidget);
 		m_directOpticalWidget = CreateDirectWidget(ui.tab_2, ui.opticalView, "directOpticalWidget");
 		return;
 	}
 
-	m_directOpticalWidget->ParseFromOpticalSvg(*opticalSvg);
-	delete opticalSvg;
+	m_directOpticalWidget->ParseFromOpticalSvg(*opticalDiagram);
+	delete opticalDiagram;
 }
 
 void CircuitModuleWidget::DisplayVirtualIed(const QString& iedName)
@@ -449,17 +449,17 @@ void CircuitModuleWidget::DisplayVirtualIed(const QString& iedName)
 		InitializeDirectWidgets();
 	}
 
-	SvgTransformer transformer;
-	VirtualSvg* virtualSvg = transformer.BuildVirtualModelByIedName(iedName);
-	if (!virtualSvg)
+	CircuitDiagramProxy diagramProxy;
+	VirtualDiagramModel* virtualDiagram = diagramProxy.BuildVirtualDiagramByIedName(iedName);
+	if (!virtualDiagram)
 	{
 		ReleaseDirectWidget(ui.tab_3, m_directVirtualWidget);
 		m_directVirtualWidget = CreateDirectWidget(ui.tab_3, ui.wholeView, "directVirtualWidget");
 		return;
 	}
 
-	m_directVirtualWidget->ParseFromVirtualSvg(*virtualSvg);
-	delete virtualSvg;
+	m_directVirtualWidget->ParseFromVirtualSvg(*virtualDiagram);
+	delete virtualDiagram;
 }
 
 void CircuitModuleWidget::DisplayStationOptical()
@@ -469,17 +469,17 @@ void CircuitModuleWidget::DisplayStationOptical()
 		InitializeDirectWidgets();
 	}
 
-	SvgTransformer transformer;
-	OpticalSvg* opticalSvg = transformer.BuildOpticalModelByStation();
-	if (!opticalSvg)
+	CircuitDiagramProxy diagramProxy;
+	OpticalDiagramModel* opticalDiagram = diagramProxy.BuildOpticalDiagramByStation();
+	if (!opticalDiagram)
 	{
 		ReleaseDirectWidget(ui.tab_2, m_directOpticalWidget);
 		m_directOpticalWidget = CreateDirectWidget(ui.tab_2, ui.opticalView, "directOpticalWidget");
 		return;
 	}
 
-	m_directOpticalWidget->ParseFromOpticalSvg(*opticalSvg);
-	delete opticalSvg;
+	m_directOpticalWidget->ParseFromOpticalSvg(*opticalDiagram);
+	delete opticalDiagram;
 }
 
 void CircuitModuleWidget::DisplayBayOptical(const QString& bayName)
@@ -489,17 +489,17 @@ void CircuitModuleWidget::DisplayBayOptical(const QString& bayName)
 		InitializeDirectWidgets();
 	}
 
-	SvgTransformer transformer;
-	OpticalSvg* opticalSvg = transformer.BuildOpticalModelByBayName(bayName);
-	if (!opticalSvg)
+	CircuitDiagramProxy diagramProxy;
+	OpticalDiagramModel* opticalDiagram = diagramProxy.BuildOpticalDiagramByBayName(bayName);
+	if (!opticalDiagram)
 	{
 		ReleaseDirectWidget(ui.tab_2, m_directOpticalWidget);
 		m_directOpticalWidget = CreateDirectWidget(ui.tab_2, ui.opticalView, "directOpticalWidget");
 		return;
 	}
 
-	m_directOpticalWidget->ParseFromOpticalSvg(*opticalSvg);
-	delete opticalSvg;
+	m_directOpticalWidget->ParseFromOpticalSvg(*opticalDiagram);
+	delete opticalDiagram;
 }
 
 bool CircuitModuleWidget::InitializeCircuitData(const QString& cimeDirectory)

@@ -46,6 +46,12 @@
     <ClCompile Include="Common\SvgTransformerCommon.cpp">
       <Filter>Source Files\Common</Filter>
     </ClCompile>
+    <ClCompile Include="CircuitDiagramFactory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CircuitDiagramProxy.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="legacy_svg\SvgTransformerLegacy.cpp">
       <Filter>Source Files\legacy_svg</Filter>
     </ClCompile>
@@ -121,6 +127,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\CircuitModuleApi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CircuitDiagramFactory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CircuitDiagramProxy.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="PainterStateGuard.h">

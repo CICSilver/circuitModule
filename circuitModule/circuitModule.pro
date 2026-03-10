@@ -26,6 +26,8 @@ INCLUDEPATH += $$PWD \
 # Headers (for IDE convenience; moc will pick up those with Q_OBJECT)
 HEADERS += \
     basemodel.h \
+    CircuitDiagramFactory.h \
+    CircuitDiagramProxy.h \
     circuitconfig.h \
     InteractiveSvgItem.h \
     mainwindow.h \
@@ -56,6 +58,8 @@ RESOURCES += \
 # Library sources
 SOURCES += \
     Common/SvgTransformerCommon.cpp \
+    CircuitDiagramFactory.cpp \
+    CircuitDiagramProxy.cpp \
     circuitconfig.cpp \
     InteractiveSvgItem.cpp \
     CircuitModuleApi.cpp \

@@ -10,6 +10,9 @@
 #include <QFontMetrics>
 #include <qmath.h>
 
+static const int DIRECT_PORT_TEXT_OFFSET = 12;
+static const int DIRECT_ARROW_OFFSET = 10;
+static const int DIRECT_BOUND_MARGIN = 12;
 
 directItemBase::~directItemBase()
 {}
@@ -96,7 +99,7 @@ static QPoint direct_get_arrow_pt(const QPoint& pt, int arrowLen, int conn_r, do
 static void direct_draw_single_port_text(QPainter* painter, const QPoint& connPoint, bool isTopSide, bool isSwitch, const QString& port, int conn_r)
 {
 	if (port.isEmpty()) return;
-	int offset = conn_r * 2 + 10;
+	int offset = conn_r * 2 + 10 + DIRECT_PORT_TEXT_OFFSET;
 	QPen pen;
 	pen.setColor(Qt::white);
 	QFont font = painter->font();
@@ -636,14 +639,20 @@ QRectF DirectOpticalLineItem::boundingRect() const
 	qreal minY = m_points[0].y();
 	qreal maxY = m_points[0].y();
 	for (int i = 1; i < m_points.size(); ++i) {
-		const QPointF& p = m_points[i];
-		if (p.x() < minX) minX = p.x();
-		if (p.x() > maxX) maxX = p.x();
-		if (p.y() < minY) minY = p.y();
-		if (p.y() > maxY) maxY = p.y();
+		const QPointF& point = m_points[i];
+		if (point.x() < minX) minX = point.x();
+		if (point.x() > maxX) maxX = point.x();
+		if (point.y() < minY) minY = point.y();
+		if (point.y() > maxY) maxY = point.y();
 	}
-	qreal pad = qMax(1, m_lineWidth * 3) + CONN_R * 2 + 8;
-	return QRectF(QPointF(minX - pad, minY - pad), QPointF(maxX + pad, maxY + pad));
+	QFont font = QApplication::font();
+	font.setPointSize(12);
+	QFontMetrics metrics(font);
+	int maxTextWidth = qMax(metrics.width(m_startPort), metrics.width(m_endPort));
+	qreal padX = qMax((qreal)(qMax(1, m_lineWidth * 3) + CONN_R * 2 + 8), (qreal)(maxTextWidth / 2 + DIRECT_BOUND_MARGIN));
+	qreal padY = qMax((qreal)(qMax(1, m_lineWidth * 3) + CONN_R * 2 + 8),
+		(qreal)(metrics.height() + CONN_R * 2 + ARROW_LEN + DIRECT_PORT_TEXT_OFFSET + DIRECT_ARROW_OFFSET + DIRECT_BOUND_MARGIN));
+	return QRectF(QPointF(minX - padX, minY - padY), QPointF(maxX + padX, maxY + padY));
 }
 
 void DirectOpticalLineItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
@@ -670,15 +679,15 @@ void DirectOpticalLineItem::paint(QPainter* painter, const QStyleOptionGraphicsI
 	double outAngle = -90;
 	double inAngle = 90;
 	if (m_arrowState & Arrow_Out) {
-		QPoint pt1 = direct_get_arrow_pt(upPoint, ARROW_LEN, CONN_R, outAngle, true, 0);
+		QPoint pt1 = direct_get_arrow_pt(upPoint, ARROW_LEN, CONN_R, outAngle, true, DIRECT_ARROW_OFFSET);
 		direct_draw_arrow_outline(painter, pt1, outAngle, m_lineColor, ARROW_LEN, w);
-		QPoint pt2 = direct_get_arrow_pt(downPoint, ARROW_LEN, CONN_R, outAngle, downPoint.y() > underRectY, 0);
+		QPoint pt2 = direct_get_arrow_pt(downPoint, ARROW_LEN, CONN_R, outAngle, downPoint.y() > underRectY, DIRECT_ARROW_OFFSET);
 		direct_draw_arrow_outline(painter, pt2, outAngle, m_lineColor, ARROW_LEN, w);
 	}
 	if (m_arrowState & Arrow_In) {
-		QPoint pt1 = direct_get_arrow_pt(upPoint, ARROW_LEN, CONN_R, inAngle, true, 0);
+		QPoint pt1 = direct_get_arrow_pt(upPoint, ARROW_LEN, CONN_R, inAngle, true, DIRECT_ARROW_OFFSET);
 		direct_draw_arrow_outline(painter, pt1, inAngle, m_lineColor, ARROW_LEN, w);
-		QPoint pt2 = direct_get_arrow_pt(downPoint, ARROW_LEN, CONN_R, inAngle, downPoint.y() > underRectY, 0);
+		QPoint pt2 = direct_get_arrow_pt(downPoint, ARROW_LEN, CONN_R, inAngle, downPoint.y() > underRectY, DIRECT_ARROW_OFFSET);
 		direct_draw_arrow_outline(painter, pt2, inAngle, m_lineColor, ARROW_LEN, w);
 	}
 	direct_draw_port_text(painter, m_startPoint, m_endPoint, m_startAtTop, m_endAtTop,

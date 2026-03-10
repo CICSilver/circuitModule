@@ -226,22 +226,29 @@ namespace
 		return pRect->y + pRect->height;
 	}
 
-	struct ScopedRectRouteRange
+		enum ScopedAnchorSide
 	{
-		ScopedRectRouteRange()
+		ScopedAnchorTop = 0,
+		ScopedAnchorBottom = 1
+	};
+
+	enum ScopedLayerType
+	{
+		ScopedLayerTop = 0,
+		ScopedLayerSwitch = 1,
+		ScopedLayerBottom = 2
+	};
+
+	struct ScopedRectRouteInfo
+	{
+		ScopedRectRouteInfo()
 		{
-			topMinY = 0;
-			topMaxY = 0;
-			bottomMinY = 0;
-			bottomMaxY = 0;
-			columnIndex = -1;
+			pRect = NULL;
+			layerType = ScopedLayerTop;
 			orderIndex = -1;
 		}
-		int topMinY;
-		int topMaxY;
-		int bottomMinY;
-		int bottomMaxY;
-		int columnIndex;
+		IedRect* pRect;
+		int layerType;
 		int orderIndex;
 	};
 
@@ -252,25 +259,21 @@ namespace
 			pOpticalCircuit = NULL;
 			pSrcRect = NULL;
 			pDestRect = NULL;
-			startSide = 0;
-			endSide = 0;
-			laneMinY = 0;
-			laneMaxY = 0;
+			srcLayerType = ScopedLayerTop;
+			destLayerType = ScopedLayerBottom;
+			startSide = ScopedAnchorBottom;
+			endSide = ScopedAnchorTop;
 		}
 		OpticalCircuit* pOpticalCircuit;
 		IedRect* pSrcRect;
 		IedRect* pDestRect;
+		int srcLayerType;
+		int destLayerType;
 		int startSide;
 		int endSide;
-		int laneMinY;
-		int laneMaxY;
+		QString startSideKey;
+		QString endSideKey;
 		QString corridorKey;
-	};
-
-	enum ScopedAnchorSide
-	{
-		ScopedAnchorTop = 0,
-		ScopedAnchorBottom = 1
 	};
 
 	static QString BuildScopedSideKey(const QString& iedName, int anchorSide)
@@ -322,139 +325,253 @@ namespace
 		}
 	}
 
-	static int PickScopedLaneY(int laneMinY, int laneMaxY, int routeIndex)
+	static int BuildScopedSpreadOffset(int routeIndex, int routeCount, int step)
 	{
-		if (laneMinY > laneMaxY)
+		int actualCount = routeCount;
+		if (actualCount < 1)
 		{
-			int tempY = laneMinY;
-			laneMinY = laneMaxY;
-			laneMaxY = tempY;
-		}
-		if (laneMinY == laneMaxY)
-		{
-			return laneMinY;
-		}
-		const int laneStep = 14;
-		int laneSpan = laneMaxY - laneMinY;
-		int slotCount = laneSpan / laneStep + 1;
-		if (slotCount < 1)
-		{
-			slotCount = 1;
+			actualCount = 1;
 		}
 		int actualIndex = routeIndex;
 		if (actualIndex < 0)
 		{
 			actualIndex = 0;
 		}
-		actualIndex = actualIndex % slotCount;
-		int usedSpan = (slotCount - 1) * laneStep;
-		int startY = laneMinY + (laneSpan - usedSpan) / 2;
-		return startY + actualIndex * laneStep;
+		if (actualIndex >= actualCount)
+		{
+			actualIndex = actualCount - 1;
+		}
+		return (actualIndex * 2 - (actualCount - 1)) * step / 2;
 	}
 
-	static void ResolveScopedOpticalRoutePlan(const ScopedRectRouteRange& srcRange,
-		const ScopedRectRouteRange& destRange,
-		IedRect* pSrcRect,
-		IedRect* pDestRect,
-		ScopedOpticalRoutePlan& routePlan)
+	static int GetScopedMaxAbsSpread(int routeCount, int step)
 	{
-		routePlan.pSrcRect = pSrcRect;
-		routePlan.pDestRect = pDestRect;
-		int srcTopY = pSrcRect ? pSrcRect->y : 0;
-		int srcBottomY = GetScopedRectBottom(pSrcRect);
-		int destTopY = pDestRect ? pDestRect->y : 0;
-		int destBottomY = GetScopedRectBottom(pDestRect);
-		int leftColumn = qMin(srcRange.columnIndex, destRange.columnIndex);
-		int rightColumn = qMax(srcRange.columnIndex, destRange.columnIndex);
-		const int routeGap = 18;
-		if (srcBottomY + routeGap <= destTopY)
+		if (routeCount <= 1)
 		{
-			routePlan.startSide = ScopedAnchorBottom;
-			routePlan.endSide = ScopedAnchorTop;
-			routePlan.laneMinY = srcBottomY + routeGap;
-			routePlan.laneMaxY = destTopY - routeGap;
-			routePlan.corridorKey = QString("M|%1|%2|%3|%4")
-				.arg(srcRange.orderIndex)
-				.arg(destRange.orderIndex)
-				.arg(leftColumn)
-				.arg(rightColumn);
-			return;
+			return 0;
 		}
-		if (destBottomY + routeGap <= srcTopY)
-		{
-			routePlan.startSide = ScopedAnchorTop;
-			routePlan.endSide = ScopedAnchorBottom;
-			routePlan.laneMinY = destBottomY + routeGap;
-			routePlan.laneMaxY = srcTopY - routeGap;
-			routePlan.corridorKey = QString("M|%1|%2|%3|%4")
-				.arg(destRange.orderIndex)
-				.arg(srcRange.orderIndex)
-				.arg(leftColumn)
-				.arg(rightColumn);
-			return;
-		}
+		return qAbs(BuildScopedSpreadOffset(routeCount - 1, routeCount, step));
+	}
 
-		int bottomMinY = qMax(srcRange.bottomMinY, destRange.bottomMinY);
-		int bottomMaxY = qMin(srcRange.bottomMaxY, destRange.bottomMaxY);
-		int topMinY = qMax(srcRange.topMinY, destRange.topMinY);
-		int topMaxY = qMin(srcRange.topMaxY, destRange.topMaxY);
-		bool canUseBottom = bottomMinY <= bottomMaxY;
-		bool canUseTop = topMinY <= topMaxY;
-		if (canUseBottom && (!canUseTop || (bottomMaxY - bottomMinY) >= (topMaxY - topMinY)))
+	static int EstimateScopedLayerGap(int maxSideCount, int maxCorridorCount, int baseLayerGap)
+	{
+		const int safeDistance = 34;
+		const int branchBase = 8;
+		const int branchStep = 14;
+		const int routeBase = 10;
+		const int routeStep = 18;
+		int maxSideSpread = GetScopedMaxAbsSpread(maxSideCount, branchStep);
+		int maxCorridorSpread = GetScopedMaxAbsSpread(maxCorridorCount, routeStep);
+		int requiredGap = safeDistance + branchBase + routeBase + maxSideSpread + maxCorridorSpread + 30;
+		if (requiredGap < baseLayerGap)
 		{
-			routePlan.startSide = ScopedAnchorBottom;
-			routePlan.endSide = ScopedAnchorBottom;
-			routePlan.laneMinY = bottomMinY;
-			routePlan.laneMaxY = bottomMaxY;
-			routePlan.corridorKey = QString("B|%1|%2|%3")
-				.arg(qMax(srcRange.orderIndex, destRange.orderIndex))
-				.arg(leftColumn)
-				.arg(rightColumn);
-			return;
+			requiredGap = baseLayerGap;
 		}
-		if (canUseTop)
-		{
-			routePlan.startSide = ScopedAnchorTop;
-			routePlan.endSide = ScopedAnchorTop;
-			routePlan.laneMinY = topMinY;
-			routePlan.laneMaxY = topMaxY;
-			routePlan.corridorKey = QString("T|%1|%2|%3")
-				.arg(qMin(srcRange.orderIndex, destRange.orderIndex))
-				.arg(leftColumn)
-				.arg(rightColumn);
-			return;
-		}
+		return requiredGap;
+	}
 
-		if ((srcRange.orderIndex + destRange.orderIndex) % 2 == 0)
+	static QPoint MoveScopedPointBySide(const QPoint& point, int anchorSide, int distance)
+	{
+		if (anchorSide == ScopedAnchorTop)
 		{
-			routePlan.startSide = ScopedAnchorBottom;
-			routePlan.endSide = ScopedAnchorBottom;
-			routePlan.laneMinY = qMax(srcBottomY, destBottomY) + 20;
-			routePlan.laneMaxY = routePlan.laneMinY + 40;
-			routePlan.corridorKey = QString("BF|%1|%2|%3")
-				.arg(qMax(srcRange.orderIndex, destRange.orderIndex))
-				.arg(leftColumn)
-				.arg(rightColumn);
+			return QPoint(point.x(), point.y() - distance);
+		}
+		return QPoint(point.x(), point.y() + distance);
+	}
+
+	static bool ShouldPlaceScopedIedAtBottom(const IED* pIed)
+	{
+		if (!pIed)
+		{
+			return false;
+		}
+		QString upperName = pIed->name.toUpper();
+		if (upperName.startsWith("IL"))
+		{
+			return true;
+		}
+		if (upperName.contains("TERM") || upperName.contains("IO"))
+		{
+			return true;
+		}
+		return false;
+	}
+
+	static void RebalanceScopedLayerList(QStringList& topIedNameList, QStringList& bottomIedNameList)
+	{
+		if (topIedNameList.isEmpty() && bottomIedNameList.size() > 1)
+		{
+			int moveCount = bottomIedNameList.size() / 2;
+			if (moveCount < 1)
+			{
+				moveCount = 1;
+			}
+			for (int moveIndex = 0; moveIndex < moveCount; ++moveIndex)
+			{
+				topIedNameList.append(bottomIedNameList.takeFirst());
+			}
+		}
+		if (bottomIedNameList.isEmpty() && topIedNameList.size() > 1)
+		{
+			int moveCount = topIedNameList.size() / 2;
+			if (moveCount < 1)
+			{
+				moveCount = 1;
+			}
+			for (int moveIndex = 0; moveIndex < moveCount; ++moveIndex)
+			{
+				bottomIedNameList.prepend(topIedNameList.takeLast());
+			}
+		}
+	}
+
+	static int GetScopedRowWidth(int itemCount, int rectWidth, int rectGap)
+	{
+		if (itemCount <= 0)
+		{
+			return 0;
+		}
+		return itemCount * rectWidth + (itemCount - 1) * rectGap;
+	}
+
+	static int GetScopedRowStartX(int totalWidth, int itemCount, int rectWidth, int rectGap)
+	{
+		int rowWidth = GetScopedRowWidth(itemCount, rectWidth, rectGap);
+		if (rowWidth <= 0)
+		{
+			return (totalWidth - rectWidth) / 2;
+		}
+		int startX = (totalWidth - rowWidth) / 2;
+		if (startX < 40)
+		{
+			startX = 40;
+		}
+		return startX;
+	}
+
+	static QString BuildScopedCorridorKey(const OpticalCircuit* pOpticalCircuit)
+	{
+		if (!pOpticalCircuit)
+		{
+			return QString();
+		}
+		QString firstName = pOpticalCircuit->srcIedName;
+		QString secondName = pOpticalCircuit->destIedName;
+		if (QString::compare(firstName, secondName, Qt::CaseInsensitive) > 0)
+		{
+			QString tempName = firstName;
+			firstName = secondName;
+			secondName = tempName;
+		}
+		return QString("%1|%2").arg(firstName).arg(secondName);
+	}
+
+	static void ResolveScopedAnchorSide(int srcLayerType,
+		int destLayerType,
+		const IedRect* pSrcRect,
+		const IedRect* pDestRect,
+		int& startSide,
+		int& endSide)
+	{
+		if (srcLayerType == destLayerType)
+		{
+			if (srcLayerType == ScopedLayerTop)
+			{
+				startSide = ScopedAnchorBottom;
+				endSide = ScopedAnchorBottom;
+				return;
+			}
+			if (srcLayerType == ScopedLayerBottom)
+			{
+				startSide = ScopedAnchorTop;
+				endSide = ScopedAnchorTop;
+				return;
+			}
+			int srcY = pSrcRect ? pSrcRect->y : 0;
+			int destY = pDestRect ? pDestRect->y : 0;
+			if (srcY <= destY)
+			{
+				startSide = ScopedAnchorBottom;
+				endSide = ScopedAnchorTop;
+			}
+			else
+			{
+				startSide = ScopedAnchorTop;
+				endSide = ScopedAnchorBottom;
+			}
+			return;
+		}
+		int srcY = pSrcRect ? pSrcRect->y : 0;
+		int destY = pDestRect ? pDestRect->y : 0;
+		if (srcY <= destY)
+		{
+			startSide = ScopedAnchorBottom;
+			endSide = ScopedAnchorTop;
 		}
 		else
 		{
-			routePlan.startSide = ScopedAnchorTop;
-			routePlan.endSide = ScopedAnchorTop;
-			routePlan.laneMaxY = qMin(srcTopY, destTopY) - 20;
-			routePlan.laneMinY = routePlan.laneMaxY - 40;
-			if (routePlan.laneMinY < 160)
-			{
-				routePlan.laneMinY = 160;
-			}
-			if (routePlan.laneMaxY < routePlan.laneMinY)
-			{
-				routePlan.laneMaxY = routePlan.laneMinY;
-			}
-			routePlan.corridorKey = QString("TF|%1|%2|%3")
-				.arg(qMin(srcRange.orderIndex, destRange.orderIndex))
-				.arg(leftColumn)
-				.arg(rightColumn);
+			startSide = ScopedAnchorTop;
+			endSide = ScopedAnchorBottom;
 		}
+	}
+
+	static quint8 ResolveScopedArrowState(CircuitConfig* circuitConfig,
+		const OpticalCircuit* pOpticalCircuit,
+		IedRect* pSrcRect,
+		IedRect* pDestRect)
+	{
+		if (!circuitConfig || !pOpticalCircuit || !pSrcRect || !pDestRect)
+		{
+			return Arrow_None;
+		}
+		quint8 arrowState = Arrow_None;
+		QList<VirtualCircuit*> virtualCircuitList = circuitConfig->GetVirtualCircuitListByOpticalCode(pOpticalCircuit->code);
+		if (virtualCircuitList.isEmpty())
+		{
+			return arrowState;
+		}
+		QString topIedName = pSrcRect->y <= pDestRect->y ? pOpticalCircuit->srcIedName : pOpticalCircuit->destIedName;
+		QString bottomIedName = pSrcRect->y <= pDestRect->y ? pOpticalCircuit->destIedName : pOpticalCircuit->srcIedName;
+		bool srcIsSwitch = IsSwitchIedName(pOpticalCircuit->srcIedName);
+		bool destIsSwitch = IsSwitchIedName(pOpticalCircuit->destIedName);
+		QString leafIedName;
+		bool leafOnTop = false;
+		if (srcIsSwitch != destIsSwitch)
+		{
+			leafIedName = srcIsSwitch ? pOpticalCircuit->destIedName : pOpticalCircuit->srcIedName;
+			leafOnTop = leafIedName.compare(topIedName, Qt::CaseInsensitive) == 0;
+		}
+		for (int virtualIndex = 0; virtualIndex < virtualCircuitList.size(); ++virtualIndex)
+		{
+			VirtualCircuit* pVirtualCircuit = virtualCircuitList.at(virtualIndex);
+			if (!pVirtualCircuit)
+			{
+				continue;
+			}
+			if (srcIsSwitch != destIsSwitch)
+			{
+				if (pVirtualCircuit->srcIedName == leafIedName)
+				{
+					arrowState |= leafOnTop ? Arrow_Out : Arrow_In;
+				}
+				else if (pVirtualCircuit->destIedName == leafIedName)
+				{
+					arrowState |= leafOnTop ? Arrow_In : Arrow_Out;
+				}
+				continue;
+			}
+			if (pVirtualCircuit->srcIedName == topIedName &&
+				pVirtualCircuit->destIedName == bottomIedName)
+			{
+				arrowState |= Arrow_Out;
+			}
+			else if (pVirtualCircuit->srcIedName == bottomIedName &&
+				pVirtualCircuit->destIedName == topIedName)
+			{
+				arrowState |= Arrow_In;
+			}
+		}
+		return arrowState;
 	}
 
 	static void BuildScopedOpticalLineGeometry(OpticalCircuitLine* opticalLine,
@@ -464,32 +581,54 @@ namespace
 		int startCount,
 		int endIndex,
 		int endCount,
-		int laneMinY,
-		int laneMaxY,
-		int routeIndex)
+		int routeIndex,
+		int routeCount)
 	{
 		if (!opticalLine || !opticalLine->pSrcRect || !opticalLine->pDestRect)
 		{
 			return;
 		}
+		const int safeDistance = 34;
+		const int branchStep = 14;
+		const int routeXStep = 20;
+		const int routeYStep = 18;
+		const int branchBase = 8;
+		const int routeBase = 10;
 		opticalLine->midPoints.clear();
 		opticalLine->startPoint = BuildScopedAnchorPoint(opticalLine->pSrcRect, startSide, startIndex, startCount);
 		opticalLine->endPoint = BuildScopedAnchorPoint(opticalLine->pDestRect, endSide, endIndex, endCount);
-		int laneY = PickScopedLaneY(laneMinY, laneMaxY, routeIndex);
-		QList<QPoint> routePointList;
-		QPoint startTurnPoint(opticalLine->startPoint.x(), laneY);
-		QPoint endTurnPoint(opticalLine->endPoint.x(), laneY);
-		if (startTurnPoint != opticalLine->startPoint)
+
+		QPoint startSafePoint = MoveScopedPointBySide(opticalLine->startPoint, startSide, safeDistance);
+		QPoint endSafePoint = MoveScopedPointBySide(opticalLine->endPoint, endSide, safeDistance);
+		int routeBranchOffset = routeBase + qAbs(BuildScopedSpreadOffset(routeIndex, routeCount, routeYStep));
+		int startBranchOffset = branchBase + routeBranchOffset + qAbs(BuildScopedSpreadOffset(startIndex, startCount, branchStep));
+		int endBranchOffset = branchBase + routeBranchOffset + qAbs(BuildScopedSpreadOffset(endIndex, endCount, branchStep));
+		QPoint startBranchPoint = MoveScopedPointBySide(startSafePoint, startSide, startBranchOffset);
+		QPoint endBranchPoint = MoveScopedPointBySide(endSafePoint, endSide, endBranchOffset);
+
+		int routeX = (startBranchPoint.x() + endBranchPoint.x()) / 2;
+		routeX += BuildScopedSpreadOffset(routeIndex, routeCount, routeXStep);
+
+		QList<QPoint> pointList;
+		AppendScopedPoint(pointList, startSafePoint);
+		AppendScopedPoint(pointList, startBranchPoint);
+		if (routeX != startBranchPoint.x())
 		{
-			AppendScopedPoint(routePointList, startTurnPoint);
+			AppendScopedPoint(pointList, QPoint(routeX, startBranchPoint.y()));
 		}
-		if (endTurnPoint != opticalLine->startPoint && endTurnPoint != opticalLine->endPoint)
+		if (startBranchPoint.y() != endBranchPoint.y() || routeX != startBranchPoint.x())
 		{
-			AppendScopedPoint(routePointList, endTurnPoint);
+			AppendScopedPoint(pointList, QPoint(routeX, endBranchPoint.y()));
 		}
-		for (int pointIndex = 0; pointIndex < routePointList.size(); ++pointIndex)
+		if (routeX != endBranchPoint.x())
 		{
-			opticalLine->midPoints.append(routePointList.at(pointIndex));
+			AppendScopedPoint(pointList, QPoint(endBranchPoint.x(), endBranchPoint.y()));
+		}
+		AppendScopedPoint(pointList, endSafePoint);
+
+		for (int pointIndex = 0; pointIndex < pointList.size(); ++pointIndex)
+		{
+			opticalLine->midPoints.append(pointList.at(pointIndex));
 		}
 	}
 
@@ -501,123 +640,205 @@ namespace
 		const QList<OpticalCircuit*>& opticalList,
 		OpticalSvg& svg)
 	{
-		const int leftMargin = 80;
-		const int topMargin = 220;
-		const int columnGap = 240;
-		const int rowGap = 80;
-		const int routeGap = 18;
-		const int tailRouteExtend = 160;
-		const int firstTopLaneY = 160;
+		const int sideMargin = 80;
+		const int rowGap = 70;
+		const int topLayerY = 220;
+		const int baseLayerGapY = 170;
+		const int switchGapY = 55;
+		QStringList topIedNameList;
+		QStringList bottomIedNameList;
+		QStringList switchIedNameList;
 		QHash<QString, IedRect*> rectHash;
-		QHash<QString, ScopedRectRouteRange> rectRouteHash;
-		int maxBottom = 0;
-		int totalWidth = leftMargin * 2 + RECT_DEFAULT_WIDTH;
+		QHash<QString, ScopedRectRouteInfo> rectInfoHash;
+
 		for (int bayIndex = 0; bayIndex < bayOrder.size(); ++bayIndex)
 		{
-			const QString& bayKey = bayOrder.at(bayIndex);
-			QStringList visibleIedList = bayVisibleIedHash.value(bayKey);
-			if (visibleIedList.isEmpty())
+			QStringList visibleIedList = bayVisibleIedHash.value(bayOrder.at(bayIndex));
+			for (int iedIndex = 0; iedIndex < visibleIedList.size(); ++iedIndex)
+			{
+				const QString& iedName = visibleIedList.at(iedIndex);
+				if (IsSwitchIedName(iedName))
+				{
+					if (!switchIedNameList.contains(iedName))
+					{
+						switchIedNameList.append(iedName);
+					}
+					continue;
+				}
+				IED* pIed = circuitConfig ? circuitConfig->GetIedByName(iedName) : NULL;
+				if (ShouldPlaceScopedIedAtBottom(pIed))
+				{
+					if (!bottomIedNameList.contains(iedName))
+					{
+						bottomIedNameList.append(iedName);
+					}
+				}
+				else if (!topIedNameList.contains(iedName))
+				{
+					topIedNameList.append(iedName);
+				}
+			}
+		}
+
+		RebalanceScopedLayerList(topIedNameList, bottomIedNameList);
+
+		QHash<QString, ScopedRectRouteInfo> previewRectInfoHash;
+		for (int topIndex = 0; topIndex < topIedNameList.size(); ++topIndex)
+		{
+			ScopedRectRouteInfo rectInfo;
+			rectInfo.layerType = ScopedLayerTop;
+			rectInfo.orderIndex = topIndex;
+			previewRectInfoHash.insert(topIedNameList.at(topIndex), rectInfo);
+		}
+		for (int switchIndex = 0; switchIndex < switchIedNameList.size(); ++switchIndex)
+		{
+			ScopedRectRouteInfo rectInfo;
+			rectInfo.layerType = ScopedLayerSwitch;
+			rectInfo.orderIndex = switchIndex;
+			previewRectInfoHash.insert(switchIedNameList.at(switchIndex), rectInfo);
+		}
+		for (int bottomIndex = 0; bottomIndex < bottomIedNameList.size(); ++bottomIndex)
+		{
+			ScopedRectRouteInfo rectInfo;
+			rectInfo.layerType = ScopedLayerBottom;
+			rectInfo.orderIndex = bottomIndex;
+			previewRectInfoHash.insert(bottomIedNameList.at(bottomIndex), rectInfo);
+		}
+
+		QHash<QString, int> previewSideCountHash;
+		QHash<QString, int> previewCorridorCountHash;
+		int maxSideCount = 1;
+		int maxCorridorCount = 1;
+		for (int opticalIndex = 0; opticalIndex < opticalList.size(); ++opticalIndex)
+		{
+			OpticalCircuit* pOpticalCircuit = opticalList.at(opticalIndex);
+			if (!pOpticalCircuit)
 			{
 				continue;
 			}
-			QStringList normalIedList;
-			QStringList switchIedList;
-			for (int i = 0; i < visibleIedList.size(); ++i)
+			if (!previewRectInfoHash.contains(pOpticalCircuit->srcIedName) ||
+				!previewRectInfoHash.contains(pOpticalCircuit->destIedName))
 			{
-				if (IsSwitchIedName(visibleIedList.at(i)))
-				{
-					switchIedList.append(visibleIedList.at(i));
-				}
-				else
-				{
-					normalIedList.append(visibleIedList.at(i));
-				}
+				continue;
 			}
-			QStringList orderedIedList = normalIedList;
-			if (orderedIedList.isEmpty())
-			{
-				orderedIedList = switchIedList;
-			}
-			else
-			{
-				int insertIndex = orderedIedList.size() / 2;
-				for (int switchIndex = 0; switchIndex < switchIedList.size(); ++switchIndex)
-				{
-					orderedIedList.insert(insertIndex + switchIndex, switchIedList.at(switchIndex));
-				}
-			}
-			int columnX = leftMargin + bayIndex * (RECT_DEFAULT_WIDTH + columnGap);
-			QList<IedRect*> columnRectList;
-			for (int rowIndex = 0; rowIndex < orderedIedList.size(); ++rowIndex)
-			{
-				IED* pIed = circuitConfig->GetIedByName(orderedIedList.at(rowIndex));
-				IedRect* pRect = CreateScopeRect(pIed, columnX, topMargin + rowIndex * (RECT_DEFAULT_HEIGHT + rowGap));
-				if (!pRect)
-				{
-					continue;
-				}
-				rectHash.insert(pIed->name, pRect);
-				if (IsSwitchIedName(pIed->name))
-				{
-					svg.switcherRectList.append(pRect);
-				}
-				else
-				{
-					svg.iedRectList.append(pRect);
-				}
-				columnRectList.append(pRect);
-				maxBottom = qMax(maxBottom, GetScopedRectBottom(pRect));
-			}
-			for (int rectIndex = 0; rectIndex < columnRectList.size(); ++rectIndex)
-			{
-				IedRect* pRect = columnRectList.at(rectIndex);
-				ScopedRectRouteRange routeRange;
-				routeRange.columnIndex = bayIndex;
-				routeRange.orderIndex = rectIndex;
-				if (rectIndex > 0)
-				{
-					routeRange.topMinY = GetScopedRectBottom(columnRectList.at(rectIndex - 1)) + routeGap;
-				}
-				else
-				{
-					routeRange.topMinY = firstTopLaneY;
-				}
-				routeRange.topMaxY = pRect->y - routeGap;
-				if (routeRange.topMaxY < routeRange.topMinY)
-				{
-					routeRange.topMaxY = routeRange.topMinY;
-				}
-				routeRange.bottomMinY = GetScopedRectBottom(pRect) + routeGap;
-				if (rectIndex + 1 < columnRectList.size())
-				{
-					routeRange.bottomMaxY = columnRectList.at(rectIndex + 1)->y - routeGap;
-				}
-				else
-				{
-					routeRange.bottomMaxY = GetScopedRectBottom(pRect) + tailRouteExtend;
-				}
-				if (routeRange.bottomMaxY < routeRange.bottomMinY)
-				{
-					routeRange.bottomMaxY = routeRange.bottomMinY;
-				}
-				rectRouteHash.insert(pRect->iedName, routeRange);
-				maxBottom = qMax(maxBottom, routeRange.bottomMaxY);
-			}
-			totalWidth = qMax(totalWidth, columnX + RECT_DEFAULT_WIDTH + leftMargin);
+			ScopedRectRouteInfo srcInfo = previewRectInfoHash.value(pOpticalCircuit->srcIedName);
+			ScopedRectRouteInfo destInfo = previewRectInfoHash.value(pOpticalCircuit->destIedName);
+			int startSide = ScopedAnchorBottom;
+			int endSide = ScopedAnchorTop;
+			ResolveScopedAnchorSide(srcInfo.layerType, destInfo.layerType, NULL, NULL, startSide, endSide);
+			QString startSideKey = BuildScopedSideKey(pOpticalCircuit->srcIedName, startSide);
+			QString endSideKey = BuildScopedSideKey(pOpticalCircuit->destIedName, endSide);
+			QString corridorKey = BuildScopedCorridorKey(pOpticalCircuit);
+			int startCount = previewSideCountHash.value(startSideKey, 0) + 1;
+			int endCount = previewSideCountHash.value(endSideKey, 0) + 1;
+			int corridorCount = previewCorridorCountHash.value(corridorKey, 0) + 1;
+			previewSideCountHash.insert(startSideKey, startCount);
+			previewSideCountHash.insert(endSideKey, endCount);
+			previewCorridorCountHash.insert(corridorKey, corridorCount);
+			maxSideCount = qMax(maxSideCount, qMax(startCount, endCount));
+			maxCorridorCount = qMax(maxCorridorCount, corridorCount);
+		}
+		int dynamicLayerGapY = EstimateScopedLayerGap(maxSideCount, maxCorridorCount, baseLayerGapY);
+
+		int maxRowCount = qMax(topIedNameList.size(), bottomIedNameList.size());
+		if (maxRowCount < 1)
+		{
+			maxRowCount = 1;
+		}
+		int totalWidth = qMax(SVG_VIEWBOX_WIDTH / 2,
+			sideMargin * 2 + GetScopedRowWidth(maxRowCount, RECT_DEFAULT_WIDTH, rowGap));
+		int switchWidth = totalWidth - sideMargin * 2;
+		if (switchWidth < RECT_DEFAULT_WIDTH + 220)
+		{
+			switchWidth = RECT_DEFAULT_WIDTH + 220;
+			totalWidth = switchWidth + sideMargin * 2;
 		}
 
 		svg.mainIedRect = CreateScopeTitleRect(titleName, titleDesc, totalWidth);
-		if (svg.mainIedRect)
+
+		int topRowStartX = GetScopedRowStartX(totalWidth, topIedNameList.size(), RECT_DEFAULT_WIDTH, rowGap);
+		for (int topIndex = 0; topIndex < topIedNameList.size(); ++topIndex)
 		{
-			totalWidth = qMax(totalWidth, (int)svg.mainIedRect->x + (int)svg.mainIedRect->width + leftMargin);
-			maxBottom = qMax(maxBottom, (int)svg.mainIedRect->GetInnerBottomY());
+			IED* pIed = circuitConfig ? circuitConfig->GetIedByName(topIedNameList.at(topIndex)) : NULL;
+			IedRect* pRect = CreateScopeRect(pIed,
+				topRowStartX + topIndex * (RECT_DEFAULT_WIDTH + rowGap),
+				topLayerY);
+			if (!pRect || !pIed)
+			{
+				continue;
+			}
+			svg.iedRectList.append(pRect);
+			rectHash.insert(pIed->name, pRect);
+			ScopedRectRouteInfo rectInfo;
+			rectInfo.pRect = pRect;
+			rectInfo.layerType = ScopedLayerTop;
+			rectInfo.orderIndex = topIndex;
+			rectInfoHash.insert(pIed->name, rectInfo);
+		}
+
+		int switchY = topLayerY + RECT_DEFAULT_HEIGHT + dynamicLayerGapY;
+		int switchStartX = (totalWidth - switchWidth) / 2;
+		for (int switchIndex = 0; switchIndex < switchIedNameList.size(); ++switchIndex)
+		{
+			IED* pSwitchIed = circuitConfig ? circuitConfig->GetIedByName(switchIedNameList.at(switchIndex)) : NULL;
+			if (!pSwitchIed)
+			{
+				continue;
+			}
+			IedRect* pRect = utils::GetIedRect(
+				pSwitchIed->name,
+				pSwitchIed->desc,
+				(quint16)switchStartX,
+				(quint16)(switchY + switchIndex * (RECT_DEFAULT_HEIGHT + switchGapY)),
+				(quint16)switchWidth,
+				RECT_DEFAULT_HEIGHT,
+				ColorHelper::ied_border,
+				ColorHelper::ied_underground);
+			svg.switcherRectList.append(pRect);
+			rectHash.insert(pSwitchIed->name, pRect);
+			ScopedRectRouteInfo rectInfo;
+			rectInfo.pRect = pRect;
+			rectInfo.layerType = ScopedLayerSwitch;
+			rectInfo.orderIndex = switchIndex;
+			rectInfoHash.insert(pSwitchIed->name, rectInfo);
+		}
+
+		int bottomLayerY = switchY + switchIedNameList.size() * RECT_DEFAULT_HEIGHT;
+		if (!switchIedNameList.isEmpty())
+		{
+			bottomLayerY += qMax(0, switchIedNameList.size() - 1) * switchGapY;
+		}
+		bottomLayerY += dynamicLayerGapY;
+		if (switchIedNameList.isEmpty())
+		{
+			bottomLayerY = topLayerY + RECT_DEFAULT_HEIGHT + dynamicLayerGapY * 2;
+		}
+		int bottomRowStartX = GetScopedRowStartX(totalWidth, bottomIedNameList.size(), RECT_DEFAULT_WIDTH, rowGap);
+		for (int bottomIndex = 0; bottomIndex < bottomIedNameList.size(); ++bottomIndex)
+		{
+			IED* pIed = circuitConfig ? circuitConfig->GetIedByName(bottomIedNameList.at(bottomIndex)) : NULL;
+			IedRect* pRect = CreateScopeRect(pIed,
+				bottomRowStartX + bottomIndex * (RECT_DEFAULT_WIDTH + rowGap),
+				bottomLayerY);
+			if (!pRect || !pIed)
+			{
+				continue;
+			}
+			svg.iedRectList.append(pRect);
+			rectHash.insert(pIed->name, pRect);
+			ScopedRectRouteInfo rectInfo;
+			rectInfo.pRect = pRect;
+			rectInfo.layerType = ScopedLayerBottom;
+			rectInfo.orderIndex = bottomIndex;
+			rectInfoHash.insert(pIed->name, rectInfo);
 		}
 
 		QList<ScopedOpticalRoutePlan> routePlanList;
 		QHash<QString, int> sideCountHash;
-		for (int i = 0; i < opticalList.size(); ++i)
+		QHash<QString, int> corridorCountHash;
+		for (int opticalIndex = 0; opticalIndex < opticalList.size(); ++opticalIndex)
 		{
-			OpticalCircuit* pOpticalCircuit = opticalList.at(i);
+			OpticalCircuit* pOpticalCircuit = opticalList.at(opticalIndex);
 			if (!pOpticalCircuit)
 			{
 				continue;
@@ -626,33 +847,32 @@ namespace
 			{
 				continue;
 			}
-			if (!rectRouteHash.contains(pOpticalCircuit->srcIedName) || !rectRouteHash.contains(pOpticalCircuit->destIedName))
-			{
-				continue;
-			}
-			IedRect* pSrcRect = rectHash.value(pOpticalCircuit->srcIedName);
-			IedRect* pDestRect = rectHash.value(pOpticalCircuit->destIedName);
-			if (!pSrcRect || !pDestRect || pSrcRect == pDestRect)
+			ScopedRectRouteInfo srcInfo = rectInfoHash.value(pOpticalCircuit->srcIedName);
+			ScopedRectRouteInfo destInfo = rectInfoHash.value(pOpticalCircuit->destIedName);
+			if (!srcInfo.pRect || !destInfo.pRect)
 			{
 				continue;
 			}
 			ScopedOpticalRoutePlan routePlan;
 			routePlan.pOpticalCircuit = pOpticalCircuit;
-			ResolveScopedOpticalRoutePlan(
-				rectRouteHash.value(pOpticalCircuit->srcIedName),
-				rectRouteHash.value(pOpticalCircuit->destIedName),
-				pSrcRect,
-				pDestRect,
-				routePlan);
+			routePlan.pSrcRect = srcInfo.pRect;
+			routePlan.pDestRect = destInfo.pRect;
+			routePlan.srcLayerType = srcInfo.layerType;
+			routePlan.destLayerType = destInfo.layerType;
+			ResolveScopedAnchorSide(srcInfo.layerType, destInfo.layerType,
+				srcInfo.pRect, destInfo.pRect, routePlan.startSide, routePlan.endSide);
+			routePlan.startSideKey = BuildScopedSideKey(pOpticalCircuit->srcIedName, routePlan.startSide);
+			routePlan.endSideKey = BuildScopedSideKey(pOpticalCircuit->destIedName, routePlan.endSide);
+			routePlan.corridorKey = BuildScopedCorridorKey(pOpticalCircuit);
 			routePlanList.append(routePlan);
-			QString startSideKey = BuildScopedSideKey(pOpticalCircuit->srcIedName, routePlan.startSide);
-			QString endSideKey = BuildScopedSideKey(pOpticalCircuit->destIedName, routePlan.endSide);
-			sideCountHash.insert(startSideKey, sideCountHash.value(startSideKey, 0) + 1);
-			sideCountHash.insert(endSideKey, sideCountHash.value(endSideKey, 0) + 1);
+			sideCountHash.insert(routePlan.startSideKey, sideCountHash.value(routePlan.startSideKey, 0) + 1);
+			sideCountHash.insert(routePlan.endSideKey, sideCountHash.value(routePlan.endSideKey, 0) + 1);
+			corridorCountHash.insert(routePlan.corridorKey, corridorCountHash.value(routePlan.corridorKey, 0) + 1);
 		}
 
 		QHash<QString, int> sideIndexHash;
 		QHash<QString, int> corridorIndexHash;
+		int maxBottom = bottomLayerY + RECT_DEFAULT_HEIGHT;
 		for (int routePlanIndex = 0; routePlanIndex < routePlanList.size(); ++routePlanIndex)
 		{
 			const ScopedOpticalRoutePlan& routePlan = routePlanList.at(routePlanIndex);
@@ -660,46 +880,50 @@ namespace
 			{
 				continue;
 			}
-			OpticalCircuitLine* opticalLine = new OpticalCircuitLine();
-			opticalLine->lineCode = routePlan.pOpticalCircuit->loopCode;
-			opticalLine->arrowState = Arrow_None;
-			opticalLine->pOpticalCircuit = routePlan.pOpticalCircuit;
-			opticalLine->pSrcRect = routePlan.pSrcRect;
-			opticalLine->pDestRect = routePlan.pDestRect;
-			QString startSideKey = BuildScopedSideKey(routePlan.pOpticalCircuit->srcIedName, routePlan.startSide);
-			QString endSideKey = BuildScopedSideKey(routePlan.pOpticalCircuit->destIedName, routePlan.endSide);
-			int startIndex = sideIndexHash.value(startSideKey, 0);
-			int endIndex = sideIndexHash.value(endSideKey, 0);
-			sideIndexHash.insert(startSideKey, startIndex + 1);
-			sideIndexHash.insert(endSideKey, endIndex + 1);
-			int routeIndex = corridorIndexHash.value(routePlan.corridorKey, 0);
-			corridorIndexHash.insert(routePlan.corridorKey, routeIndex + 1);
+			OpticalCircuitLine* pOpticalLine = new OpticalCircuitLine();
+			pOpticalLine->lineCode = routePlan.pOpticalCircuit->loopCode;
+			pOpticalLine->pOpticalCircuit = routePlan.pOpticalCircuit;
+			pOpticalLine->pSrcRect = routePlan.pSrcRect;
+			pOpticalLine->pDestRect = routePlan.pDestRect;
+			pOpticalLine->arrowState = ResolveScopedArrowState(circuitConfig,
+				routePlan.pOpticalCircuit,
+				routePlan.pSrcRect,
+				routePlan.pDestRect);
+
+			int startIndex = sideIndexHash.value(routePlan.startSideKey, 0);
+			int endIndex = sideIndexHash.value(routePlan.endSideKey, 0);
+			int corridorIndex = corridorIndexHash.value(routePlan.corridorKey, 0);
+			sideIndexHash.insert(routePlan.startSideKey, startIndex + 1);
+			sideIndexHash.insert(routePlan.endSideKey, endIndex + 1);
+			corridorIndexHash.insert(routePlan.corridorKey, corridorIndex + 1);
+
 			BuildScopedOpticalLineGeometry(
-				opticalLine,
+				pOpticalLine,
 				routePlan.startSide,
 				routePlan.endSide,
 				startIndex,
-				sideCountHash.value(startSideKey, 1),
+				sideCountHash.value(routePlan.startSideKey, 1),
 				endIndex,
-				sideCountHash.value(endSideKey, 1),
-				routePlan.laneMinY,
-				routePlan.laneMaxY,
-				routeIndex);
-			maxBottom = qMax(maxBottom, opticalLine->startPoint.y());
-			maxBottom = qMax(maxBottom, opticalLine->endPoint.y());
-			for (int pointIndex = 0; pointIndex < opticalLine->midPoints.size(); ++pointIndex)
+				sideCountHash.value(routePlan.endSideKey, 1),
+				corridorIndex,
+				corridorCountHash.value(routePlan.corridorKey, 1));
+
+			maxBottom = qMax(maxBottom, pOpticalLine->startPoint.y());
+			maxBottom = qMax(maxBottom, pOpticalLine->endPoint.y());
+			for (int pointIndex = 0; pointIndex < pOpticalLine->midPoints.size(); ++pointIndex)
 			{
-				maxBottom = qMax(maxBottom, opticalLine->midPoints.at(pointIndex).y());
+				maxBottom = qMax(maxBottom, pOpticalLine->midPoints.at(pointIndex).y());
 			}
-			svg.opticalCircuitLineList.append(opticalLine);
+			svg.opticalCircuitLineList.append(pOpticalLine);
 		}
 
 		svg.viewBoxX = 0;
 		svg.viewBoxY = 0;
-		svg.viewBoxWidth = qMax(totalWidth + leftMargin, SVG_VIEWBOX_WIDTH / 2);
-		svg.viewBoxHeight = qMax(maxBottom + 100, topMargin + RECT_DEFAULT_HEIGHT + 100);
+		svg.viewBoxWidth = qMax(totalWidth + sideMargin, SVG_VIEWBOX_WIDTH / 2);
+		svg.viewBoxHeight = qMax(maxBottom + 120, bottomLayerY + RECT_DEFAULT_HEIGHT + 120);
 	}
 }
+
 
 SvgTransformer::SvgTransformer()
 {

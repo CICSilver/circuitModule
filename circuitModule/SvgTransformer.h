@@ -366,15 +366,16 @@ private:
 
 	void SetArrowStateDirect(const QList<LogicCircuit*>& inList,
 		const QList<LogicCircuit*>& outList,
+		const QString& mainIedName,
 		const QString& peerIedName,
-		quint8& lineState);
+		OpticalCircuitLine* pLine);
 
 	void SetArrowStateThroughSwitch(const QList<LogicCircuit*>& inList,
 		const QList<LogicCircuit*>& outList,
+		const QString& mainIedName,
 		const QString& peerIedName,
-		int peersCount,
-		quint8& oppLineState,      // 交换机?对侧IED
-		quint8& mainSwitchState);  // 主IED?交换机
+		OpticalCircuitLine* pOppLine,
+		OpticalCircuitLine* pMainSwitchLine);
 
 	//************************************
 	// 函数名称:	drawArrowHeader

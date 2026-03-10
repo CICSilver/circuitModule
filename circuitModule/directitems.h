@@ -305,7 +305,8 @@ private:
 	bool m_startAtTop;
 	bool m_endAtTop;
 	int m_underRectY;
-	quint8 m_arrowState;
+	quint8 m_startArrowState;
+	quint8 m_endArrowState;
 	quint16 m_lineCode;
 	QColor m_lineColor;
 	int m_lineWidth;

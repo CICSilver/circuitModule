@@ -10,9 +10,10 @@
 #include <QFontMetrics>
 #include <qmath.h>
 
-static const int DIRECT_PORT_TEXT_OFFSET = 12;
-static const int DIRECT_ARROW_OFFSET = 10;
-static const int DIRECT_BOUND_MARGIN = 12;
+#define DIRECT_PORT_TEXT_OFFSET 12	// 端口文字距连接点偏移
+#define DIRECT_ARROW_OFFSET 10	// 箭头距连接点偏移
+#define DIRECT_BOUND_MARGIN 12	// 交互区域额外边距
+#define DIRECT_DOUBLE_ARROW_GAP_RATIO 1.5	// 双向箭头前后错开比例
 
 directItemBase::~directItemBase()
 {}
@@ -93,6 +94,18 @@ static QPointF direct_build_arrow_point_on_line(const QPointF& connPoint, const 
 		connPoint.y() + outwardVec.y() / vectorLength * totalOffset);
 }
 
+static QPointF direct_offset_point_by_vec(const QPointF& point, const QPointF& vec, qreal offset)
+{
+	qreal vectorLength = qSqrt(vec.x() * vec.x() + vec.y() * vec.y());
+	if (vectorLength < 0.001)
+	{
+		return point;
+	}
+	return QPointF(
+		point.x() + vec.x() / vectorLength * offset,
+		point.y() + vec.y() / vectorLength * offset);
+}
+
 static void direct_draw_single_port_text(QPainter* painter, const QPoint& connPoint, bool isTopSide, bool isSwitch, const QString& port, int conn_r)
 {
 	if (port.isEmpty()) return;
@@ -121,6 +134,29 @@ static bool direct_is_top_anchor(const QPoint& point, const IedRect* rect)
 	int topDistance = qAbs(point.y() - (int)rect->y);
 	int bottomDistance = qAbs(point.y() - (int)(rect->y + rect->height));
 	return topDistance <= bottomDistance;
+}
+
+static bool direct_is_point_attached_to_rect(const QPoint& point, const IedRect* rect)
+{
+	if (!rect)
+	{
+		return false;
+	}
+	int left = rect->x;
+	int right = rect->x + rect->width;
+	int top = rect->y;
+	int bottom = rect->y + rect->height;
+	bool withinHorizontal = point.x() >= left && point.x() <= right;
+	bool withinVertical = point.y() >= top && point.y() <= bottom;
+	if (withinHorizontal && (point.y() == top || point.y() == bottom))
+	{
+		return true;
+	}
+	if (withinVertical && (point.x() == left || point.x() == right))
+	{
+		return true;
+	}
+	return false;
 }
 
 static void direct_draw_port_text(QPainter* painter, const QPoint& startPoint, const QPoint& endPoint,
@@ -605,7 +641,8 @@ DirectOpticalLineItem::DirectOpticalLineItem(QGraphicsItem* parent)
 	, m_startAtTop(true)
 	, m_endAtTop(false)
 	, m_underRectY(0)
-	, m_arrowState(Arrow_None)
+	, m_startArrowState(Arrow_None)
+	, m_endArrowState(Arrow_None)
 	, m_lineCode(0)
 	, m_lineColor(Qt::green)
 	, m_lineWidth(1)
@@ -669,21 +706,38 @@ void DirectOpticalLineItem::paint(QPainter* painter, const QStyleOptionGraphicsI
 		startOutwardVec = m_points[1] - m_points[0];
 		endOutwardVec = m_points[m_points.size() - 2] - m_points[m_points.size() - 1];
 	}
-	if (m_arrowState & Arrow_Out) {
-		QPointF startArrowPoint = direct_build_arrow_point_on_line(m_points[0], startOutwardVec, CONN_R, ARROW_LEN, DIRECT_ARROW_OFFSET);
-		double startArrowAngle = direct_angle_by_vec(-startOutwardVec);
-		direct_draw_arrow_outline(painter, startArrowPoint, startArrowAngle, m_lineColor, ARROW_LEN, w);
-		QPointF endArrowPoint = direct_build_arrow_point_on_line(m_points[m_points.size() - 1], endOutwardVec, CONN_R, ARROW_LEN, DIRECT_ARROW_OFFSET);
-		double endArrowAngle = direct_angle_by_vec(-endOutwardVec);
-		direct_draw_arrow_outline(painter, endArrowPoint, endArrowAngle, m_lineColor, ARROW_LEN, w);
+	QPointF startArrowPoint = direct_build_arrow_point_on_line(m_points[0], startOutwardVec, CONN_R, ARROW_LEN, DIRECT_ARROW_OFFSET);
+	QPointF endArrowPoint = direct_build_arrow_point_on_line(m_points[m_points.size() - 1], endOutwardVec, CONN_R, ARROW_LEN, DIRECT_ARROW_OFFSET);
+	qreal doubleArrowGap = ARROW_LEN * DIRECT_DOUBLE_ARROW_GAP_RATIO;
+	QPointF startOutArrowPoint = startArrowPoint;
+	QPointF startInArrowPoint = startArrowPoint;
+	QPointF endOutArrowPoint = endArrowPoint;
+	QPointF endInArrowPoint = endArrowPoint;
+	if ((m_startArrowState & Arrow_InOut) == Arrow_InOut)
+	{
+		startOutArrowPoint = direct_offset_point_by_vec(startArrowPoint, startOutwardVec, doubleArrowGap * 0.5);
+		startInArrowPoint = direct_offset_point_by_vec(startArrowPoint, startOutwardVec, -doubleArrowGap * 0.5);
 	}
-	if (m_arrowState & Arrow_In) {
-		QPointF startArrowPoint = direct_build_arrow_point_on_line(m_points[0], startOutwardVec, CONN_R, ARROW_LEN, DIRECT_ARROW_OFFSET);
+	if ((m_endArrowState & Arrow_InOut) == Arrow_InOut)
+	{
+		endOutArrowPoint = direct_offset_point_by_vec(endArrowPoint, endOutwardVec, doubleArrowGap * 0.5);
+		endInArrowPoint = direct_offset_point_by_vec(endArrowPoint, endOutwardVec, -doubleArrowGap * 0.5);
+	}
+	if (m_startArrowState & Arrow_Out) {
 		double startArrowAngle = direct_angle_by_vec(startOutwardVec);
-		direct_draw_arrow_outline(painter, startArrowPoint, startArrowAngle, m_lineColor, ARROW_LEN, w);
-		QPointF endArrowPoint = direct_build_arrow_point_on_line(m_points[m_points.size() - 1], endOutwardVec, CONN_R, ARROW_LEN, DIRECT_ARROW_OFFSET);
+		direct_draw_arrow(painter, startOutArrowPoint, startArrowAngle, m_lineColor, ARROW_LEN);
+	}
+	if (m_startArrowState & Arrow_In) {
+		double startArrowAngle = direct_angle_by_vec(-startOutwardVec);
+		direct_draw_arrow(painter, startInArrowPoint, startArrowAngle, m_lineColor, ARROW_LEN);
+	}
+	if (m_endArrowState & Arrow_Out) {
 		double endArrowAngle = direct_angle_by_vec(endOutwardVec);
-		direct_draw_arrow_outline(painter, endArrowPoint, endArrowAngle, m_lineColor, ARROW_LEN, w);
+		direct_draw_arrow(painter, endOutArrowPoint, endArrowAngle, m_lineColor, ARROW_LEN);
+	}
+	if (m_endArrowState & Arrow_In) {
+		double endArrowAngle = direct_angle_by_vec(-endOutwardVec);
+		direct_draw_arrow(painter, endInArrowPoint, endArrowAngle, m_lineColor, ARROW_LEN);
 	}
 	direct_draw_port_text(painter, m_startPoint, m_endPoint, m_startAtTop, m_endAtTop,
 		m_startIsSwitch, m_endIsSwitch, m_startPort, m_endPort, CONN_R);
@@ -728,7 +782,8 @@ void DirectOpticalLineItem::setFromOpticalLine(const OpticalCircuitLine& line)
 	m_points.append(QPointF(line.endPoint));
 	m_startPoint = line.startPoint;
 	m_endPoint = line.endPoint;
-	m_arrowState = line.arrowState;
+	m_startArrowState = Arrow_None;
+	m_endArrowState = Arrow_None;
 	m_lineCode = line.lineCode;
 	m_startPort.clear();
 	m_endPort.clear();
@@ -738,13 +793,36 @@ void DirectOpticalLineItem::setFromOpticalLine(const OpticalCircuitLine& line)
 	m_endAtTop = false;
 	m_underRectY = 0;
 	if (line.pSrcRect && line.pDestRect && line.pOpticalCircuit) {
-		m_startIsSwitch = line.pSrcRect->iedName.contains("SW");
-		m_endIsSwitch = line.pDestRect->iedName.contains("SW");
+		bool startIsSrc = direct_is_point_attached_to_rect(line.startPoint, line.pSrcRect);
+		bool endIsSrc = direct_is_point_attached_to_rect(line.endPoint, line.pSrcRect);
+		bool useStartAsSrc = true;
+		if (!startIsSrc && endIsSrc)
+		{
+			useStartAsSrc = false;
+		}
 		m_underRectY = line.pSrcRect->y > line.pDestRect->y ? line.pSrcRect->y : line.pDestRect->y;
-		m_startPort = line.pOpticalCircuit->srcIedPort;
-		m_endPort = line.pOpticalCircuit->destIedPort;
-		m_startAtTop = direct_is_top_anchor(line.startPoint, line.pSrcRect);
-		m_endAtTop = direct_is_top_anchor(line.endPoint, line.pDestRect);
+		if (useStartAsSrc)
+		{
+			m_startArrowState = line.srcArrowState;
+			m_endArrowState = line.destArrowState;
+			m_startIsSwitch = line.pSrcRect->iedName.contains("SW");
+			m_endIsSwitch = line.pDestRect->iedName.contains("SW");
+			m_startPort = line.pOpticalCircuit->srcIedPort;
+			m_endPort = line.pOpticalCircuit->destIedPort;
+			m_startAtTop = direct_is_top_anchor(line.startPoint, line.pSrcRect);
+			m_endAtTop = direct_is_top_anchor(line.endPoint, line.pDestRect);
+		}
+		else
+		{
+			m_startArrowState = line.destArrowState;
+			m_endArrowState = line.srcArrowState;
+			m_startIsSwitch = line.pDestRect->iedName.contains("SW");
+			m_endIsSwitch = line.pSrcRect->iedName.contains("SW");
+			m_startPort = line.pOpticalCircuit->destIedPort;
+			m_endPort = line.pOpticalCircuit->srcIedPort;
+			m_startAtTop = direct_is_top_anchor(line.startPoint, line.pDestRect);
+			m_endAtTop = direct_is_top_anchor(line.endPoint, line.pSrcRect);
+		}
 	}
 	update();
 }

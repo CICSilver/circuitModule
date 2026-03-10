@@ -7,9 +7,26 @@
 #include "PainterStateGuard.h"
 #include "SvgUtils.h"
 #include <QBuffer>
+#include <QSet>
 #include <sstream>
 using utils::ColorHelper;
 #define SAFE_DISTANCE 34	// 光纤起点/终点与矩形边缘的安全距离，避免箭头与矩形重叠
+#define SCOPED_BRANCH_BASE 8	// scoped分支基础偏移
+#define SCOPED_BRANCH_STEP 14	// scoped分支分层步长
+#define SCOPED_TRUNK_BASE 10	// scoped主干基础偏移
+#define SCOPED_LANE_STEP 32	// scoped主干和竖线分层间距
+#define SCOPED_DOGLEG_STEP 12	// scoped转折点附加偏移
+#define SCOPED_SIDE_MARGIN 80	// scoped图左右边距
+#define SCOPED_ROW_GAP 70	// scoped同层IED水平间距
+#define SCOPED_TOP_LAYER_Y 220	// scoped顶部IED起始Y
+#define SCOPED_BASE_LAYER_GAP_Y 170	// scoped基础层间距
+#define SCOPED_SWITCH_GAP_Y 55	// scoped交换机竖向间距
+#define IED_OPTICAL_HORIZONTAL_DISTANCE 50	// IED光纤图水平间距
+#define IED_OPTICAL_VERTICAL_DISTANCE 150	// IED光纤图垂直间距
+#define IED_OPTICAL_SWITCHER_WIDTH_RATIO 0.75	// IED交换机宽度比例
+#define IED_OPTICAL_MIDPOINT_DISTANCE 10	// IED直连光纤转折间距
+#define OPTICAL_ARROW_EXTRA_OFFSET 5	// 箭头距连接点的额外偏移
+#define OPTICAL_DOUBLE_ARROW_GAP_RATIO 2	// 双向箭头前后错开比例
 namespace
 {
 	static bool IsSwitchIedName(const QString& iedName)
@@ -389,13 +406,9 @@ namespace
 	}
 	static int EstimateScopedLayerGap(int maxSideCount, int maxCorridorCount, int baseLayerGap)
 	{
-		const int branchBase = 8;
-		const int branchStep = 14;
-		const int routeBase = 10;
-		const int routeStep = 32;
-		int maxSideSpread = GetScopedMaxAbsSpread(maxSideCount, branchStep);
-		int maxCorridorSpread = GetScopedMaxAbsSpread(maxCorridorCount, routeStep);
-		int requiredGap = SAFE_DISTANCE + branchBase + routeBase + maxSideSpread + maxCorridorSpread + 40;
+		int maxSideSpread = GetScopedMaxAbsSpread(maxSideCount, SCOPED_BRANCH_STEP);
+		int maxCorridorSpread = GetScopedMaxAbsSpread(maxCorridorCount, SCOPED_LANE_STEP);
+		int requiredGap = SAFE_DISTANCE + SCOPED_BRANCH_BASE + SCOPED_TRUNK_BASE + maxSideSpread + maxCorridorSpread + 40;
 		if (requiredGap < baseLayerGap)
 		{
 			requiredGap = baseLayerGap;
@@ -501,31 +514,27 @@ namespace
 	}
 	static int ComputeScopedTrunkY(const ScopedOpticalRoutePlan& routePlan)
 	{
-		const int branchStep = 14;
-		const int branchBase = 8;
-		const int trunkBase = 10;
-		const int laneStep = 32;
 		QPoint startPoint = BuildScopedAnchorPoint(routePlan.pSrcRect, routePlan.startSide, routePlan.startIndex, routePlan.startCount);
 		QPoint endPoint = BuildScopedAnchorPoint(routePlan.pDestRect, routePlan.endSide, routePlan.endIndex, routePlan.endCount);
 		QPoint startSafePoint = MoveScopedPointBySide(startPoint, routePlan.startSide, SAFE_DISTANCE);
 		QPoint endSafePoint = MoveScopedPointBySide(endPoint, routePlan.endSide, SAFE_DISTANCE);
-		int startBranchOffset = branchBase + qAbs(BuildScopedSpreadOffset(routePlan.startIndex, routePlan.startCount, branchStep));
+		int startBranchOffset = SCOPED_BRANCH_BASE + qAbs(BuildScopedSpreadOffset(routePlan.startIndex, routePlan.startCount, SCOPED_BRANCH_STEP));
 		QPoint startBranchPoint = MoveScopedPointBySide(startSafePoint, routePlan.startSide, startBranchOffset);
 		int trunkY = startBranchPoint.y();
 		if (routePlan.startSide != routePlan.endSide)
 		{
 			int upperY = qMin(startSafePoint.y(), endSafePoint.y());
-			trunkY = upperY + trunkBase + routePlan.laneIndex * laneStep;
+			trunkY = upperY + SCOPED_TRUNK_BASE + routePlan.laneIndex * SCOPED_LANE_STEP;
 		}
 		else if (routePlan.startSide == ScopedAnchorBottom && routePlan.endSide == ScopedAnchorBottom)
 		{
 			int baseY = qMax(startSafePoint.y(), endSafePoint.y());
-			trunkY = baseY + trunkBase + routePlan.laneIndex * laneStep;
+			trunkY = baseY + SCOPED_TRUNK_BASE + routePlan.laneIndex * SCOPED_LANE_STEP;
 		}
 		else
 		{
 			int baseY = qMin(startSafePoint.y(), endSafePoint.y());
-			trunkY = baseY - trunkBase - routePlan.laneIndex * laneStep;
+			trunkY = baseY - SCOPED_TRUNK_BASE - routePlan.laneIndex * SCOPED_LANE_STEP;
 		}
 		return trunkY;
 	}
@@ -557,12 +566,11 @@ namespace
 	}
 	static int ComputeScopedVerticalLaneX(int safePointX, int laneIndex, int laneCount)
 	{
-		const int verticalLaneStep = 32;
-		if (laneCount <= 1)
+				if (laneCount <= 1)
 		{
 			return safePointX;
 		}
-		return safePointX + BuildScopedSpreadOffset(laneIndex, laneCount, verticalLaneStep);
+		return safePointX + BuildScopedSpreadOffset(laneIndex, laneCount, SCOPED_LANE_STEP);
 	}
 	static void RefreshScopedHorizontalSpan(ScopedOpticalRoutePlan& routePlan)
 	{
@@ -820,31 +828,35 @@ namespace
 			endSide = ScopedAnchorBottom;
 		}
 	}
-	static quint8 ResolveScopedArrowState(CircuitConfig* circuitConfig,
-		const OpticalCircuit* pOpticalCircuit,
-		IedRect* pSrcRect,
-		IedRect* pDestRect)
+	static void AppendArrowDirection(quint8& fromArrowState, quint8& toArrowState)
 	{
-		if (!circuitConfig || !pOpticalCircuit || !pSrcRect || !pDestRect)
+		fromArrowState |= Arrow_Out;
+		toArrowState |= Arrow_In;
+	}
+	static void ResolveOpticalArrowState(CircuitConfig* circuitConfig,
+		const OpticalCircuit* pOpticalCircuit,
+		quint8& srcArrowState,
+		quint8& destArrowState)
+	{
+		srcArrowState = Arrow_None;
+		destArrowState = Arrow_None;
+		if (!circuitConfig || !pOpticalCircuit)
 		{
-			return Arrow_None;
+			return;
 		}
-		quint8 arrowState = Arrow_None;
 		QList<VirtualCircuit*> virtualCircuitList = circuitConfig->GetVirtualCircuitListByOpticalCode(pOpticalCircuit->code);
 		if (virtualCircuitList.isEmpty())
 		{
-			return arrowState;
+			return;
 		}
-		QString topIedName = pSrcRect->y <= pDestRect->y ? pOpticalCircuit->srcIedName : pOpticalCircuit->destIedName;
-		QString bottomIedName = pSrcRect->y <= pDestRect->y ? pOpticalCircuit->destIedName : pOpticalCircuit->srcIedName;
 		bool srcIsSwitch = IsSwitchIedName(pOpticalCircuit->srcIedName);
 		bool destIsSwitch = IsSwitchIedName(pOpticalCircuit->destIedName);
 		QString leafIedName;
-		bool leafOnTop = false;
+		bool leafIsSrc = false;
 		if (srcIsSwitch != destIsSwitch)
 		{
 			leafIedName = srcIsSwitch ? pOpticalCircuit->destIedName : pOpticalCircuit->srcIedName;
-			leafOnTop = leafIedName.compare(topIedName, Qt::CaseInsensitive) == 0;
+			leafIsSrc = leafIedName.compare(pOpticalCircuit->srcIedName, Qt::CaseInsensitive) == 0;
 		}
 		for (int virtualIndex = 0; virtualIndex < virtualCircuitList.size(); ++virtualIndex)
 		{
@@ -857,26 +869,83 @@ namespace
 			{
 				if (pVirtualCircuit->srcIedName == leafIedName)
 				{
-					arrowState |= leafOnTop ? Arrow_Out : Arrow_In;
+					if (leafIsSrc)
+					{
+						AppendArrowDirection(srcArrowState, destArrowState);
+					}
+					else
+					{
+						AppendArrowDirection(destArrowState, srcArrowState);
+					}
 				}
 				else if (pVirtualCircuit->destIedName == leafIedName)
 				{
-					arrowState |= leafOnTop ? Arrow_In : Arrow_Out;
+					if (leafIsSrc)
+					{
+						AppendArrowDirection(destArrowState, srcArrowState);
+					}
+					else
+					{
+						AppendArrowDirection(srcArrowState, destArrowState);
+					}
 				}
 				continue;
 			}
-			if (pVirtualCircuit->srcIedName == topIedName &&
-				pVirtualCircuit->destIedName == bottomIedName)
+			if (pVirtualCircuit->srcIedName == pOpticalCircuit->srcIedName &&
+				pVirtualCircuit->destIedName == pOpticalCircuit->destIedName)
 			{
-				arrowState |= Arrow_Out;
+				AppendArrowDirection(srcArrowState, destArrowState);
 			}
-			else if (pVirtualCircuit->srcIedName == bottomIedName &&
-				pVirtualCircuit->destIedName == topIedName)
+			else if (pVirtualCircuit->srcIedName == pOpticalCircuit->destIedName &&
+				pVirtualCircuit->destIedName == pOpticalCircuit->srcIedName)
 			{
-				arrowState |= Arrow_In;
+				AppendArrowDirection(destArrowState, srcArrowState);
 			}
 		}
-		return arrowState;
+	}
+	static void ResolveScopedArrowState(CircuitConfig* circuitConfig,
+		const OpticalCircuit* pOpticalCircuit,
+		quint8& srcArrowState,
+		quint8& destArrowState)
+	{
+		ResolveOpticalArrowState(circuitConfig, pOpticalCircuit, srcArrowState, destArrowState);
+	}
+	static void AppendLineArrowState(OpticalCircuitLine* pLine, const QString& iedName, quint8 arrowState)
+	{
+		if (!pLine || !pLine->pOpticalCircuit)
+		{
+			return;
+		}
+		if (pLine->pOpticalCircuit->srcIedName.compare(iedName, Qt::CaseInsensitive) == 0)
+		{
+			pLine->srcArrowState |= arrowState;
+		}
+		else if (pLine->pOpticalCircuit->destIedName.compare(iedName, Qt::CaseInsensitive) == 0)
+		{
+			pLine->destArrowState |= arrowState;
+		}
+		pLine->arrowState = pLine->srcArrowState | pLine->destArrowState;
+	}
+	static void AppendLineArrowDirection(OpticalCircuitLine* pLine, const QString& fromIedName, const QString& toIedName)
+	{
+		AppendLineArrowState(pLine, fromIedName, Arrow_Out);
+		AppendLineArrowState(pLine, toIedName, Arrow_In);
+	}
+	static QString ResolveLinePeerIedName(OpticalCircuitLine* pLine, const QString& knownIedName)
+	{
+		if (!pLine || !pLine->pOpticalCircuit)
+		{
+			return QString();
+		}
+		if (pLine->pOpticalCircuit->srcIedName.compare(knownIedName, Qt::CaseInsensitive) == 0)
+		{
+			return pLine->pOpticalCircuit->destIedName;
+		}
+		if (pLine->pOpticalCircuit->destIedName.compare(knownIedName, Qt::CaseInsensitive) == 0)
+		{
+			return pLine->pOpticalCircuit->srcIedName;
+		}
+		return QString();
 	}
 	static void BuildScopedOpticalLineGeometry(OpticalCircuitLine* opticalLine,
 		int startSide,
@@ -890,8 +959,7 @@ namespace
 		int startVerticalX,
 		int endVerticalX)
 	{
-		const int doglegStep = 12;
-		if (!opticalLine || !opticalLine->pSrcRect || !opticalLine->pDestRect)
+				if (!opticalLine || !opticalLine->pSrcRect || !opticalLine->pDestRect)
 		{
 			return;
 		}
@@ -909,7 +977,7 @@ namespace
 			{
 				startAvailableOffset = 0;
 			}
-			int startDoglegOffset = qMin(startAvailableOffset, laneIndex * doglegStep);
+			int startDoglegOffset = qMin(startAvailableOffset, laneIndex * SCOPED_DOGLEG_STEP);
 			if (startDoglegOffset > 0)
 			{
 				startTurnY = startSafePoint.y() + (trunkY > startSafePoint.y() ? startDoglegOffset : -startDoglegOffset);
@@ -922,7 +990,7 @@ namespace
 			{
 				endAvailableOffset = 0;
 			}
-			int endDoglegOffset = qMin(endAvailableOffset, laneIndex * doglegStep);
+			int endDoglegOffset = qMin(endAvailableOffset, laneIndex * SCOPED_DOGLEG_STEP);
 			if (endDoglegOffset > 0)
 			{
 				endTurnY = endSafePoint.y() + (trunkY > endSafePoint.y() ? endDoglegOffset : -endDoglegOffset);
@@ -971,11 +1039,6 @@ namespace
 		const QList<OpticalCircuit*>& opticalList,
 		OpticalSvg& svg)
 	{
-		const int sideMargin = 80;
-		const int rowGap = 70;
-		const int topLayerY = 220;
-		const int baseLayerGapY = 170;
-		const int switchGapY = 55;
 		QStringList topIedNameList;
 		QStringList bottomIedNameList;
 		QStringList switchIedNameList;
@@ -1059,28 +1122,28 @@ namespace
 			previewSideCountHash.insert(endSideKey, endCount);
 			maxSideCount = qMax(maxSideCount, qMax(startCount, endCount));
 		}
-		int dynamicLayerGapY = EstimateScopedLayerGap(maxSideCount, qMax(maxSideCount, 1), baseLayerGapY);
+		int dynamicLayerGapY = EstimateScopedLayerGap(maxSideCount, qMax(maxSideCount, 1), SCOPED_BASE_LAYER_GAP_Y);
 		int maxRowCount = qMax(topIedNameList.size(), bottomIedNameList.size());
 		if (maxRowCount < 1)
 		{
 			maxRowCount = 1;
 		}
 		int totalWidth = qMax(SVG_VIEWBOX_WIDTH / 2,
-			sideMargin * 2 + GetScopedRowWidth(maxRowCount, RECT_DEFAULT_WIDTH, rowGap));
-		int switchWidth = totalWidth - sideMargin * 2;
+			SCOPED_SIDE_MARGIN * 2 + GetScopedRowWidth(maxRowCount, RECT_DEFAULT_WIDTH, SCOPED_ROW_GAP));
+		int switchWidth = totalWidth - SCOPED_SIDE_MARGIN * 2;
 		if (switchWidth < RECT_DEFAULT_WIDTH + 220)
 		{
 			switchWidth = RECT_DEFAULT_WIDTH + 220;
-			totalWidth = switchWidth + sideMargin * 2;
+			totalWidth = switchWidth + SCOPED_SIDE_MARGIN * 2;
 		}
 		svg.mainIedRect = CreateScopeTitleRect(titleName, titleDesc, totalWidth);
-		int topRowStartX = GetScopedRowStartX(totalWidth, topIedNameList.size(), RECT_DEFAULT_WIDTH, rowGap);
+		int topRowStartX = GetScopedRowStartX(totalWidth, topIedNameList.size(), RECT_DEFAULT_WIDTH, SCOPED_ROW_GAP);
 		for (int topIndex = 0; topIndex < topIedNameList.size(); ++topIndex)
 		{
 			IED* pIed = circuitConfig ? circuitConfig->GetIedByName(topIedNameList.at(topIndex)) : NULL;
 			IedRect* pRect = CreateScopeRect(pIed,
-				topRowStartX + topIndex * (RECT_DEFAULT_WIDTH + rowGap),
-				topLayerY);
+				topRowStartX + topIndex * (RECT_DEFAULT_WIDTH + SCOPED_ROW_GAP),
+				SCOPED_TOP_LAYER_Y);
 			if (!pRect || !pIed)
 			{
 				continue;
@@ -1093,7 +1156,7 @@ namespace
 			rectInfo.orderIndex = topIndex;
 			rectInfoHash.insert(pIed->name, rectInfo);
 		}
-		int switchY = topLayerY + RECT_DEFAULT_HEIGHT + dynamicLayerGapY;
+		int switchY = SCOPED_TOP_LAYER_Y + RECT_DEFAULT_HEIGHT + dynamicLayerGapY;
 		int switchStartX = (totalWidth - switchWidth) / 2;
 		for (int switchIndex = 0; switchIndex < switchIedNameList.size(); ++switchIndex)
 		{
@@ -1106,7 +1169,7 @@ namespace
 				pSwitchIed->name,
 				pSwitchIed->desc,
 				(quint16)switchStartX,
-				(quint16)(switchY + switchIndex * (RECT_DEFAULT_HEIGHT + switchGapY)),
+				(quint16)(switchY + switchIndex * (RECT_DEFAULT_HEIGHT + SCOPED_SWITCH_GAP_Y)),
 				(quint16)switchWidth,
 				RECT_DEFAULT_HEIGHT,
 				ColorHelper::ied_border,
@@ -1122,19 +1185,19 @@ namespace
 		int bottomLayerY = switchY + switchIedNameList.size() * RECT_DEFAULT_HEIGHT;
 		if (!switchIedNameList.isEmpty())
 		{
-			bottomLayerY += qMax(0, switchIedNameList.size() - 1) * switchGapY;
+			bottomLayerY += qMax(0, switchIedNameList.size() - 1) * SCOPED_SWITCH_GAP_Y;
 		}
 		bottomLayerY += dynamicLayerGapY;
 		if (switchIedNameList.isEmpty())
 		{
-			bottomLayerY = topLayerY + RECT_DEFAULT_HEIGHT + dynamicLayerGapY * 2;
+			bottomLayerY = SCOPED_TOP_LAYER_Y + RECT_DEFAULT_HEIGHT + dynamicLayerGapY * 2;
 		}
-		int bottomRowStartX = GetScopedRowStartX(totalWidth, bottomIedNameList.size(), RECT_DEFAULT_WIDTH, rowGap);
+		int bottomRowStartX = GetScopedRowStartX(totalWidth, bottomIedNameList.size(), RECT_DEFAULT_WIDTH, SCOPED_ROW_GAP);
 		for (int bottomIndex = 0; bottomIndex < bottomIedNameList.size(); ++bottomIndex)
 		{
 			IED* pIed = circuitConfig ? circuitConfig->GetIedByName(bottomIedNameList.at(bottomIndex)) : NULL;
 			IedRect* pRect = CreateScopeRect(pIed,
-				bottomRowStartX + bottomIndex * (RECT_DEFAULT_WIDTH + rowGap),
+				bottomRowStartX + bottomIndex * (RECT_DEFAULT_WIDTH + SCOPED_ROW_GAP),
 				bottomLayerY);
 			if (!pRect || !pIed)
 			{
@@ -1216,13 +1279,13 @@ namespace
 		AssignScopedVerticalLaneIndices(routePlanList);
 		if (maxCorridorCount > 1)
 		{
-			int expandedLayerGapY = EstimateScopedLayerGap(maxSideCount, maxCorridorCount, baseLayerGapY);
+			int expandedLayerGapY = EstimateScopedLayerGap(maxSideCount, maxCorridorCount, SCOPED_BASE_LAYER_GAP_Y);
 			if (expandedLayerGapY > dynamicLayerGapY)
 			{
 				dynamicLayerGapY = expandedLayerGapY;
 			}
 		}
-		switchY = topLayerY + RECT_DEFAULT_HEIGHT + dynamicLayerGapY;
+		switchY = SCOPED_TOP_LAYER_Y + RECT_DEFAULT_HEIGHT + dynamicLayerGapY;
 		if (!switchIedNameList.isEmpty())
 		{
 			for (int switchIndex = 0; switchIndex < svg.switcherRectList.size(); ++switchIndex)
@@ -1230,7 +1293,7 @@ namespace
 				IedRect* pRect = svg.switcherRectList.at(switchIndex);
 				if (pRect)
 				{
-					pRect->y = switchY + switchIndex * (RECT_DEFAULT_HEIGHT + switchGapY);
+					pRect->y = switchY + switchIndex * (RECT_DEFAULT_HEIGHT + SCOPED_SWITCH_GAP_Y);
 				}
 			}
 		}
@@ -1239,12 +1302,12 @@ namespace
 			bottomLayerY = switchY + switchIedNameList.size() * RECT_DEFAULT_HEIGHT;
 			if (!switchIedNameList.isEmpty())
 			{
-				bottomLayerY += qMax(0, switchIedNameList.size() - 1) * switchGapY;
+				bottomLayerY += qMax(0, switchIedNameList.size() - 1) * SCOPED_SWITCH_GAP_Y;
 			}
 			bottomLayerY += dynamicLayerGapY;
 			if (switchIedNameList.isEmpty())
 			{
-				bottomLayerY = topLayerY + RECT_DEFAULT_HEIGHT + dynamicLayerGapY * 2;
+				bottomLayerY = SCOPED_TOP_LAYER_Y + RECT_DEFAULT_HEIGHT + dynamicLayerGapY * 2;
 			}
 			for (int bottomIndex = 0; bottomIndex < bottomIedNameList.size() && bottomIndex < svg.iedRectList.size(); ++bottomIndex)
 			{
@@ -1276,10 +1339,11 @@ namespace
 			pOpticalLine->pOpticalCircuit = routePlan.pOpticalCircuit;
 			pOpticalLine->pSrcRect = routePlan.pSrcRect;
 			pOpticalLine->pDestRect = routePlan.pDestRect;
-			pOpticalLine->arrowState = ResolveScopedArrowState(circuitConfig,
+			ResolveScopedArrowState(circuitConfig,
 				routePlan.pOpticalCircuit,
-				routePlan.pSrcRect,
-				routePlan.pDestRect);
+				pOpticalLine->srcArrowState,
+				pOpticalLine->destArrowState);
+			pOpticalLine->arrowState = pOpticalLine->srcArrowState | pOpticalLine->destArrowState;
 			BuildScopedOpticalLineGeometry(
 				pOpticalLine,
 				routePlan.startSide,
@@ -1302,9 +1366,36 @@ namespace
 		}
 		svg.viewBoxX = 0;
 		svg.viewBoxY = 0;
-		svg.viewBoxWidth = qMax(totalWidth + sideMargin, SVG_VIEWBOX_WIDTH / 2);
+		svg.viewBoxWidth = qMax(totalWidth + SCOPED_SIDE_MARGIN, SVG_VIEWBOX_WIDTH / 2);
 		svg.viewBoxHeight = qMax(maxBottom + 120, bottomLayerY + RECT_DEFAULT_HEIGHT + 120);
 	}
+}
+
+OpticalSvg::~OpticalSvg()
+{
+	QSet<IedRect*> deletedRectSet;
+	foreach(IedRect* pRect, iedRectList)
+	{
+		if (!pRect || deletedRectSet.contains(pRect))
+		{
+			continue;
+		}
+		deletedRectSet.insert(pRect);
+		delete pRect;
+	}
+	iedRectList.clear();
+	switcherRectList.clear();
+	QSet<OpticalCircuitLine*> deletedLineSet;
+	foreach(OpticalCircuitLine* pLine, opticalCircuitLineList)
+	{
+		if (!pLine || deletedLineSet.contains(pLine))
+		{
+			continue;
+		}
+		deletedLineSet.insert(pLine);
+		delete pLine;
+	}
+	opticalCircuitLineList.clear();
 }
 
 SvgTransformer::SvgTransformer()
@@ -1949,9 +2040,7 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 		// 交换机作为中心设备时，不生成光纤链路图
 		return;	
 	}
-	const int horizontal_distance = 50;
-	const int vertical_distance = 150;
-	const int switcherWidth = SVG_VIEWBOX_WIDTH * 0.75;
+	const int switcherWidth = SVG_VIEWBOX_WIDTH * IED_OPTICAL_SWITCHER_WIDTH_RATIO;
 	QList<IedRect*> directRectList;		// 直连IED列表
 	QList<IedRect*> indirectRectList;	// 经过交换机的IED列表
 	QHash<IedRect*, qint8> connectPtHash;	// 记录连接点数量，交换机不记录直接绘制垂直线
@@ -1961,7 +2050,7 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 		pIed->name,
 		pIed->desc,
 		(SVG_VIEWBOX_WIDTH - RECT_DEFAULT_WIDTH) / 2,
-		horizontal_distance,
+		IED_OPTICAL_HORIZONTAL_DISTANCE,
 		RECT_DEFAULT_WIDTH,
 		RECT_DEFAULT_HEIGHT,
 		ColorHelper::ied_border,
@@ -1995,7 +2084,7 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 				oppsiteIedName,
 				oppsiteIedDesc,
 				0,															// x，暂不设置
-				SVG_VIEWBOX_HEIGHT - RECT_DEFAULT_HEIGHT * 2 - horizontal_distance,	// y
+				SVG_VIEWBOX_HEIGHT - RECT_DEFAULT_HEIGHT * 2 - IED_OPTICAL_HORIZONTAL_DISTANCE,	// y
 				RECT_DEFAULT_WIDTH,
 				RECT_DEFAULT_HEIGHT,
 				ColorHelper::ied_border,
@@ -2032,7 +2121,7 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 						iedName,
 						m_circuitConfig->GetIedByName(iedName)->desc,
 						0,	// x，暂不设置
-						SVG_VIEWBOX_HEIGHT - RECT_DEFAULT_HEIGHT * 2 - horizontal_distance,	// y
+						SVG_VIEWBOX_HEIGHT - RECT_DEFAULT_HEIGHT * 2 - IED_OPTICAL_HORIZONTAL_DISTANCE,	// y
 						RECT_DEFAULT_WIDTH,
 						RECT_DEFAULT_HEIGHT,
 						ColorHelper::ied_border,
@@ -2060,7 +2149,7 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 				}
 				QList<LogicCircuit*> inCircuitList = m_circuitConfig->GetInLogicCircuitListByIedName(pIed->name);
 				QList<LogicCircuit*> outCircuitList = m_circuitConfig->GetOutLogicCircuitListByIedName(pIed->name);
-				SetArrowStateThroughSwitch(inCircuitList, outCircuitList, iedName, iedSet.size(), oppsiteOptLine->arrowState, optLine->arrowState);
+				SetArrowStateThroughSwitch(inCircuitList, outCircuitList, pIed->name, iedName, oppsiteOptLine, optLine);
 				//foreach(LogicCircuit * pLogicCircuit, inCircuitList)
 				//{
 
@@ -2087,18 +2176,18 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 				//}
 				++connectPtHash[pIedRect];
 			}
-			pOppsiteIedRect->y = svg.mainIedRect->y + svg.mainIedRect->height + vertical_distance + svg.switcherRectList.size() * (RECT_DEFAULT_HEIGHT + vertical_distance * 0.5);	// 调整交换机位置到主IED下方
+			pOppsiteIedRect->y = svg.mainIedRect->y + svg.mainIedRect->height + IED_OPTICAL_VERTICAL_DISTANCE + svg.switcherRectList.size() * (RECT_DEFAULT_HEIGHT + IED_OPTICAL_VERTICAL_DISTANCE * 0.5);	// 调整交换机位置到主IED下方
 			svg.switcherRectList.append(pOppsiteIedRect);
 		}
 		else
 		{
 			// 直连设备
-			//optLine->arrowState
 			SetArrowStateDirect(
 				m_circuitConfig->GetInLogicCircuitListByIedName(pIed->name),
 				m_circuitConfig->GetOutLogicCircuitListByIedName(pIed->name),
+				pIed->name,
 				oppsiteIedName,
-				optLine->arrowState);
+				optLine);
 			directRectList.append(pOppsiteIedRect);
 			++connectPtHash[pOppsiteIedRect];
 		}
@@ -2108,11 +2197,11 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 	}
 	// 直连IED全部靠左排列
 	int x = 0;
-	int belowIedY = svg.switcherRectList.isEmpty() ? 3 * IED_VERTICAL_DISTANCE + vertical_distance + svg.mainIedRect->GetInnerBottomY() : svg.switcherRectList.last()->GetInnerBottomY() + vertical_distance;	// 交换机下方的IED y
+	int belowIedY = svg.switcherRectList.isEmpty() ? 3 * IED_VERTICAL_DISTANCE + IED_OPTICAL_VERTICAL_DISTANCE + svg.mainIedRect->GetInnerBottomY() : svg.switcherRectList.last()->GetInnerBottomY() + IED_OPTICAL_VERTICAL_DISTANCE;	// 交换机下方的IED y
 	for (size_t i = 0; i < directRectList.size(); ++i)
 	{
 		IedRect* rect = directRectList.at(i);
-			rect->x = horizontal_distance + i * (rect->width + horizontal_distance);
+			rect->x = IED_OPTICAL_HORIZONTAL_DISTANCE + i * (rect->width + IED_OPTICAL_HORIZONTAL_DISTANCE);
 			rect->y = belowIedY;
 	}
 	// 有直连情况则主IED与直连IED对齐，否则主IED居中
@@ -2129,9 +2218,9 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 			//			交    换    机
 			// 直连IED
 			IedRect* rect = indirectRectList.first();
-			rect->x = svg.mainIedRect->x + svg.mainIedRect->width + horizontal_distance;
+			rect->x = svg.mainIedRect->x + svg.mainIedRect->width + IED_OPTICAL_HORIZONTAL_DISTANCE;
 			rect->y = svg.mainIedRect->y;
-			totalWidth = svg.mainIedRect->width + rect->width + horizontal_distance;
+			totalWidth = svg.mainIedRect->width + rect->width + IED_OPTICAL_HORIZONTAL_DISTANCE;
 		}else
 		{
 			// 不止一个过交换机的IED，位置关系为：
@@ -2143,11 +2232,11 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 			{
 				IedRect* rect = indirectRectList.at(i);
 				quint16 startX = directRectList.isEmpty() ? svg.switcherRectList.first()->x : directRectList.last()->x + directRectList.last()->width;
-				rect->x = startX + horizontal_distance + i * (horizontal_distance + rect->width);
-				rect->y = directRectList.isEmpty() ? svg.switcherRectList.last()->y + svg.switcherRectList.last()->height + horizontal_distance * 2 : directRectList.last()->y;
-				totalWidth += rect->width + horizontal_distance;
+				rect->x = startX + IED_OPTICAL_HORIZONTAL_DISTANCE + i * (IED_OPTICAL_HORIZONTAL_DISTANCE + rect->width);
+				rect->y = directRectList.isEmpty() ? svg.switcherRectList.last()->y + svg.switcherRectList.last()->height + IED_OPTICAL_HORIZONTAL_DISTANCE * 2 : directRectList.last()->y;
+				totalWidth += rect->width + IED_OPTICAL_HORIZONTAL_DISTANCE;
 			}
-			totalWidth -= horizontal_distance;
+			totalWidth -= IED_OPTICAL_HORIZONTAL_DISTANCE;
 			switcherX = indirectRectList.first()->x;		// 多个交换机IED时，交换机与第一个经过交换机的IED对齐
 		}
 	}
@@ -2174,7 +2263,7 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 	for(size_t i = 0;i < svg.opticalCircuitLineList.size(); ++i)
 	{
 		OpticalCircuitLine* optLine = svg.opticalCircuitLineList.at(i);
-		int midPointDistance = 10;	// 中间转折点垂直/水平距离
+		int midPointDistance = IED_OPTICAL_MIDPOINT_DISTANCE;	// 中间转折点垂直/水平距离
 		// 分两种光纤回路，直连和间接
 		if(svg.switcherRectList.contains(optLine->pDestRect) ||
 			svg.switcherRectList.contains(optLine->pSrcRect))
@@ -2470,48 +2559,58 @@ void SvgTransformer::AdjustExtendRectByCircuit(QList<IedRect*>& iedList, LogicSv
 	}
 }
 
-void SvgTransformer::SetArrowStateDirect(const QList<LogicCircuit*>& inList, const QList<LogicCircuit*>& outList, const QString& peerIedName, quint8& lineState)
+void SvgTransformer::SetArrowStateDirect(const QList<LogicCircuit*>& inList, const QList<LogicCircuit*>& outList, const QString& mainIedName, const QString& peerIedName, OpticalCircuitLine* pLine)
 {
-	quint8 dummy = 0;
-	SetArrowStateThroughSwitch(inList, outList, peerIedName, 1,
-		dummy,
-		lineState);
-}
-
-void SvgTransformer::SetArrowStateThroughSwitch(const QList<LogicCircuit*>& inList,
-
-	const QList<LogicCircuit*>& outList,
-	const QString& peerIedName,
-	int peersCount,
-	quint8& oppLineState,
-	quint8& mainSwitchState)
-{
-	// 对侧 IED -> 主 IED（主IED的入链路里，源为对侧 IED）
 	foreach(LogicCircuit * pLogicCircuit, inList)
 	{
 		if (pLogicCircuit && pLogicCircuit->pSrcIed && pLogicCircuit->pSrcIed->name == peerIedName)
 		{
-			// 多个 IED 经同一交换机：交换机?对侧 的方向与只有一个时相反
-			oppLineState |= (peersCount > 1) ? Arrow_In : Arrow_Out;
-			// 主?交换机 这段为“入”
-			mainSwitchState |= Arrow_In;
-			break; 
+			AppendLineArrowDirection(pLine, peerIedName, mainIedName);
+			break;
 		}
 	}
-	// 主 IED -> 对侧 IED（主IED的出链路里，目的为对侧 IED）
 	foreach(LogicCircuit * pLogicCircuit, outList)
 	{
 		if (pLogicCircuit && pLogicCircuit->pDestIed && pLogicCircuit->pDestIed->name == peerIedName)
 		{
-			// 多个 IED 经同一交换机：交换机?对侧 的方向与只有一个时相反
-			oppLineState |= (peersCount > 1) ? Arrow_Out : Arrow_In;
-			// 主?交换机 这段为“出”
-			mainSwitchState |= Arrow_Out;
+			AppendLineArrowDirection(pLine, mainIedName, peerIedName);
 			break;
 		}
 	}
-	// 如果两种都没命中，就不改状态（保持原值）
 }
+
+void SvgTransformer::SetArrowStateThroughSwitch(const QList<LogicCircuit*>& inList,
+	const QList<LogicCircuit*>& outList,
+	const QString& mainIedName,
+	const QString& peerIedName,
+	OpticalCircuitLine* pOppLine,
+	OpticalCircuitLine* pMainSwitchLine)
+{
+	QString switchIedName = ResolveLinePeerIedName(pMainSwitchLine, mainIedName);
+	if (switchIedName.isEmpty())
+	{
+		return;
+	}
+	foreach(LogicCircuit * pLogicCircuit, inList)
+	{
+		if (pLogicCircuit && pLogicCircuit->pSrcIed && pLogicCircuit->pSrcIed->name == peerIedName)
+		{
+			AppendLineArrowDirection(pOppLine, peerIedName, switchIedName);
+			AppendLineArrowDirection(pMainSwitchLine, switchIedName, mainIedName);
+			break;
+		}
+	}
+	foreach(LogicCircuit * pLogicCircuit, outList)
+	{
+		if (pLogicCircuit && pLogicCircuit->pDestIed && pLogicCircuit->pDestIed->name == peerIedName)
+		{
+			AppendLineArrowDirection(pMainSwitchLine, mainIedName, switchIedName);
+			AppendLineArrowDirection(pOppLine, switchIedName, peerIedName);
+			break;
+		}
+	}
+}
+
 
 void SvgTransformer::drawArrowHeader(const QPoint& endPoint, double arrowAngle, QColor color, int arrowLen)
 {
@@ -3149,6 +3248,79 @@ void SvgTransformer::DrawVirtualCircuitLine(QList<IedRect*>& rectList)
 	}
 }
 
+static QPoint BuildArrowTipPoint(const QPoint& endpoint, const QPoint& innerPoint, int offset)
+{
+	QPointF direction = innerPoint - endpoint;
+	double length = sqrt(direction.x() * direction.x() + direction.y() * direction.y());
+	if (length < 0.001)
+	{
+		return endpoint;
+	}
+	double scale = offset / length;
+	QPointF tipPoint(endpoint.x() + direction.x() * scale, endpoint.y() + direction.y() * scale);
+	return QPoint(qRound(tipPoint.x()), qRound(tipPoint.y()));
+}
+static QPoint OffsetArrowPointByVec(const QPoint& point, const QPoint& vec, double offset)
+{
+	double length = sqrt((double)vec.x() * (double)vec.x() + (double)vec.y() * (double)vec.y());
+	if (length < 0.001)
+	{
+		return point;
+	}
+	QPointF shiftedPoint(point.x() + vec.x() / length * offset, point.y() + vec.y() / length * offset);
+	return QPoint(qRound(shiftedPoint.x()), qRound(shiftedPoint.y()));
+}
+static bool IsPointAttachedToRect(const QPoint& point, const IedRect* pRect)
+{
+	if (!pRect)
+	{
+		return false;
+	}
+	int left = pRect->x;
+	int right = pRect->x + pRect->width;
+	int top = pRect->y;
+	int bottom = pRect->y + pRect->height;
+	bool withinHorizontal = point.x() >= left && point.x() <= right;
+	bool withinVertical = point.y() >= top && point.y() <= bottom;
+	if (withinHorizontal && (point.y() == top || point.y() == bottom))
+	{
+		return true;
+	}
+	if (withinVertical && (point.x() == left || point.x() == right))
+	{
+		return true;
+	}
+	return false;
+}
+static QPoint ResolveArrowAdjacentPoint(const QVector<QPoint>& pointList, int endpointIndex)
+{
+	if (pointList.isEmpty() || endpointIndex < 0 || endpointIndex >= pointList.size())
+	{
+		return QPoint();
+	}
+	QPoint endpoint = pointList.at(endpointIndex);
+	if (endpointIndex == 0)
+	{
+		for (int pointIndex = 1; pointIndex < pointList.size(); ++pointIndex)
+		{
+			if (pointList.at(pointIndex) != endpoint)
+			{
+				return pointList.at(pointIndex);
+			}
+		}
+	}
+	else
+	{
+		for (int pointIndex = endpointIndex - 1; pointIndex >= 0; --pointIndex)
+		{
+			if (pointList.at(pointIndex) != endpoint)
+			{
+				return pointList.at(pointIndex);
+			}
+		}
+	}
+	return endpoint;
+}
 void SvgTransformer::DrawOpticalLine(OpticalCircuitLine* optLine)
 {
     QPen pen;
@@ -3171,8 +3343,6 @@ void SvgTransformer::DrawOpticalLine(OpticalCircuitLine* optLine)
 	font.setPointSize(TYPE_OpticalCircuit);
 	//font.setWeight(m_circuit_id++);	// 标识链路id
 	m_painter->setFont(font);
-    double outAngle = -90;
-    double inAngle = 90;
     // 绘制光纤链路折线
     QVector<QPoint> points;
     points << optLine->startPoint;
@@ -3190,30 +3360,75 @@ void SvgTransformer::DrawOpticalLine(OpticalCircuitLine* optLine)
 	QPoint& downPoint = optLine->startPoint.y() < optLine->endPoint.y() ? optLine->endPoint : optLine->startPoint;
     DrawConnCircle(upPoint, CONN_R);
     DrawConnCircle(downPoint, CONN_R, false);
-	quint16 underRectY = optLine->pSrcRect->y > optLine->pDestRect->y ? optLine->pSrcRect->y : optLine->pDestRect->y;
-    // 绘制箭头
 	font.setPointSize(TYPE_Circuit_Arrow);
 	m_painter->setFont(font);
-    if (optLine->arrowState & Arrow_Out)
-    {
-        drawArrowHeader(GetArrowPt(upPoint, ARROW_LEN, CONN_R, outAngle, true), outAngle);
-        drawArrowHeader(GetArrowPt(downPoint, ARROW_LEN, CONN_R, outAngle, downPoint.y() > underRectY), outAngle);
-    }
-    if (optLine->arrowState & Arrow_In)
-    {
-        drawArrowHeader(GetArrowPt(upPoint, ARROW_LEN, CONN_R, inAngle, true), inAngle);
-        drawArrowHeader(GetArrowPt(downPoint, ARROW_LEN, CONN_R, inAngle, downPoint.y() > underRectY), inAngle);
-    }
-    // m_painter->restore();
+	if (points.size() < 2 || !optLine->pSrcRect || !optLine->pDestRect)
+	{
+		return;
+	}
+	bool startIsSrc = IsPointAttachedToRect(optLine->startPoint, optLine->pSrcRect);
+	bool endIsSrc = IsPointAttachedToRect(optLine->endPoint, optLine->pSrcRect);
+	int srcPointIndex = 0;
+	int destPointIndex = points.size() - 1;
+	if (!startIsSrc && endIsSrc)
+	{
+		srcPointIndex = points.size() - 1;
+		destPointIndex = 0;
+	}
+	QPoint srcPoint = points.at(srcPointIndex);
+	QPoint destPoint = points.at(destPointIndex);
+	QPoint srcAdjacentPoint = ResolveArrowAdjacentPoint(points, srcPointIndex);
+	QPoint destAdjacentPoint = ResolveArrowAdjacentPoint(points, destPointIndex);
+	if (srcPoint == srcAdjacentPoint || destPoint == destAdjacentPoint)
+	{
+		return;
+	}
+	int arrowOffset = 2 * CONN_R + ARROW_LEN + OPTICAL_ARROW_EXTRA_OFFSET;
+	QPoint srcArrowPoint = BuildArrowTipPoint(srcPoint, srcAdjacentPoint, arrowOffset);
+	QPoint destArrowPoint = BuildArrowTipPoint(destPoint, destAdjacentPoint, arrowOffset);
+	QPoint srcVec = srcAdjacentPoint - srcPoint;
+	QPoint destVec = destAdjacentPoint - destPoint;
+	double srcOutAngle = GetAngleByVec(srcVec);
+	double srcInAngle = GetAngleByVec(srcPoint - srcAdjacentPoint);
+	double destOutAngle = GetAngleByVec(destVec);
+	double destInAngle = GetAngleByVec(destPoint - destAdjacentPoint);
+	double doubleArrowGap = ARROW_LEN * OPTICAL_DOUBLE_ARROW_GAP_RATIO;
+	QPoint srcOutArrowPoint = srcArrowPoint;
+	QPoint srcInArrowPoint = srcArrowPoint;
+	QPoint destOutArrowPoint = destArrowPoint;
+	QPoint destInArrowPoint = destArrowPoint;
+	if ((optLine->srcArrowState & Arrow_InOut) == Arrow_InOut)
+	{
+		srcOutArrowPoint = OffsetArrowPointByVec(srcArrowPoint, srcVec, doubleArrowGap * 0.5);
+		srcInArrowPoint = OffsetArrowPointByVec(srcArrowPoint, srcVec, -doubleArrowGap * 0.5);
+	}
+	if ((optLine->destArrowState & Arrow_InOut) == Arrow_InOut)
+	{
+		destOutArrowPoint = OffsetArrowPointByVec(destArrowPoint, destVec, doubleArrowGap * 0.5);
+		destInArrowPoint = OffsetArrowPointByVec(destArrowPoint, destVec, -doubleArrowGap * 0.5);
+	}
+	if (optLine->srcArrowState & Arrow_Out)
+	{
+		drawArrowHeader(srcOutArrowPoint, srcOutAngle);
+	}
+	if (optLine->srcArrowState & Arrow_In)
+	{
+		drawArrowHeader(srcInArrowPoint, srcInAngle);
+	}
+	if (optLine->destArrowState & Arrow_Out)
+	{
+		drawArrowHeader(destOutArrowPoint, destOutAngle);
+	}
+	if (optLine->destArrowState & Arrow_In)
+	{
+		drawArrowHeader(destInArrowPoint, destInAngle);
+	}
 }
 
 void SvgTransformer::DrawPortText(OpticalCircuitLine* line, int conn_r)
 {
-	// 端口号绘制在矩形和连接点直接
-	//PainterStateGuard __painter_guard(m_painter);
-	//m_painter->save();
 	PAINTER_STATE_GUARD(m_painter);
-	int offset = conn_r * 2 + 10;	// 端口号与连接点的偏移量
+	int offset = conn_r * 2 + 10;
 	QPen pen;
 	pen.setColor(ColorHelper::Color(ColorHelper::pure_white));
 	QFont font;
@@ -3224,14 +3439,13 @@ void SvgTransformer::DrawPortText(OpticalCircuitLine* line, int conn_r)
 	QPoint& bottomPoint = line->startPoint.y() < line->endPoint.y() ? line->endPoint : line->startPoint;
 	IedRect* topRect = line->pSrcRect->y < line->pDestRect->y ? line->pSrcRect : line->pDestRect;
 	IedRect* bottomRect = line->pSrcRect->y < line->pDestRect->y ? line->pDestRect : line->pSrcRect;
-	int topPtY = topRect->iedName.contains("SW")? topPoint.y() - offset : topPoint.y() + offset;
-	// 下侧设备为交换机时，端口号绘制在矩形内
+	int topPtY = topRect->iedName.contains("SW") ? topPoint.y() - offset : topPoint.y() + offset;
 	int bottomPtY = bottomRect->iedName.contains("SW") ? bottomPoint.y() + offset : bottomPoint.y() - offset;
-	QString topPort = line->pSrcRect->y > line->pDestRect->y ? 
-		line->pOpticalCircuit->destIedPort :		// 源设备位于下方时，上方端口号为目的设备端口号
-		line->pOpticalCircuit->srcIedPort;			// 源设备位于上方时，上方端口号为源设备端口号
-	QString bottomPort = line->pSrcRect->y > line->pDestRect->y ? 
-		line->pOpticalCircuit->srcIedPort : 
+	QString topPort = line->pSrcRect->y > line->pDestRect->y ?
+		line->pOpticalCircuit->destIedPort :
+		line->pOpticalCircuit->srcIedPort;
+	QString bottomPort = line->pSrcRect->y > line->pDestRect->y ?
+		line->pOpticalCircuit->srcIedPort :
 		line->pOpticalCircuit->destIedPort;
 	QFontMetrics fm(m_painter->font());
 	int upperPortStrWidth = fm.width(topPort);
@@ -3240,10 +3454,8 @@ void SvgTransformer::DrawPortText(OpticalCircuitLine* line, int conn_r)
 	QPoint topPort_rb_pt(topPoint.x() + upperPortStrWidth / 2, topPtY + fm.height());
 	QPoint bottomPort_lt_pt(bottomPoint.x() - bottomPortStrWidth / 2, bottomPtY - 5);
 	QPoint bottomPort_rb_pt(bottomPoint.x() + bottomPortStrWidth / 2, bottomPtY + fm.height());
-	// 绘制端口号
 	m_painter->drawText(QRect(topPort_lt_pt, topPort_rb_pt), topPort);
 	m_painter->drawText(QRect(bottomPort_lt_pt, bottomPort_rb_pt), bottomPort);
-	// m_painter->restore();
 }
 
 void SvgTransformer::DrawVirtualIcon(const QPoint& pt, VirtualType _type, const quint32 color)

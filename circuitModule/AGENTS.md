@@ -91,5 +91,12 @@ Numeric constants
 - If multiple places use the same numeric rule, centralize it.
 - Do not replace an existing macro-based style with repeated literals.
 
+Function parameters
+- Do not add unused parameters to preserve a uniform signature unless explicitly required by an existing callback/interface type.
+- Every function parameter must have a real use in that function.
+- If a parameter is unused, remove it instead of silencing it with `(void)param`.
+- `(void)param` is allowed only when required by an existing external interface, callback typedef, or virtual override that cannot be changed.
+- Do not create wrapper/adaptor functions that only forward to another function while ignoring extra parameters, unless this is strictly required by the calling interface.
+
 Before writing code
 - Restate constraints in one line: Qt 4.8.6 / C++03 / GB2312 / TAB(4) / Allman braces / Qt containers default / m_ members / no assignment in conditions / Chinese comments.

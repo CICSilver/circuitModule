@@ -144,12 +144,16 @@ struct OpticalCircuitLine
 	{
 		lineCode = 0;
 		arrowState = Arrow_None;
+		srcArrowState = Arrow_None;
+		destArrowState = Arrow_None;
 		pSrcRect = NULL;
 		pDestRect = NULL;
 		pOpticalCircuit = NULL;
 	}
 	quint16 lineCode;		// 光纤编号
 	quint8 arrowState;
+	quint8 srcArrowState;
+	quint8 destArrowState;
 	QPoint startPoint;			// 光纤起点，位于图像上方，与光纤方向无关
 	QPoint endPoint;			// 光纤终点，位于图像下方，与光纤方向无关
 	QList<QPoint> midPoints;	// 可能有多个折线点
@@ -258,11 +262,7 @@ public:
 struct OpticalSvg : public BaseSvg
 {
 	OpticalSvg() {}
-	~OpticalSvg() 
-	{
-		qDeleteAll(iedRectList);
-		qDeleteAll(opticalCircuitLineList);
-	};
+	~OpticalSvg();
 
 	IedRect* GetIedRectByIedName(QString iedName) const
 	{

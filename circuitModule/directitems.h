@@ -56,6 +56,25 @@ private:
 	bool m_isSwitcher;
 };
 
+class LogicFrameItem : public directItemBase
+{
+public:
+	LogicFrameItem(QGraphicsItem* parent = NULL);
+	~LogicFrameItem();
+	QRectF boundingRect() const;
+	void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget);
+	void setFrame(const QRectF& rect, const QString& title, const QColor& borderColor, bool showLegend);
+
+private:
+	QRectF buildLegendRect() const;
+
+private:
+	QRectF m_rect;
+	QString m_title;
+	QColor m_borderColor;
+	bool m_showLegend;
+};
+
 class DirectPlateItem : public directItemBase
 {
 public:
@@ -323,11 +342,18 @@ public:
 	void setPoints(const QVector<QPointF>& pts);
 	void setColor(const QColor& color);
 	void setWidth(int w);
+	void setArrowVisible(bool visible);
+	void setArrowColor(const QColor& color);
+	void setArrowState(quint8 startArrowState, quint8 endArrowState);
 
 private:
 	QVector<QPointF> m_points;
 	QColor m_color;
+	QColor m_arrowColor;
 	int m_width;
+	bool m_arrowVisible;
+	quint8 m_startArrowState;
+	quint8 m_endArrowState;
 };
 
 //class DirectPlateItem : public directItemBase

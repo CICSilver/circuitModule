@@ -26,16 +26,21 @@ INCLUDEPATH += $$PWD \
 # Headers (for IDE convenience; moc will pick up those with Q_OBJECT)
 HEADERS += \
     basemodel.h \
+    Common/DiagramBuilderBase.h \
     CircuitDiagramFactory.h \
     CircuitDiagramProxy.h \
     circuitconfig.h \
     InteractiveSvgItem.h \
+    Logical/LogicDiagramBuilder.h \
     mainwindow.h \
+    Optical/OpticalDiagramBuilder.h \
     PainterStateGuard.h \
     RtdbClient.h \
     svgmodel.h \
     SvgTransformer.h \
     SvgUtils.h \
+    Virtual/VirtualDiagramBuilder.h \
+    Whole/WholeDiagramBuilder.h \
     CircuitModuleApi.h \
     circuitmodule_global.h \
     directitems.h \
@@ -57,7 +62,7 @@ RESOURCES += \
 
 # Library sources
 SOURCES += \
-    Common/SvgTransformerCommon.cpp \
+    Common/DiagramBuilderBase.cpp \
     CircuitDiagramFactory.cpp \
     CircuitDiagramProxy.cpp \
     circuitconfig.cpp \
@@ -66,14 +71,14 @@ SOURCES += \
     directitems.cpp \
     directwidget.cpp \
     legacy_svg/SvgTransformerLegacy.cpp \
-    Logical/SvgTransformerLogic.cpp \
+    Logical/LogicDiagramBuilder.cpp \
     mainwindow.cpp \
-    Optical/SvgTransformerOptical.cpp \
+    Optical/OpticalDiagramBuilder.cpp \
     RtdbClient.cpp \
     SvgTransformer.cpp \
     SvgUtils.cpp \
-    Virtual/SvgTransformerVirtual.cpp \
-    Whole/SvgTransformerWhole.cpp \
+    Virtual/VirtualDiagramBuilder.cpp \
+    Whole/WholeDiagramBuilder.cpp \
     include/pugixml/pugixml.cpp \
     include/rtdb/rtdb_dll.cpp
 

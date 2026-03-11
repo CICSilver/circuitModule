@@ -39,6 +39,7 @@ protected:
 	void InitializeDirectWidgets();
 	void ResetDirectWidgets();
 	void DisplayLogicIed(const QString& iedName);
+	void DisplayBayLogic(const QString& bayName);
 	void DisplayOpticalIed(const QString& iedName);
 	void DisplayVirtualIed(const QString& iedName);
 	void DisplayStationOptical();

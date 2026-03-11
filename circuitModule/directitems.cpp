@@ -299,6 +299,96 @@ void IedItem::drawText(QPainter* painter, const QRectF& rect, const QString& nam
 	}
 }
 
+LogicFrameItem::LogicFrameItem(QGraphicsItem* parent)
+	: m_borderColor(Qt::green)
+	, m_showLegend(false)
+{
+	Q_UNUSED(parent);
+	m_itemType = Text;
+}
+
+LogicFrameItem::~LogicFrameItem()
+{
+}
+
+void LogicFrameItem::setFrame(const QRectF& rect, const QString& title, const QColor& borderColor, bool showLegend)
+{
+	prepareGeometryChange();
+	m_rect = rect;
+	m_title = title;
+	m_borderColor = borderColor;
+	m_showLegend = showLegend;
+	update();
+}
+
+QRectF LogicFrameItem::buildLegendRect() const
+{
+	if (!m_showLegend || m_rect.isNull())
+	{
+		return QRectF();
+	}
+	QFont font = QApplication::font();
+	font.setPointSize(15);
+	QFontMetrics metrics(font);
+	qreal descWidth = 180.0;
+	qreal descHeight = metrics.height() * 2 + 10;
+	return QRectF(m_rect.x(), m_rect.y() - descHeight - 20, descWidth, descHeight);
+}
+
+QRectF LogicFrameItem::boundingRect() const
+{
+	QRectF rect = m_rect;
+	QRectF legendRect = buildLegendRect();
+	if (!legendRect.isNull())
+	{
+		rect |= legendRect;
+	}
+	return rect.adjusted(-4.0, -4.0, 4.0, 4.0);
+}
+
+void LogicFrameItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
+{
+	Q_UNUSED(option);
+	Q_UNUSED(widget);
+	if (m_rect.isNull())
+	{
+		return;
+	}
+	QFont font = painter->font();
+	font.setPointSize(15);
+	painter->setFont(font);
+	QFontMetrics metrics(font);
+	QPen pen(m_borderColor);
+	pen.setStyle(Qt::DashLine);
+	painter->setPen(pen);
+	painter->setBrush(Qt::NoBrush);
+	painter->drawRect(m_rect);
+	QPen textPen(Qt::white);
+	painter->setPen(textPen);
+	painter->drawText(QPointF(m_rect.x() + 10, m_rect.y() + metrics.height()), m_title);
+	QRectF legendRect = buildLegendRect();
+	if (legendRect.isNull())
+	{
+		return;
+	}
+	QPen legendPen(Qt::white);
+	legendPen.setStyle(Qt::DashLine);
+	painter->setPen(legendPen);
+	painter->drawRect(legendRect);
+	qreal lineWidth = 70.0;
+	qreal lineLeft = legendRect.x() + 5.0;
+	qreal firstLineY = legendRect.y() + metrics.height() / 2.0 + 5.0;
+	QPen gsePen(utils::ColorHelper::Color(utils::ColorHelper::line_gse));
+	painter->setPen(gsePen);
+	painter->drawLine(QPointF(lineLeft, firstLineY), QPointF(lineLeft + lineWidth, firstLineY));
+	QPen svPen(utils::ColorHelper::Color(utils::ColorHelper::line_smv));
+	painter->setPen(svPen);
+	painter->drawLine(QPointF(lineLeft, firstLineY + metrics.height()), QPointF(lineLeft + lineWidth, firstLineY + metrics.height()));
+	painter->setPen(textPen);
+	painter->drawText(QPointF(lineLeft + lineWidth + 10.0, legendRect.y() + metrics.height()), QString::fromLatin1("Goose"));
+	painter->drawText(QPointF(lineLeft + lineWidth + 10.0, legendRect.y() + metrics.height() * 2), QString::fromLatin1("SV"));
+}
+
 DirectPlateItem::DirectPlateItem(QGraphicsItem* parent)
 	: m_closed(true)
 	, m_code(0)
@@ -388,7 +478,11 @@ void DirectPlateItem::rebuildGeometry()
 }
 LineItem::LineItem(QGraphicsItem* parent)
 	: m_color(Qt::green)
+	, m_arrowColor(Qt::green)
 	, m_width(1)
+	, m_arrowVisible(false)
+	, m_startArrowState(Arrow_None)
+	, m_endArrowState(Arrow_None)
 {
 	Q_UNUSED(parent);
 	m_itemType = CircuitLine;
@@ -432,7 +526,7 @@ QRectF LineItem::boundingRect() const
 		if (p.y() < minY) minY = p.y();
 		if (p.y() > maxY) maxY = p.y();
 	}
-	qreal pad = qMax(1, m_width) + 2;
+	qreal pad = qMax(1, m_width) + ARROW_LEN + 2;
 	return QRectF(QPointF(minX - pad, minY - pad), QPointF(maxX + pad, maxY + pad));
 }
 
@@ -448,7 +542,81 @@ void LineItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, 
 	for (int i = 1; i < m_points.size(); ++i) {
 		painter->drawLine(m_points[i - 1], m_points[i]);
 	}
+	if (!m_arrowVisible)
+	{
+		return;
+	}
+	QPointF startVec = m_points[1] - m_points[0];
+	QPointF endVec = m_points[m_points.size() - 2] - m_points[m_points.size() - 1];
+	if (qFuzzyIsNull(startVec.x()) && qFuzzyIsNull(startVec.y()) &&
+		qFuzzyIsNull(endVec.x()) && qFuzzyIsNull(endVec.y()))
+	{
+		return;
+	}
+	QPointF startArrowPoint = direct_build_arrow_point_on_line(m_points[0], startVec, 0, ARROW_LEN, 0);
+	QPointF endArrowPoint = direct_build_arrow_point_on_line(m_points[m_points.size() - 1], endVec, 0, ARROW_LEN, 0);
+	qreal doubleArrowGap = ARROW_LEN * DIRECT_DOUBLE_ARROW_GAP_RATIO;
+	QPointF startOutArrowPoint = startArrowPoint;
+	QPointF startInArrowPoint = startArrowPoint;
+	QPointF endOutArrowPoint = endArrowPoint;
+	QPointF endInArrowPoint = endArrowPoint;
+	if ((m_startArrowState & Arrow_InOut) == Arrow_InOut)
+	{
+		startOutArrowPoint = direct_offset_point_by_vec(startArrowPoint, startVec, doubleArrowGap * 0.5);
+		startInArrowPoint = direct_offset_point_by_vec(startArrowPoint, startVec, -doubleArrowGap * 0.5);
+	}
+	if ((m_endArrowState & Arrow_InOut) == Arrow_InOut)
+	{
+		endOutArrowPoint = direct_offset_point_by_vec(endArrowPoint, endVec, doubleArrowGap * 0.5);
+		endInArrowPoint = direct_offset_point_by_vec(endArrowPoint, endVec, -doubleArrowGap * 0.5);
+	}
+	if ((m_startArrowState & Arrow_Out) && (!qFuzzyIsNull(startVec.x()) || !qFuzzyIsNull(startVec.y())))
+	{
+		direct_draw_arrow(painter, startOutArrowPoint, direct_angle_by_vec(startVec), m_arrowColor, ARROW_LEN);
+	}
+	if ((m_startArrowState & Arrow_In) && (!qFuzzyIsNull(startVec.x()) || !qFuzzyIsNull(startVec.y())))
+	{
+		direct_draw_arrow(painter, startInArrowPoint, direct_angle_by_vec(-startVec), m_arrowColor, ARROW_LEN);
+	}
+	if ((m_endArrowState & Arrow_Out) && (!qFuzzyIsNull(endVec.x()) || !qFuzzyIsNull(endVec.y())))
+	{
+		direct_draw_arrow(painter, endOutArrowPoint, direct_angle_by_vec(endVec), m_arrowColor, ARROW_LEN);
+	}
+	if ((m_endArrowState & Arrow_In) && (!qFuzzyIsNull(endVec.x()) || !qFuzzyIsNull(endVec.y())))
+	{
+		direct_draw_arrow(painter, endInArrowPoint, direct_angle_by_vec(-endVec), m_arrowColor, ARROW_LEN);
+	}
 }
+
+void LineItem::setArrowVisible(bool visible)
+{
+	m_arrowVisible = visible;
+	if (!visible)
+	{
+		m_startArrowState = Arrow_None;
+		m_endArrowState = Arrow_None;
+	}
+	else if (m_startArrowState == Arrow_None && m_endArrowState == Arrow_None)
+	{
+		m_endArrowState = Arrow_In;
+	}
+	update();
+}
+
+void LineItem::setArrowColor(const QColor& color)
+{
+	m_arrowColor = color;
+	update();
+}
+
+void LineItem::setArrowState(quint8 startArrowState, quint8 endArrowState)
+{
+	m_startArrowState = startArrowState;
+	m_endArrowState = endArrowState;
+	m_arrowVisible = startArrowState != Arrow_None || endArrowState != Arrow_None;
+	update();
+}
+
 DirectVirtualLineItem::DirectVirtualLineItem(QGraphicsItem* parent)
 	: m_virtualType(0)
 	, m_lineColor(Qt::green)

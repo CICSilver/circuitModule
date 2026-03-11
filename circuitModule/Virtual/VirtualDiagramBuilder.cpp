@@ -1,18 +1,27 @@
-#include "SvgTransformer.h"
+#include "Virtual/VirtualDiagramBuilder.h"
+#include <QFont>
+#include <QFontMetrics>
 
 using utils::ColorHelper;
 
-
-VirtualSvg* SvgTransformer::BuildVirtualModelByIedName(const QString& iedName)
+VirtualDiagramBuilder::VirtualDiagramBuilder()
 {
-	IED* pIed = m_circuitConfig->GetIedByName(iedName);
+}
+
+VirtualDiagramBuilder::~VirtualDiagramBuilder()
+{
+}
+
+VirtualSvg* VirtualDiagramBuilder::BuildVirtualDiagramByIedName(const QString& iedName)
+{
+	IED* pIed = m_pCircuitConfig->GetIedByName(iedName);
 	if (!pIed) return NULL;
 	VirtualSvg* svg = new VirtualSvg();
-	GenerateVirtualSvgByIed(pIed, *svg);
+	GenerateVirtualDiagramByIed(pIed, *svg);
 	return svg;
 }
 
-void SvgTransformer::GenerateVirtualSvgByIed(const IED* pIed, VirtualSvg& svg/*, const QString& swName*/)
+void VirtualDiagramBuilder::GenerateVirtualDiagramByIed(const IED* pIed, VirtualSvg& svg/*, const QString& swName*/)
 {
 	//// 生成图形
 	// 矩形构成：内矩形（IED名、描述）+ 外矩形（回路、回路类型图标、压板矩形（压板连接状态）、测量值、）+
@@ -65,17 +74,13 @@ void SvgTransformer::GenerateVirtualSvgByIed(const IED* pIed, VirtualSvg& svg/*,
 	AdjustVirtualCircuitLinePosition(svg);
 }
 
-void SvgTransformer::AdjustVirtualCircuitLinePosition(VirtualSvg& svg)
+void VirtualDiagramBuilder::AdjustVirtualCircuitLinePosition(VirtualSvg& svg)
 {
-	if (svg.mainIedRect->iedName == "P_B5012A")
-	{
-		int a = 1;
-	}
 	AdjustVirtualCircuitLinePosition(svg, svg.leftIedRectList, svg.mainIedRect);
 	AdjustVirtualCircuitLinePosition(svg, svg.rightIedRectList, svg.mainIedRect, false);
 }
 
-void SvgTransformer::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QList<IedRect*>& rectList, IedRect* mainIed, bool isLeft)
+void VirtualDiagramBuilder::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QList<IedRect*>& rectList, IedRect* mainIed, bool isLeft)
 {
     foreach(IedRect* rect, rectList)
     {
@@ -198,7 +203,7 @@ void SvgTransformer::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QList<Ied
 	// m_painter->restore();
 }
 
-void SvgTransformer::AdjustVirtualCircuitPlatePosition(QHash<QString, PlateRect>& hash, const QString& iedName, const QPoint& linePt, const QString& plateDesc, const QString& plateRef, quint64 plateCode, bool isSrcPlate, bool isSideSrc, bool isLeft)
+void VirtualDiagramBuilder::AdjustVirtualCircuitPlatePosition(QHash<QString, PlateRect>& hash, const QString& iedName, const QPoint& linePt, const QString& plateDesc, const QString& plateRef, quint64 plateCode, bool isSrcPlate, bool isSideSrc, bool isLeft)
 {
 	if( plateDesc.isEmpty() || plateRef.isEmpty())
 		return;

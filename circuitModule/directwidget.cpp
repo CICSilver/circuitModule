@@ -5,6 +5,7 @@
 #include "circuitconfig.h"
 #include "CircuitDiagramProxy.h"
 #include <QApplication>
+#include <QFontMetrics>
 #include <QGraphicsScene>
 #include <QGraphicsView>
 #include <QResizeEvent>
@@ -80,6 +81,52 @@ static QString build_virtual_tooltip(const VirtualCircuitLine* line)
 	if (!optLine.isEmpty()) tip += "\n" + optLine;
 	if (line && !line->circuitDesc.isEmpty()) tip += "\n" + line->circuitDesc;
 	return tip;
+}
+
+static QString build_logic_review_title()
+{
+	return QString::fromLocal8Bit("¼ìÐÞÓò");
+}
+
+static QString build_logic_effect_title()
+{
+	return QString::fromLocal8Bit("Ó°ÏìÓò");
+}
+
+static QRectF build_logic_external_rect(const IedRect* rect, const QString& title)
+{
+	if (!rect)
+	{
+		return QRectF();
+	}
+	QFont font = QApplication::font();
+	font.setPointSize(12);
+	QFontMetrics metrics(font);
+	int titleWidth = metrics.width(title);
+	return QRectF(
+		rect->x - rect->horizontal_margin - titleWidth,
+		rect->y - rect->vertical_margin,
+		rect->width + rect->horizontal_margin * 2 + titleWidth,
+		rect->height + rect->vertical_margin * 2);
+}
+
+static QRectF build_logic_external_rect(const QList<IedRect*>& rectList, const QString& title)
+{
+	if (rectList.isEmpty())
+	{
+		return QRectF();
+	}
+	IedRect* firstIed = rectList.first();
+	IedRect* lastIed = rectList.last();
+	QFont font = QApplication::font();
+	font.setPointSize(15);
+	QFontMetrics metrics(font);
+	int titleWidth = metrics.width(title);
+	int x = firstIed->x - firstIed->horizontal_margin - titleWidth;
+	int y = firstIed->y - firstIed->vertical_margin;
+	int width = firstIed->width + firstIed->horizontal_margin * 2 + titleWidth;
+	int height = (lastIed->y - y + lastIed->height) + lastIed->vertical_margin;
+	return QRectF(x, y, width, height);
 }
 
 class DirectRelationWindow : public QWidget
@@ -363,26 +410,59 @@ void DirectWidget::ParseFromLogicSvg(const LogicSvg& svg)
 {
 	if (!m_scene) return;
 	ClearScene();
-	m_currentIedName = svg.mainIedRect ? svg.mainIedRect->iedName : QString();
+	m_currentIedName = svg.mainIedRect ? svg.mainIedRect->iedName : (svg.centerIedRectList.isEmpty() ? QString() : svg.centerIedRectList.first()->iedName);
 	m_scene->setSceneRect(0, 0, svg.viewBoxWidth, svg.viewBoxHeight);
-	// IEDs
+	QString reviewTitle = build_logic_review_title();
+	QString effectTitle = build_logic_effect_title();
+	if (!svg.centerIedRectList.isEmpty()) {
+		LogicFrameItem* frameItem = new LogicFrameItem();
+		frameItem->setFrame(build_logic_external_rect(svg.centerIedRectList, reviewTitle), reviewTitle, utils::ColorHelper::Color(utils::ColorHelper::pure_red), false);
+		frameItem->setZValue(-2.0);
+		m_scene->addItem(frameItem);
+	} else if (svg.mainIedRect) {
+		LogicFrameItem* frameItem = new LogicFrameItem();
+		frameItem->setFrame(build_logic_external_rect(svg.mainIedRect, reviewTitle), reviewTitle, utils::ColorHelper::Color(svg.mainIedRect->border_color), false);
+		frameItem->setZValue(-2.0);
+		m_scene->addItem(frameItem);
+	}
+	if (!svg.leftIedRectList.isEmpty()) {
+		LogicFrameItem* frameItem = new LogicFrameItem();
+		frameItem->setFrame(build_logic_external_rect(svg.leftIedRectList, effectTitle), effectTitle, utils::ColorHelper::Color(svg.leftIedRectList.first()->border_color), true);
+		frameItem->setZValue(-2.0);
+		m_scene->addItem(frameItem);
+	}
+	if (!svg.rightIedRectList.isEmpty()) {
+		LogicFrameItem* frameItem = new LogicFrameItem();
+		frameItem->setFrame(build_logic_external_rect(svg.rightIedRectList, effectTitle), effectTitle, utils::ColorHelper::Color(svg.rightIedRectList.first()->border_color), false);
+		frameItem->setZValue(-2.0);
+		m_scene->addItem(frameItem);
+	}
 	if (svg.mainIedRect) {
 		IedItem* item = new IedItem();
 		item->setFromIedRect(*svg.mainIedRect, false);
+		item->setZValue(-1.0);
+		m_scene->addItem(item);
+	}
+	for (int i = 0; i < svg.centerIedRectList.size(); ++i) {
+		IedItem* item = new IedItem();
+		item->setFromIedRect(*svg.centerIedRectList[i], false);
+		item->setZValue(-1.0);
 		m_scene->addItem(item);
 	}
 	for (int i = 0; i < svg.leftIedRectList.size(); ++i) {
 		IedItem* item = new IedItem();
 		item->setFromIedRect(*svg.leftIedRectList[i], false);
+		item->setZValue(-1.0);
 		m_scene->addItem(item);
 	}
 	for (int i = 0; i < svg.rightIedRectList.size(); ++i) {
 		IedItem* item = new IedItem();
 		item->setFromIedRect(*svg.rightIedRectList[i], false);
+		item->setZValue(-1.0);
 		m_scene->addItem(item);
 	}
-	// Logic lines
 	QList<IedRect*> all;
+	all += svg.centerIedRectList;
 	all += svg.leftIedRectList;
 	all += svg.rightIedRectList;
 	for (int i = 0; i < all.size(); ++i) {
@@ -391,17 +471,30 @@ void DirectWidget::ParseFromLogicSvg(const LogicSvg& svg)
 			LogicCircuitLine* line = rect->logic_line_list[j];
 			QVector<QPointF> pts;
 			pts.append(line->startPoint);
-			pts.append(line->midPoint);
+			if (!line->turnPointList.isEmpty()) {
+				for (int ptIndex = 0; ptIndex < line->turnPointList.size(); ++ptIndex) {
+					pts.append(line->turnPointList.at(ptIndex));
+				}
+			} else {
+				pts.append(line->midPoint);
+			}
 			pts.append(line->endPoint);
 			LineItem* l = new LineItem();
 			QColor color = (line->pLogicCircuit && line->pLogicCircuit->type == SV) ?
 				utils::ColorHelper::Color(utils::ColorHelper::line_smv) :
 				utils::ColorHelper::Color(utils::ColorHelper::line_gse);
 			l->setColor(color);
+			l->setArrowColor(color);
+			l->setArrowState(line->srcArrowState, line->destArrowState);
 			l->setWidth(1);
 			l->setPoints(pts);
 			m_scene->addItem(l);
 		}
+	}
+	QRectF itemsRect = m_scene->itemsBoundingRect();
+	if (!itemsRect.isNull())
+	{
+		m_scene->setSceneRect(itemsRect.adjusted(-20.0, -20.0, 20.0, 20.0));
 	}
 }
 
@@ -462,13 +555,25 @@ void DirectWidget::ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64
 		for (int i = 0; i < allRectList.size(); ++i)
 		{
 			IedRect* rect = allRectList.at(i);
+			if (!rect)
+			{
+				continue;
+			}
 			for (int j = 0; j < rect->logic_line_list.size(); ++j)
 			{
 				LogicCircuitLine* logic = rect->logic_line_list.at(j);
+				if (!logic)
+				{
+					continue;
+				}
 				for (int k = 0; k < logic->virtual_line_list.size(); ++k)
 				{
 					VirtualCircuitLine* virtualLine = logic->virtual_line_list.at(k);
-					VirtualCircuit* virtualCircuit = virtualLine ? virtualLine->pVirtualCircuit : NULL;
+					if (!virtualLine)
+					{
+						continue;
+					}
+					VirtualCircuit* virtualCircuit = virtualLine->pVirtualCircuit;
 					if (!virtualCircuit)
 					{
 						continue;
@@ -525,6 +630,10 @@ void DirectWidget::ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64
 	for (int i = 0; i < allRectList.size(); ++i)
 	{
 		IedRect* rect = allRectList.at(i);
+		if (!rect)
+		{
+			continue;
+		}
 		if (hasFilter && !visibleIedNameSet.contains(rect->iedName))
 		{
 			continue;
@@ -532,10 +641,18 @@ void DirectWidget::ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64
 		for (int j = 0; j < rect->logic_line_list.size(); ++j)
 		{
 			LogicCircuitLine* logic = rect->logic_line_list.at(j);
+			if (!logic)
+			{
+				continue;
+			}
 			for (int k = 0; k < logic->virtual_line_list.size(); ++k)
 			{
 				VirtualCircuitLine* virtualLine = logic->virtual_line_list.at(k);
-				VirtualCircuit* virtualCircuit = virtualLine ? virtualLine->pVirtualCircuit : NULL;
+				if (!virtualLine)
+				{
+					continue;
+				}
+				VirtualCircuit* virtualCircuit = virtualLine->pVirtualCircuit;
 				if (hasFilter)
 				{
 					if (!virtualCircuit || !circuitCodeSet.contains(virtualCircuit->code))

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug_exe|Win32">
@@ -116,17 +116,17 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="basemodel.h" />
-    <ClCompile Include="Common\SvgTransformerCommon.cpp" />
+    <ClCompile Include="Common\DiagramBuilderBase.cpp" />
     <ClCompile Include="CircuitDiagramFactory.cpp" />
     <ClCompile Include="CircuitDiagramProxy.cpp" />
     <ClCompile Include="CircuitModuleApi.cpp" />
     <ClCompile Include="directitems.cpp" />
     <ClCompile Include="directwidget.cpp" />
-    <ClCompile Include="Logical\SvgTransformerLogic.cpp" />
-    <ClCompile Include="Optical\SvgTransformerOptical.cpp" />
+    <ClCompile Include="Logical\LogicDiagramBuilder.cpp" />
+    <ClCompile Include="Optical\OpticalDiagramBuilder.cpp" />
     <ClCompile Include="legacy_svg\SvgTransformerLegacy.cpp" />
-    <ClCompile Include="Virtual\SvgTransformerVirtual.cpp" />
-    <ClCompile Include="Whole\SvgTransformerWhole.cpp" />
+    <ClCompile Include="Virtual\VirtualDiagramBuilder.cpp" />
+    <ClCompile Include="Whole\WholeDiagramBuilder.cpp" />
     <ClCompile Include="GeneratedFiles\Debug\moc_directwidget.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug_exe|Win32'">true</ExcludedFromBuild>

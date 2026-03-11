@@ -1,8 +1,15 @@
-#include "SvgTransformer.h"
+#include "Optical/OpticalDiagramBuilder.h"
 #include <QSet>
 
 using utils::ColorHelper;
 
+OpticalDiagramBuilder::OpticalDiagramBuilder()
+{
+}
+
+OpticalDiagramBuilder::~OpticalDiagramBuilder()
+{
+}
 
 namespace
 {
@@ -1383,6 +1390,15 @@ OpticalSvg::~OpticalSvg()
 		deletedRectSet.insert(pRect);
 		delete pRect;
 	}
+	foreach(IedRect* pRect, switcherRectList)
+	{
+		if (!pRect || deletedRectSet.contains(pRect))
+		{
+			continue;
+		}
+		deletedRectSet.insert(pRect);
+		delete pRect;
+	}
 	iedRectList.clear();
 	switcherRectList.clear();
 	QSet<OpticalCircuitLine*> deletedLineSet;
@@ -1398,18 +1414,18 @@ OpticalSvg::~OpticalSvg()
 	opticalCircuitLineList.clear();
 }
 
-OpticalSvg* SvgTransformer::BuildOpticalModelByIedName(const QString& iedName)
+OpticalSvg* OpticalDiagramBuilder::BuildOpticalDiagramByIedName(const QString& iedName)
 {
-	IED* pIed = m_circuitConfig->GetIedByName(iedName);
+	IED* pIed = m_pCircuitConfig->GetIedByName(iedName);
 	if (!pIed) return NULL;
 	OpticalSvg* svg = new OpticalSvg();
-	GenerateOpticalSvgByIed(pIed, *svg);
+	GenerateOpticalDiagramByIed(pIed, *svg);
 	return svg;
 }
 
-OpticalSvg* SvgTransformer::BuildOpticalModelByStation()
+OpticalSvg* OpticalDiagramBuilder::BuildOpticalDiagramByStation()
 {
-	const CRtdbEleModelStation* station = m_circuitConfig->StationModel();
+	const CRtdbEleModelStation* station = m_pCircuitConfig->StationModel();
 	if (!station)
 	{
 		return NULL;
@@ -1419,7 +1435,7 @@ OpticalSvg* SvgTransformer::BuildOpticalModelByStation()
 	QMap<QString, QString> iedBayHash;
 	QStringList bayOrder;
 	QString stationText;
-	CollectBayContext(station, m_circuitConfig, bayIedHash, bayTextHash, iedBayHash, bayOrder, stationText);
+	CollectBayContext(station, m_pCircuitConfig, bayIedHash, bayTextHash, iedBayHash, bayOrder, stationText);
 	if (bayOrder.isEmpty())
 	{
 		return NULL;
@@ -1438,7 +1454,7 @@ OpticalSvg* SvgTransformer::BuildOpticalModelByStation()
 	QSet<QString>::const_iterator iedIt = visibleIedSet.constBegin();
 	for (; iedIt != visibleIedSet.constEnd(); ++iedIt)
 	{
-		IED* pIed = m_circuitConfig->GetIedByName(*iedIt);
+		IED* pIed = m_pCircuitConfig->GetIedByName(*iedIt);
 		if (!pIed)
 		{
 			continue;
@@ -1470,13 +1486,13 @@ OpticalSvg* SvgTransformer::BuildOpticalModelByStation()
 		bayVisibleIedHash.insert(bayKey, FilterVisibleIedList(bayIedHash.value(bayKey), visibleIedSet, true));
 	}
 	OpticalSvg* svg = new OpticalSvg();
-	BuildScopedOpticalSvg(m_circuitConfig, stationText, QString("Station Optical"), bayOrder, bayVisibleIedHash, opticalList, *svg);
+	BuildScopedOpticalSvg(m_pCircuitConfig, stationText, QString("Station Optical"), bayOrder, bayVisibleIedHash, opticalList, *svg);
 	return svg;
 }
 
-OpticalSvg* SvgTransformer::BuildOpticalModelByBayName(const QString& bayName)
+OpticalSvg* OpticalDiagramBuilder::BuildOpticalDiagramByBayName(const QString& bayName)
 {
-	const CRtdbEleModelStation* station = m_circuitConfig->StationModel();
+	const CRtdbEleModelStation* station = m_pCircuitConfig->StationModel();
 	if (!station || bayName.isEmpty())
 	{
 		return NULL;
@@ -1486,7 +1502,7 @@ OpticalSvg* SvgTransformer::BuildOpticalModelByBayName(const QString& bayName)
 	QMap<QString, QString> iedBayHash;
 	QStringList bayOrder;
 	QString stationText;
-	CollectBayContext(station, m_circuitConfig, bayIedHash, bayTextHash, iedBayHash, bayOrder, stationText);
+	CollectBayContext(station, m_pCircuitConfig, bayIedHash, bayTextHash, iedBayHash, bayOrder, stationText);
 	QStringList selectedBayIedList = bayIedHash.value(bayName);
 	if (selectedBayIedList.isEmpty())
 	{
@@ -1501,7 +1517,7 @@ OpticalSvg* SvgTransformer::BuildOpticalModelByBayName(const QString& bayName)
 	QSet<quint64> opticalLoopCodeSet;
 	for (int i = 0; i < selectedBayIedList.size(); ++i)
 	{
-		IED* pIed = m_circuitConfig->GetIedByName(selectedBayIedList.at(i));
+		IED* pIed = m_pCircuitConfig->GetIedByName(selectedBayIedList.at(i));
 		if (!pIed)
 		{
 			continue;
@@ -1564,11 +1580,11 @@ OpticalSvg* SvgTransformer::BuildOpticalModelByBayName(const QString& bayName)
 	}
 	QString bayText = bayTextHash.value(bayName, bayName);
 	OpticalSvg* svg = new OpticalSvg();
-	BuildScopedOpticalSvg(m_circuitConfig, bayText, QString("Bay Optical"), visibleBayOrder, bayVisibleIedHash, opticalList, *svg);
+	BuildScopedOpticalSvg(m_pCircuitConfig, bayText, QString("Bay Optical"), visibleBayOrder, bayVisibleIedHash, opticalList, *svg);
 	return svg;
 }
 
-void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
+void OpticalDiagramBuilder::GenerateOpticalDiagramByIed(const IED* pIed, OpticalSvg& svg)
 {
 	if(pIed->name.contains("SW"))
 	{
@@ -1632,7 +1648,7 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 			// pIed的connectedIedNameList和交换机的connectedIedNameList的交集即为对侧IED
 			optLine->arrowState = Arrow_None; // 经过交换机的光纤链路，方向不明确，初始化
 			QSet<QString> iedSet = pIed->connectedIedNameSet;
-			IED* pOppsiteIed = m_circuitConfig->GetIedByName(oppsiteIedName);
+			IED* pOppsiteIed = m_pCircuitConfig->GetIedByName(oppsiteIedName);
 			if(!pOppsiteIed)
 			{
 				m_errStr += QString("光纤链路 %1 中的交换机设备 %2 不存在，请检查IED配置文件 \n").arg(optCircuit->loopCode).arg(oppsiteIedName);
@@ -1654,7 +1670,7 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 				{
 					pIedRect = utils::GetIedRect(
 						iedName,
-						m_circuitConfig->GetIedByName(iedName)->desc,
+						m_pCircuitConfig->GetIedByName(iedName)->desc,
 						0,	// x，暂不设置
 						SVG_VIEWBOX_HEIGHT - RECT_DEFAULT_HEIGHT * 2 - IED_OPTICAL_HORIZONTAL_DISTANCE,	// y
 						RECT_DEFAULT_WIDTH,
@@ -1665,7 +1681,7 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 					indirectRectList.append(pIedRect);
 				}
 				// 获取对端设备和交换机的光纤链路
-				QList<OpticalCircuit*> oppsiteOptList = m_circuitConfig->getOpticalByIeds(pOppsiteIed->name, iedName);
+				QList<OpticalCircuit*> oppsiteOptList = m_pCircuitConfig->getOpticalByIeds(pOppsiteIed->name, iedName);
 				if(oppsiteOptList.isEmpty())
 				{
 					m_errStr += QString("光纤链路 %1 中的交换机设备 %2 与对侧设备 %3 没有连接，请检查光纤链路配置文件 \n").arg(optCircuit->loopCode).arg(oppsiteIedName).arg(iedName);
@@ -1682,8 +1698,8 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 					oppsiteOptLine->pOpticalCircuit = oppsiteOptCircuit;
 					svg.opticalCircuitLineList.append(oppsiteOptLine);
 				}
-				QList<LogicCircuit*> inCircuitList = m_circuitConfig->GetInLogicCircuitListByIedName(pIed->name);
-				QList<LogicCircuit*> outCircuitList = m_circuitConfig->GetOutLogicCircuitListByIedName(pIed->name);
+				QList<LogicCircuit*> inCircuitList = m_pCircuitConfig->GetInLogicCircuitListByIedName(pIed->name);
+				QList<LogicCircuit*> outCircuitList = m_pCircuitConfig->GetOutLogicCircuitListByIedName(pIed->name);
 				SetArrowStateThroughSwitch(inCircuitList, outCircuitList, pIed->name, iedName, oppsiteOptLine, optLine);
 				//foreach(LogicCircuit * pLogicCircuit, inCircuitList)
 				//{
@@ -1718,8 +1734,8 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 		{
 			// 直连设备
 			SetArrowStateDirect(
-				m_circuitConfig->GetInLogicCircuitListByIedName(pIed->name),
-				m_circuitConfig->GetOutLogicCircuitListByIedName(pIed->name),
+				m_pCircuitConfig->GetInLogicCircuitListByIedName(pIed->name),
+				m_pCircuitConfig->GetOutLogicCircuitListByIedName(pIed->name),
 				pIed->name,
 				oppsiteIedName,
 				optLine);
@@ -1875,7 +1891,7 @@ void SvgTransformer::GenerateOpticalSvgByIed(const IED* pIed, OpticalSvg& svg)
 	}
 }
 
-void SvgTransformer::SetArrowStateDirect(const QList<LogicCircuit*>& inList, const QList<LogicCircuit*>& outList, const QString& mainIedName, const QString& peerIedName, OpticalCircuitLine* pLine)
+void OpticalDiagramBuilder::SetArrowStateDirect(const QList<LogicCircuit*>& inList, const QList<LogicCircuit*>& outList, const QString& mainIedName, const QString& peerIedName, OpticalCircuitLine* pLine)
 {
 	foreach(LogicCircuit * pLogicCircuit, inList)
 	{
@@ -1895,7 +1911,7 @@ void SvgTransformer::SetArrowStateDirect(const QList<LogicCircuit*>& inList, con
 	}
 }
 
-void SvgTransformer::SetArrowStateThroughSwitch(const QList<LogicCircuit*>& inList,
+void OpticalDiagramBuilder::SetArrowStateThroughSwitch(const QList<LogicCircuit*>& inList,
 	const QList<LogicCircuit*>& outList,
 	const QString& mainIedName,
 	const QString& peerIedName,

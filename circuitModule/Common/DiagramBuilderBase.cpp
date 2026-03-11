@@ -1,14 +1,27 @@
-#include "SvgTransformer.h"
+#include "Common/DiagramBuilderBase.h"
 
 using utils::ColorHelper;
 
+DiagramBuilderBase::DiagramBuilderBase()
+{
+	m_pCircuitConfig = CircuitConfig::Instance();
+}
 
-void SvgTransformer::ParseCircuitFromIed(LogicSvg& svg, const IED* pIed)
+DiagramBuilderBase::~DiagramBuilderBase()
+{
+}
+
+const QString& DiagramBuilderBase::GetErrorString() const
+{
+	return m_errStr;
+}
+
+void DiagramBuilderBase::ParseCircuitFromIed(LogicSvg& svg, const IED* pIed)
 {
 	quint8 index = 0; // 关联ied编号，用于区分位置
 	QList<IedRect*>* list = &svg.leftIedRectList;
-	QList<LogicCircuit*> inCircuitList = m_circuitConfig->GetInLogicCircuitListByIedName(pIed->name);
-	QList<LogicCircuit*> outCircuitList = m_circuitConfig->GetOutLogicCircuitListByIedName(pIed->name);
+	QList<LogicCircuit*> inCircuitList = m_pCircuitConfig->GetInLogicCircuitListByIedName(pIed->name);
+	QList<LogicCircuit*> outCircuitList = m_pCircuitConfig->GetOutLogicCircuitListByIedName(pIed->name);
 	foreach(const QString & iedName, pIed->connectedIedNameSet)
 	{
 		if (iedName.contains("SW"))
@@ -50,7 +63,7 @@ void SvgTransformer::ParseCircuitFromIed(LogicSvg& svg, const IED* pIed)
 	}
 }
 
-void SvgTransformer::AdjustOtherIedRectPosition(QList<IedRect*>& rectList, const IedRect* mainIedRect)
+void DiagramBuilderBase::AdjustOtherIedRectPosition(QList<IedRect*>& rectList, const IedRect* mainIedRect)
 {
 	if (rectList.size() > 1)
 	{
@@ -70,7 +83,7 @@ void SvgTransformer::AdjustOtherIedRectPosition(QList<IedRect*>& rectList, const
 	}
 }
 
-void SvgTransformer::AdjustExtendRectByCircuit(IedRect& pRect)
+void DiagramBuilderBase::AdjustExtendRectByCircuit(IedRect& pRect)
 {
 	int circuitSize = 0;
 	foreach(LogicCircuitLine * line, pRect.logic_line_list)
@@ -80,7 +93,7 @@ void SvgTransformer::AdjustExtendRectByCircuit(IedRect& pRect)
 	pRect.extend_height = circuitSize * (CIRCUIT_VERTICAL_DISTANCE + ICON_LENGTH) + pRect.inner_gap + PLATE_HEIGHT;
 }
 
-void SvgTransformer::AdjustExtendRectByCircuit(QList<IedRect*>& iedList, LogicSvg& svg)
+void DiagramBuilderBase::AdjustExtendRectByCircuit(QList<IedRect*>& iedList, LogicSvg& svg)
 {
 	quint16 lastY = svg.mainIedRect->y + svg.mainIedRect->height;
 	quint8 cnt = 0;
@@ -93,7 +106,7 @@ void SvgTransformer::AdjustExtendRectByCircuit(QList<IedRect*>& iedList, LogicSv
 	}
 }
 
-IedRect* SvgTransformer::GetOtherIedRect(quint16 rectIndex, IedRect* mainIedRect, const IED* pIed, const quint32 border_color, const quint32 underground_color)
+IedRect* DiagramBuilderBase::GetOtherIedRect(quint16 rectIndex, IedRect* mainIedRect, const IED* pIed, const quint32 border_color, const quint32 underground_color)
 {
 	quint8 row = rectIndex / 2;
 	quint8 col = rectIndex % 2;
@@ -102,7 +115,7 @@ IedRect* SvgTransformer::GetOtherIedRect(quint16 rectIndex, IedRect* mainIedRect
 	return utils::GetIedRect(pIed->name, pIed->desc, x, y, RECT_DEFAULT_WIDTH, RECT_DEFAULT_HEIGHT - 15, border_color, underground_color);
 }
 
-void SvgTransformer::AdjustMainSideCircuitLinePosition(const size_t circuitCnt, QList<IedRect*>& rectList, IedRect* mainIedRect, bool isLeft)
+void DiagramBuilderBase::AdjustMainSideCircuitLinePosition(const size_t circuitCnt, QList<IedRect*>& rectList, IedRect* mainIedRect, bool isLeft)
 {
 	size_t mainCircuitDiff = mainIedRect->height / (circuitCnt + 1);
 	// 左侧IED列表，主IED连接点位于左侧；右侧IED列表，主IED连接点位于右侧

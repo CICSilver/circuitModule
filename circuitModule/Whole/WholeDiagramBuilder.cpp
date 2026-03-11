@@ -1,18 +1,25 @@
-#include "SvgTransformer.h"
+#include "Whole/WholeDiagramBuilder.h"
 
 using utils::ColorHelper;
 
-
-WholeCircuitSvg* SvgTransformer::BuildWholeCircuitModelByIedName(const QString& iedName)
+WholeDiagramBuilder::WholeDiagramBuilder()
 {
-	IED* pIed = m_circuitConfig->GetIedByName(iedName);
+}
+
+WholeDiagramBuilder::~WholeDiagramBuilder()
+{
+}
+
+WholeCircuitSvg* WholeDiagramBuilder::BuildWholeDiagramByIedName(const QString& iedName)
+{
+	IED* pIed = m_pCircuitConfig->GetIedByName(iedName);
 	if (!pIed) return NULL;
 	WholeCircuitSvg* svg = new WholeCircuitSvg();
-	GenerateWholeCircuitSvgByIed(pIed, *svg);
+	GenerateWholeDiagramByIed(pIed, *svg);
 	return svg;
 }
 
-void SvgTransformer::GenerateWholeCircuitSvgByIed(const IED* pIed, WholeCircuitSvg& svg)
+void WholeDiagramBuilder::GenerateWholeDiagramByIed(const IED* pIed, WholeCircuitSvg& svg)
 {
 	//svg.mainIedRect = GetMainIedRect(pIed, ColorHelper::pure_red);
 	svg.mainIedRect->y = 50;

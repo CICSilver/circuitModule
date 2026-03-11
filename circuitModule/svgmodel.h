@@ -106,12 +106,30 @@ struct IedRect : public SvgRect
 	QString iedDesc;	// 设备描述
 };
 
+// 连接点箭头状态，支持双向箭头
+enum ArrowState
+{
+	Arrow_None = 0x0,
+	Arrow_In = 0x01,
+	Arrow_Out = 0x10,
+	Arrow_InOut = Arrow_In | Arrow_Out
+};
+
 struct BaseCircuitLine
 {
-	//quint8 id;		// 标识在IED中的链路编号，从0开始，仅在SVG内使用
-	QPoint startPoint;	// 起点坐标，方向有关，在srcIedRect侧
-	QPoint midPoint;	// 折线点坐标，仅用于逻辑链路中
-	QPoint endPoint;	// 终点坐标，方向有关，在destIedRect侧
+	BaseCircuitLine()
+	{
+		startPoint = QPoint(0, 0);
+		midPoint = QPoint(0, 0);
+		endPoint = QPoint(0, 0);
+		pSrcIedRect = NULL;
+		pDestIedRect = NULL;
+	}
+	//quint8 id;		// 标识IED中的回路编号，从0开始，仅供SVG中使用
+	QPoint startPoint;	// 起点坐标，和方向相关，指向srcIedRect
+	QPoint midPoint;	// 折线中点坐标，仅用于普通逻辑链路
+	QPoint endPoint;	// 终点坐标，和方向相关，指向destIedRect
+	QList<QPoint> turnPointList;	// 多拐点逻辑线的中间折点
 
 	IedRect* pSrcIedRect;
 	IedRect* pDestIedRect;
@@ -124,17 +142,20 @@ struct LogicCircuitLine : public BaseCircuitLine
 	LogicCircuitLine()
 	{
 		pLogicCircuit = NULL;
+		arrowState = Arrow_None;
+		srcArrowState = Arrow_None;
+		destArrowState = Arrow_In;
+	}
+	~LogicCircuitLine()
+	{
+		qDeleteAll(virtual_line_list);
+		virtual_line_list.clear();
 	}
 	LogicCircuit* pLogicCircuit;
-	QList<VirtualCircuitLine*> virtual_line_list;	// 逻辑链路对应的虚链路列表
-};
-// 连接点箭头状态：入、出、出入
-enum ArrowState
-{
-	Arrow_None = 0x0,
-	Arrow_In = 0x01,
-	Arrow_Out = 0x10,
-	Arrow_InOut = Arrow_In | Arrow_Out
+	quint8 arrowState;
+	quint8 srcArrowState;
+	quint8 destArrowState;
+	QList<VirtualCircuitLine*> virtual_line_list;	// 逻辑链路对应的虚回路列表
 };
 
 // 不存在跨交换机线路，交换机本身作为设备存储，连交换机的光纤视为单独光纤
@@ -146,6 +167,8 @@ struct OpticalCircuitLine
 		arrowState = Arrow_None;
 		srcArrowState = Arrow_None;
 		destArrowState = Arrow_None;
+		startPoint = QPoint(0, 0);
+		endPoint = QPoint(0, 0);
 		pSrcRect = NULL;
 		pDestRect = NULL;
 		pOpticalCircuit = NULL;
@@ -166,6 +189,7 @@ struct BaseSvg
 {
 	BaseSvg() 
 	{
+		mainIedRect = NULL;
 		viewBoxWidth = SVG_VIEWBOX_WIDTH;
 		viewBoxHeight = SVG_VIEWBOX_HEIGHT;
 		viewBoxX = 0;
@@ -225,6 +249,7 @@ public:
 
 	~LogicSvg()
 	{
+		qDeleteAll(centerIedRectList);
 		qDeleteAll(leftIedRectList);
 		qDeleteAll(rightIedRectList);
 		qDeleteAll(descRectList);
@@ -253,6 +278,7 @@ private:
 		return ret;
 	}
 public:
+	QList<IedRect*> centerIedRectList;
 	QList<IedRect*> leftIedRectList;
 	QList<IedRect*> rightIedRectList;
 	QList<IedRect*> descRectList;
@@ -299,7 +325,7 @@ struct OpticalSvg : public BaseSvg
 		return NULL;
 	}
 	QList<IedRect*> iedRectList;			// 管理全部设备矩形内存
-	QList<IedRect*> switcherRectList;		// 仅记录，不做内存管理
+	QList<IedRect*> switcherRectList;		// 管理交换机矩形内存
 	QList<OpticalCircuitLine*> opticalCircuitLineList;
 };
 struct VirtualCircuitLine : public BaseCircuitLine

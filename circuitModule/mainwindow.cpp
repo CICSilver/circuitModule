@@ -354,9 +354,8 @@ void CircuitModuleWidget::onStationTreeItemClicked(const QModelIndex& index)
 	}
 	if (nodeType == TreeNodeType_Bay)
 	{
+		DisplayBayLogic(nodeKey);
 		DisplayBayOptical(nodeKey);
-		ReleaseDirectWidget(ui.tab, m_directLogicWidget);
-		m_directLogicWidget = CreateDirectWidget(ui.tab, ui.logicView, "directLogicWidget");
 		ReleaseDirectWidget(ui.tab_3, m_directVirtualWidget);
 		m_directVirtualWidget = CreateDirectWidget(ui.tab_3, ui.wholeView, "directVirtualWidget");
 		ui.tabWidget->setCurrentWidget(ui.tab_2);
@@ -411,6 +410,26 @@ void CircuitModuleWidget::DisplayLogicIed(const QString& iedName)
 
 	CircuitDiagramProxy diagramProxy;
 	LogicDiagramModel* logicDiagram = diagramProxy.BuildLogicDiagramByIedName(iedName);
+	if (!logicDiagram)
+	{
+		ReleaseDirectWidget(ui.tab, m_directLogicWidget);
+		m_directLogicWidget = CreateDirectWidget(ui.tab, ui.logicView, "directLogicWidget");
+		return;
+	}
+
+	m_directLogicWidget->ParseFromLogicSvg(*logicDiagram);
+	delete logicDiagram;
+}
+
+void CircuitModuleWidget::DisplayBayLogic(const QString& bayName)
+{
+	if (!m_directLogicWidget)
+	{
+		InitializeDirectWidgets();
+	}
+
+	CircuitDiagramProxy diagramProxy;
+	LogicDiagramModel* logicDiagram = diagramProxy.BuildLogicDiagramByBayName(bayName);
 	if (!logicDiagram)
 	{
 		ReleaseDirectWidget(ui.tab, m_directLogicWidget);

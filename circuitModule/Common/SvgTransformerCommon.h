@@ -16,7 +16,7 @@
 // 角度转弧度，供箭头朝向和几何计算使用
 #define GET_RADIANS(angle) (angle * M_PI / 180)
 // 全站/间隔实回路图中，连线离开设备连接点后的首段安全距离
-#define SAFE_DISTANCE 34
+#define SAFE_DISTANCE 100
 // 全站/间隔实回路图中，安全距离之后继续外扩的基础偏移
 #define SCOPED_BRANCH_BASE 8
 // 全站/间隔实回路图中，同侧多条线路展开时的附加步长

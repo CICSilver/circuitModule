@@ -226,6 +226,13 @@ namespace
 		ScopedLayerSwitch = 1,
 		ScopedLayerBottom = 2
 	};
+	enum ScopedMiddleRouteMode
+	{
+		ScopedMiddleUpperY = 0,
+		ScopedMiddleLowerY = 1,
+		ScopedMiddleDirectY = 2,
+		ScopedMiddleVerticalX = 3
+	};
 	struct ScopedRectRouteInfo
 	{
 		ScopedRectRouteInfo()
@@ -936,6 +943,68 @@ namespace
 	{
 		ResolveOpticalArrowState(circuitConfig, pOpticalCircuit, srcArrowState, destArrowState);
 	}
+	static int BuildScopedSharedMiddleY(int upperY, int lowerY)
+	{
+		if (lowerY <= upperY)
+		{
+			return upperY;
+		}
+		return upperY + (lowerY - upperY) / 2;
+	}
+	static int BuildScopedAccumulatedGap(int layerCount, int baseGap)
+	{
+		int gap = baseGap;
+		if (layerCount > 0)
+		{
+			int requiredGap = SAFE_DISTANCE + (layerCount + 1) * SCOPED_LANE_STEP;
+			if (requiredGap > gap)
+			{
+				gap = requiredGap;
+			}
+		}
+		return gap;
+	}
+	static int ResolveScopedRouteMode(const ScopedOpticalRoutePlan& routePlan, bool hasSwitchLayer)
+	{
+		if (hasSwitchLayer)
+		{
+			if ((routePlan.srcLayerType == ScopedLayerTop && routePlan.destLayerType == ScopedLayerBottom) ||
+				(routePlan.srcLayerType == ScopedLayerBottom && routePlan.destLayerType == ScopedLayerTop) ||
+				(routePlan.srcLayerType == ScopedLayerSwitch && routePlan.destLayerType == ScopedLayerSwitch))
+			{
+				return ScopedMiddleVerticalX;
+			}
+			if ((routePlan.srcLayerType == ScopedLayerTop && routePlan.destLayerType == ScopedLayerTop) ||
+				(routePlan.srcLayerType == ScopedLayerTop && routePlan.destLayerType == ScopedLayerSwitch) ||
+				(routePlan.srcLayerType == ScopedLayerSwitch && routePlan.destLayerType == ScopedLayerTop))
+			{
+				return ScopedMiddleUpperY;
+			}
+			if ((routePlan.srcLayerType == ScopedLayerBottom && routePlan.destLayerType == ScopedLayerBottom) ||
+				(routePlan.srcLayerType == ScopedLayerBottom && routePlan.destLayerType == ScopedLayerSwitch) ||
+				(routePlan.srcLayerType == ScopedLayerSwitch && routePlan.destLayerType == ScopedLayerBottom))
+			{
+				return ScopedMiddleLowerY;
+			}
+		}
+		return ScopedMiddleDirectY;
+	}
+	static int ResolveScopedLayeredMiddleY(int upperY, int lowerY, int layerIndex)
+	{
+		int actualUpperY = qMin(upperY, lowerY);
+		int actualLowerY = qMax(upperY, lowerY);
+		int middleY = actualUpperY + SCOPED_LANE_STEP * (layerIndex + 1);
+		int maxMiddleY = actualLowerY - SCOPED_LANE_STEP;
+		if (middleY > maxMiddleY)
+		{
+			middleY = BuildScopedSharedMiddleY(actualUpperY, actualLowerY);
+		}
+		return middleY;
+	}
+	static int ResolveScopedLayeredMiddleX(int switchRightX, int layerIndex)
+	{
+		return switchRightX + SAFE_DISTANCE + SCOPED_LANE_STEP * (layerIndex + 1);
+	}
 	static void AppendLineArrowState(OpticalCircuitLine* pLine, const QString& iedName, quint8 arrowState)
 	{
 		if (!pLine || !pLine->pOpticalCircuit)
@@ -980,77 +1049,26 @@ namespace
 		int startCount,
 		int endIndex,
 		int endCount,
-		int laneIndex,
-		int trunkY,
-		int startVerticalX,
-		int endVerticalX)
+		bool useMiddleX,
+		int middleAxisValue)
 	{
-				if (!opticalLine || !opticalLine->pSrcRect || !opticalLine->pDestRect)
+		if (!opticalLine || !opticalLine->pSrcRect || !opticalLine->pDestRect)
 		{
 			return;
 		}
 		opticalLine->midPoints.clear();
 		opticalLine->startPoint = BuildScopedAnchorPoint(opticalLine->pSrcRect, startSide, startIndex, startCount);
 		opticalLine->endPoint = BuildScopedAnchorPoint(opticalLine->pDestRect, endSide, endIndex, endCount);
-		QPoint startSafePoint = MoveScopedPointBySide(opticalLine->startPoint, startSide, SAFE_DISTANCE);
-		QPoint endSafePoint = MoveScopedPointBySide(opticalLine->endPoint, endSide, SAFE_DISTANCE);
-		int startTurnY = startSafePoint.y();
-		int endTurnY = endSafePoint.y();
-		if (startSafePoint.y() != trunkY)
-		{
-			int startAvailableOffset = qAbs(trunkY - startSafePoint.y()) - 4;
-			if (startAvailableOffset < 0)
-			{
-				startAvailableOffset = 0;
-			}
-			int startDoglegOffset = qMin(startAvailableOffset, laneIndex * SCOPED_DOGLEG_STEP);
-			if (startDoglegOffset > 0)
-			{
-				startTurnY = startSafePoint.y() + (trunkY > startSafePoint.y() ? startDoglegOffset : -startDoglegOffset);
-			}
-		}
-		if (endSafePoint.y() != trunkY)
-		{
-			int endAvailableOffset = qAbs(trunkY - endSafePoint.y()) - 4;
-			if (endAvailableOffset < 0)
-			{
-				endAvailableOffset = 0;
-			}
-			int endDoglegOffset = qMin(endAvailableOffset, laneIndex * SCOPED_DOGLEG_STEP);
-			if (endDoglegOffset > 0)
-			{
-				endTurnY = endSafePoint.y() + (trunkY > endSafePoint.y() ? endDoglegOffset : -endDoglegOffset);
-			}
-		}
 		QList<QPoint> pointList;
-		AppendScopedPoint(pointList, startSafePoint);
-		if (startTurnY != startSafePoint.y())
+		if (useMiddleX)
 		{
-			AppendScopedPoint(pointList, QPoint(startSafePoint.x(), startTurnY));
+			AppendScopedPoint(pointList, QPoint(middleAxisValue, opticalLine->startPoint.y()));
+			AppendScopedPoint(pointList, QPoint(middleAxisValue, opticalLine->endPoint.y()));
 		}
-		if (startVerticalX != startSafePoint.x())
+		else
 		{
-			AppendScopedPoint(pointList, QPoint(startVerticalX, startTurnY));
-		}
-		if (startTurnY != trunkY)
-		{
-			AppendScopedPoint(pointList, QPoint(startVerticalX, trunkY));
-		}
-		if (endVerticalX != startVerticalX)
-		{
-			AppendScopedPoint(pointList, QPoint(endVerticalX, trunkY));
-		}
-		if (endTurnY != trunkY)
-		{
-			AppendScopedPoint(pointList, QPoint(endVerticalX, endTurnY));
-		}
-		if (endVerticalX != endSafePoint.x())
-		{
-			AppendScopedPoint(pointList, QPoint(endSafePoint.x(), endTurnY));
-		}
-		if (endTurnY != endSafePoint.y())
-		{
-			AppendScopedPoint(pointList, QPoint(endSafePoint.x(), endSafePoint.y()));
+			AppendScopedPoint(pointList, QPoint(opticalLine->startPoint.x(), middleAxisValue));
+			AppendScopedPoint(pointList, QPoint(opticalLine->endPoint.x(), middleAxisValue));
 		}
 		for (int pointIndex = 0; pointIndex < pointList.size(); ++pointIndex)
 		{
@@ -1239,7 +1257,6 @@ namespace
 		}
 		QList<ScopedOpticalRoutePlan> routePlanList;
 		QHash<QString, int> sideCountHash;
-		QHash<QString, int> corridorCountHash;
 		for (int opticalIndex = 0; opticalIndex < opticalList.size(); ++opticalIndex)
 		{
 			OpticalCircuit* pOpticalCircuit = opticalList.at(opticalIndex);
@@ -1267,11 +1284,9 @@ namespace
 				srcInfo.pRect, destInfo.pRect, routePlan.startSide, routePlan.endSide);
 			routePlan.startSideKey = BuildScopedSideKey(pOpticalCircuit->srcIedName, routePlan.startSide);
 			routePlan.endSideKey = BuildScopedSideKey(pOpticalCircuit->destIedName, routePlan.endSide);
-			routePlan.corridorKey = BuildScopedCorridorKey(pOpticalCircuit);
 			routePlanList.append(routePlan);
 			sideCountHash.insert(routePlan.startSideKey, sideCountHash.value(routePlan.startSideKey, 0) + 1);
 			sideCountHash.insert(routePlan.endSideKey, sideCountHash.value(routePlan.endSideKey, 0) + 1);
-			corridorCountHash.insert(routePlan.corridorKey, corridorCountHash.value(routePlan.corridorKey, 0) + 1);
 		}
 		QHash<QString, int> sideIndexHash;
 		for (int routePlanIndex = 0; routePlanIndex < routePlanList.size(); ++routePlanIndex)
@@ -1283,23 +1298,45 @@ namespace
 			routePlan.endCount = sideCountHash.value(routePlan.endSideKey, 1);
 			sideIndexHash.insert(routePlan.startSideKey, routePlan.startIndex + 1);
 			sideIndexHash.insert(routePlan.endSideKey, routePlan.endIndex + 1);
-			QPoint startPoint = BuildScopedAnchorPoint(routePlan.pSrcRect, routePlan.startSide, routePlan.startIndex, routePlan.startCount);
-			QPoint endPoint = BuildScopedAnchorPoint(routePlan.pDestRect, routePlan.endSide, routePlan.endIndex, routePlan.endCount);
-			routePlan.startVerticalX = startPoint.x();
-			routePlan.endVerticalX = endPoint.x();
-			RefreshScopedHorizontalSpan(routePlan);
-			routePlan.overlapGroupKey = BuildScopedHorizontalGroupKey(routePlan.startSide, routePlan.endSide);
 		}
-		int maxCorridorCount = RefineScopedRouteLayout(routePlanList);
-		if (maxCorridorCount > 1)
+		bool hasSwitchLayer = !switchIedNameList.isEmpty();
+		QList<int> routeModeList;
+		int upperRouteCount = 0;
+		int lowerRouteCount = 0;
+		int directRouteCount = 0;
+		int verticalRouteCount = 0;
+		for (int routePlanIndex = 0; routePlanIndex < routePlanList.size(); ++routePlanIndex)
 		{
-			int expandedLayerGapY = EstimateScopedLayerGap(maxSideCount, maxCorridorCount, SCOPED_BASE_LAYER_GAP_Y);
-			if (expandedLayerGapY > dynamicLayerGapY)
+			int routeMode = ResolveScopedRouteMode(routePlanList.at(routePlanIndex), hasSwitchLayer);
+			routeModeList.append(routeMode);
+			if (routeMode == ScopedMiddleUpperY)
 			{
-				dynamicLayerGapY = expandedLayerGapY;
+				++upperRouteCount;
+			}
+			else if (routeMode == ScopedMiddleLowerY)
+			{
+				++lowerRouteCount;
+			}
+			else if (routeMode == ScopedMiddleVerticalX)
+			{
+				++verticalRouteCount;
+			}
+			else
+			{
+				++directRouteCount;
 			}
 		}
-		switchY = SCOPED_TOP_LAYER_Y + RECT_DEFAULT_HEIGHT + dynamicLayerGapY;
+		int upperGapY = BuildScopedAccumulatedGap(upperRouteCount, SCOPED_BASE_LAYER_GAP_Y);
+		int lowerGapY = BuildScopedAccumulatedGap(lowerRouteCount, SCOPED_BASE_LAYER_GAP_Y);
+		int directGapY = BuildScopedAccumulatedGap(directRouteCount, SCOPED_BASE_LAYER_GAP_Y);
+		if (hasSwitchLayer)
+		{
+			switchY = SCOPED_TOP_LAYER_Y + RECT_DEFAULT_HEIGHT + upperGapY;
+		}
+		else
+		{
+			switchY = SCOPED_TOP_LAYER_Y + RECT_DEFAULT_HEIGHT + directGapY;
+		}
 		if (!switchIedNameList.isEmpty())
 		{
 			for (int switchIndex = 0; switchIndex < svg.switcherRectList.size(); ++switchIndex)
@@ -1313,15 +1350,18 @@ namespace
 		}
 		if (!bottomIedNameList.isEmpty())
 		{
-			bottomLayerY = switchY + switchIedNameList.size() * RECT_DEFAULT_HEIGHT;
-			if (!switchIedNameList.isEmpty())
+			if (hasSwitchLayer)
 			{
-				bottomLayerY += qMax(0, switchIedNameList.size() - 1) * SCOPED_SWITCH_GAP_Y;
+				bottomLayerY = switchY + switchIedNameList.size() * RECT_DEFAULT_HEIGHT;
+				if (!switchIedNameList.isEmpty())
+				{
+					bottomLayerY += qMax(0, switchIedNameList.size() - 1) * SCOPED_SWITCH_GAP_Y;
+				}
+				bottomLayerY += lowerGapY;
 			}
-			bottomLayerY += dynamicLayerGapY;
-			if (switchIedNameList.isEmpty())
+			else
 			{
-				bottomLayerY = SCOPED_TOP_LAYER_Y + RECT_DEFAULT_HEIGHT + dynamicLayerGapY * 2;
+				bottomLayerY = SCOPED_TOP_LAYER_Y + RECT_DEFAULT_HEIGHT + directGapY * 2;
 			}
 			for (int bottomIndex = 0; bottomIndex < bottomIedNameList.size() && bottomIndex < svg.iedRectList.size(); ++bottomIndex)
 			{
@@ -1332,8 +1372,45 @@ namespace
 				}
 			}
 		}
-		RefineScopedRouteLayout(routePlanList);
-		int maxBottom = bottomLayerY + RECT_DEFAULT_HEIGHT;
+		QList<int> routeLayerIndexList;
+		int upperLayerIndex = 0;
+		int lowerLayerIndex = 0;
+		int directLayerIndex = 0;
+		int verticalLayerIndex = 0;
+		for (int routePlanIndex = 0; routePlanIndex < routeModeList.size(); ++routePlanIndex)
+		{
+			int routeMode = routeModeList.at(routePlanIndex);
+			if (routeMode == ScopedMiddleUpperY)
+			{
+				routeLayerIndexList.append(upperLayerIndex);
+				++upperLayerIndex;
+			}
+			else if (routeMode == ScopedMiddleLowerY)
+			{
+				routeLayerIndexList.append(lowerLayerIndex);
+				++lowerLayerIndex;
+			}
+			else if (routeMode == ScopedMiddleVerticalX)
+			{
+				routeLayerIndexList.append(verticalLayerIndex);
+				++verticalLayerIndex;
+			}
+			else
+			{
+				routeLayerIndexList.append(directLayerIndex);
+				++directLayerIndex;
+			}
+		}
+		int topLayerBottomY = SCOPED_TOP_LAYER_Y + RECT_DEFAULT_HEIGHT;
+		int switchBottomY = switchY;
+		if (hasSwitchLayer)
+		{
+			switchBottomY += switchIedNameList.size() * RECT_DEFAULT_HEIGHT;
+			switchBottomY += qMax(0, switchIedNameList.size() - 1) * SCOPED_SWITCH_GAP_Y;
+		}
+		int maxBottom = qMax(bottomLayerY + RECT_DEFAULT_HEIGHT, switchBottomY);
+		int maxRightX = totalWidth;
+		int switchRightX = switchStartX + switchWidth;
 		for (int routePlanIndex = 0; routePlanIndex < routePlanList.size(); ++routePlanIndex)
 		{
 			const ScopedOpticalRoutePlan& routePlan = routePlanList.at(routePlanIndex);
@@ -1351,6 +1428,31 @@ namespace
 				pOpticalLine->srcArrowState,
 				pOpticalLine->destArrowState);
 			pOpticalLine->arrowState = pOpticalLine->srcArrowState | pOpticalLine->destArrowState;
+			int routeMode = routeModeList.at(routePlanIndex);
+			int layerIndex = routeLayerIndexList.at(routePlanIndex);
+			bool useMiddleX = false;
+			int middleAxisValue = 0;
+			if (routeMode == ScopedMiddleUpperY)
+			{
+				middleAxisValue = ResolveScopedLayeredMiddleY(topLayerBottomY, switchY, layerIndex);
+			}
+			else if (routeMode == ScopedMiddleLowerY)
+			{
+				middleAxisValue = ResolveScopedLayeredMiddleY(switchBottomY, bottomLayerY, layerIndex);
+			}
+			else if (routeMode == ScopedMiddleVerticalX)
+			{
+				useMiddleX = true;
+				middleAxisValue = ResolveScopedLayeredMiddleX(switchRightX, layerIndex);
+				if (middleAxisValue > maxRightX)
+				{
+					maxRightX = middleAxisValue;
+				}
+			}
+			else
+			{
+				middleAxisValue = ResolveScopedLayeredMiddleY(topLayerBottomY, bottomLayerY, layerIndex);
+			}
 			BuildScopedOpticalLineGeometry(
 				pOpticalLine,
 				routePlan.startSide,
@@ -1359,18 +1461,18 @@ namespace
 				routePlan.startCount,
 				routePlan.endIndex,
 				routePlan.endCount,
-				routePlan.laneIndex,
-				routePlan.trunkY,
-				routePlan.startVerticalX,
-				routePlan.endVerticalX);
+				useMiddleX,
+				middleAxisValue);
 			maxBottom = qMax(maxBottom, pOpticalLine->startPoint.y());
 			maxBottom = qMax(maxBottom, pOpticalLine->endPoint.y());
 			for (int pointIndex = 0; pointIndex < pOpticalLine->midPoints.size(); ++pointIndex)
 			{
 				maxBottom = qMax(maxBottom, pOpticalLine->midPoints.at(pointIndex).y());
+				maxRightX = qMax(maxRightX, pOpticalLine->midPoints.at(pointIndex).x());
 			}
 			svg.opticalCircuitLineList.append(pOpticalLine);
 		}
+		totalWidth = qMax(totalWidth, maxRightX + SCOPED_SIDE_MARGIN);
 		svg.viewBoxX = 0;
 		svg.viewBoxY = 0;
 		svg.viewBoxWidth = qMax(totalWidth + SCOPED_SIDE_MARGIN, SVG_VIEWBOX_WIDTH / 2);

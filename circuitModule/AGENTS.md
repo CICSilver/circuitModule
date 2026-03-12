@@ -106,7 +106,7 @@ Function parameters
 File references
 - When reporting changed locations, use local file paths with line numbers.
 - Preferred format: absolute or workspace-relative file path followed by `:line` or `:start-end`.
-- Do not use webview/cdn links such as `file+.vscode-resource.vscode-cdn.net`.
+- format your file link as `/e:/XXX/XXX`.
 - If a clickable editor link cannot be generated reliably, always include a plain text file path with line numbers.
 
 Before writing code

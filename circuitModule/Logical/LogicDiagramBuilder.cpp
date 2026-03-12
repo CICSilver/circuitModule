@@ -13,7 +13,6 @@ namespace
 	const int BAY_LOGIC_ROW_GAP = 40;
 	const int BAY_LOGIC_CHANNEL_START_GAP = 80;
 	const int BAY_LOGIC_CHANNEL_GAP = 28;
-	const int BAY_LOGIC_CHANNEL_TYPE_GAP = 80;
 	const int RECT_AREA_CENTER = 0;
 	const int RECT_AREA_LEFT = 1;
 	const int RECT_AREA_RIGHT = 2;
@@ -322,7 +321,7 @@ void LogicDiagramBuilder::GenerateLogicDiagramByBay(const QString& bayName, Logi
 	QMap<QString, InternalCircuitGroup>::const_iterator groupIt = internalGroupHash.constBegin();
 	for (; groupIt != internalGroupHash.constEnd(); ++groupIt)
 	{
-		int lineCount = qMax(groupIt.value().firstToSecondList.size(), groupIt.value().secondToFirstList.size());
+		int lineCount = groupIt.value().firstToSecondList.size() + groupIt.value().secondToFirstList.size();
 		if (groupIt.value().type == SV)
 		{
 			svLineCount += lineCount;
@@ -340,22 +339,15 @@ void LogicDiagramBuilder::GenerateLogicDiagramByBay(const QString& bayName, Logi
 	}
 
 	int leftRectX = BAY_LOGIC_LEFT_MARGIN;
-	int centerRectX = leftRectX + RECT_DEFAULT_WIDTH + BAY_LOGIC_SIDE_DISTANCE;
-	int gseBaseX = centerRectX + RECT_DEFAULT_WIDTH + BAY_LOGIC_CHANNEL_START_GAP;
-	int svBaseX = gseBaseX;
+	int leftChannelSpan = 0;
 	if (gseLineCount > 0)
 	{
-		svBaseX += gseLineCount * BAY_LOGIC_CHANNEL_GAP;
+		leftChannelSpan = BAY_LOGIC_CHANNEL_START_GAP + (gseLineCount - 1) * BAY_LOGIC_CHANNEL_GAP;
 	}
-	if (gseLineCount > 0 && svLineCount > 0)
-	{
-		svBaseX += BAY_LOGIC_CHANNEL_TYPE_GAP;
-	}
+	int centerRectX = leftRectX + RECT_DEFAULT_WIDTH + BAY_LOGIC_SIDE_DISTANCE + leftChannelSpan;
+	int gseBaseX = centerRectX - BAY_LOGIC_CHANNEL_START_GAP;
+	int svBaseX = centerRectX + RECT_DEFAULT_WIDTH + BAY_LOGIC_CHANNEL_START_GAP;
 	int lastChannelX = centerRectX + RECT_DEFAULT_WIDTH;
-	if (gseLineCount > 0)
-	{
-		lastChannelX = qMax(lastChannelX, gseBaseX + (gseLineCount - 1) * BAY_LOGIC_CHANNEL_GAP);
-	}
 	if (svLineCount > 0)
 	{
 		lastChannelX = qMax(lastChannelX, svBaseX + (svLineCount - 1) * BAY_LOGIC_CHANNEL_GAP);
@@ -395,74 +387,45 @@ void LogicDiagramBuilder::GenerateLogicDiagramByBay(const QString& bayName, Logi
 	for (; groupIt != internalGroupHash.constEnd(); ++groupIt)
 	{
 		const InternalCircuitGroup& group = groupIt.value();
-		IedRect* pFirstRect = rectHash.value(group.firstIedName, NULL);
-		IedRect* pSecondRect = rectHash.value(group.secondIedName, NULL);
-		if (!pFirstRect || !pSecondRect)
+		QList<LogicCircuit*> groupCircuitList = group.firstToSecondList + group.secondToFirstList;
+		for (int lineIndex = 0; lineIndex < groupCircuitList.size(); ++lineIndex)
 		{
-			continue;
-		}
-		IedRect* pStartRect = pFirstRect;
-		IedRect* pEndRect = pSecondRect;
-		QString startIedName = group.firstIedName;
-		QString endIedName = group.secondIedName;
-		if (pFirstRect->y > pSecondRect->y)
-		{
-			pStartRect = pSecondRect;
-			pEndRect = pFirstRect;
-			startIedName = group.secondIedName;
-			endIedName = group.firstIedName;
-		}
-		int lineCount = qMax(group.firstToSecondList.size(), group.secondToFirstList.size());
-		for (int lineIndex = 0; lineIndex < lineCount; ++lineIndex)
-		{
-			LogicCircuit* pPreferCircuit = lineIndex < group.firstToSecondList.size() ?
-				group.firstToSecondList.at(lineIndex) : group.secondToFirstList.at(lineIndex);
-			if (!pPreferCircuit)
+			LogicCircuit* pLogicCircuit = groupCircuitList.at(lineIndex);
+			if (!pLogicCircuit || !pLogicCircuit->pSrcIed || !pLogicCircuit->pDestIed)
+			{
+				continue;
+			}
+			IedRect* pSrcRect = rectHash.value(pLogicCircuit->pSrcIed->name, NULL);
+			IedRect* pDestRect = rectHash.value(pLogicCircuit->pDestIed->name, NULL);
+			if (!pSrcRect || !pDestRect)
 			{
 				continue;
 			}
 			LogicCircuitLine* pLine = new LogicCircuitLine();
-			pLine->pLogicCircuit = pPreferCircuit;
-			pLine->pSrcIedRect = pStartRect;
-			pLine->pDestIedRect = pEndRect;
-			bool hasForward = lineIndex < group.firstToSecondList.size();
-			bool hasBackward = lineIndex < group.secondToFirstList.size();
-			if (hasForward && hasBackward)
-			{
-				pLine->srcArrowState = Arrow_In;
-				pLine->destArrowState = Arrow_In;
-			}
-			else
-			{
-				QString actualSrcName = pPreferCircuit->pSrcIed ? pPreferCircuit->pSrcIed->name : QString();
-				if (actualSrcName == startIedName)
-				{
-					pLine->srcArrowState = Arrow_None;
-					pLine->destArrowState = Arrow_In;
-				}
-				else
-				{
-					pLine->srcArrowState = Arrow_In;
-					pLine->destArrowState = Arrow_None;
-				}
-			}
-			pLine->arrowState = pLine->srcArrowState | pLine->destArrowState;
-			pStartRect->logic_line_list.append(pLine);
+			pLine->pLogicCircuit = pLogicCircuit;
+			pLine->pSrcIedRect = pSrcRect;
+			pLine->pDestIedRect = pDestRect;
+			pLine->srcArrowState = Arrow_None;
+			pLine->destArrowState = Arrow_In;
+			pLine->arrowState = Arrow_In;
+			pSrcRect->logic_line_list.append(pLine);
 			LogicLayoutLine layoutLine;
 			layoutLine.pLine = pLine;
 			layoutLine.isInternal = true;
-			layoutLine.routeX = pPreferCircuit->type == SV ? nextSvX : nextGseX;
+			layoutLine.routeX = pLogicCircuit->type == SV ? nextSvX : nextGseX;
 			layoutLineList.append(layoutLine);
 			internalRouteXHash.insert(pLine, layoutLine.routeX);
-			rightTotalCountHash.insert(pStartRect, rightTotalCountHash.value(pStartRect, 0) + 1);
-			rightTotalCountHash.insert(pEndRect, rightTotalCountHash.value(pEndRect, 0) + 1);
-			if (pPreferCircuit->type == SV)
+			if (pLogicCircuit->type == SV)
 			{
+				rightTotalCountHash.insert(pSrcRect, rightTotalCountHash.value(pSrcRect, 0) + 1);
+				rightTotalCountHash.insert(pDestRect, rightTotalCountHash.value(pDestRect, 0) + 1);
 				nextSvX += BAY_LOGIC_CHANNEL_GAP;
 			}
 			else
 			{
-				nextGseX += BAY_LOGIC_CHANNEL_GAP;
+				leftTotalCountHash.insert(pSrcRect, leftTotalCountHash.value(pSrcRect, 0) + 1);
+				leftTotalCountHash.insert(pDestRect, leftTotalCountHash.value(pDestRect, 0) + 1);
+				nextGseX -= BAY_LOGIC_CHANNEL_GAP;
 			}
 		}
 	}
@@ -516,8 +479,13 @@ void LogicDiagramBuilder::GenerateLogicDiagramByBay(const QString& bayName, Logi
 		int destArea = rectAreaHash.value(pLine->pDestIedRect, RECT_AREA_CENTER);
 		if (layoutLineList.at(layoutIndex).isInternal)
 		{
-			pLine->startPoint = BuildConnectPoint(pLine->pSrcIedRect, true, rightUsedCountHash, rightTotalCountHash);
-			pLine->endPoint = BuildConnectPoint(pLine->pDestIedRect, true, rightUsedCountHash, rightTotalCountHash);
+			bool useRightSide = pLine->pLogicCircuit && pLine->pLogicCircuit->type == SV;
+			pLine->startPoint = BuildConnectPoint(pLine->pSrcIedRect, useRightSide,
+				useRightSide ? rightUsedCountHash : leftUsedCountHash,
+				useRightSide ? rightTotalCountHash : leftTotalCountHash);
+			pLine->endPoint = BuildConnectPoint(pLine->pDestIedRect, useRightSide,
+				useRightSide ? rightUsedCountHash : leftUsedCountHash,
+				useRightSide ? rightTotalCountHash : leftTotalCountHash);
 			int routeX = internalRouteXHash.value(pLine, pLine->startPoint.x());
 			pLine->turnPointList.clear();
 			pLine->turnPointList.append(QPoint(routeX, pLine->startPoint.y()));

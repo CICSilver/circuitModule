@@ -17,18 +17,10 @@
 #define GET_RADIANS(angle) (angle * M_PI / 180)
 // 全站/间隔实回路图中，连线离开设备连接点后的首段安全距离
 #define SAFE_DISTANCE 100
-// 全站/间隔实回路图中，安全距离之后继续外扩的基础偏移
-#define SCOPED_BRANCH_BASE 8
-// 全站/间隔实回路图中，同侧多条线路展开时的附加步长
-#define SCOPED_BRANCH_STEP 14
-// 全站/间隔实回路图中，主干横线相对设备层的基础偏移
-#define SCOPED_TRUNK_BASE 10
-// 全站/间隔实回路图中，主干通道和竖向通道的错层步长
+// 全站/间隔实回路图中，第二段分层折线的累加步长
 #define SCOPED_LANE_STEP 32
-// 全站/间隔实回路图中，折线路径细化时的拐肘偏移步长
-#define SCOPED_DOGLEG_STEP 12
-// 全站/间隔实回路图自动布局的最大迭代次数
-#define SCOPED_LAYOUT_REFINE_PASSES 6
+// 全站/间隔实回路图中，仅当层间剩余空间不足该值时才触发动态扩距
+#define SCOPED_DYNAMIC_RESERVED_GAP 20
 // 全站/间隔实回路图整体左右留白
 #define SCOPED_SIDE_MARGIN 80
 // 全站/间隔实回路图同层 IED 之间的横向间距

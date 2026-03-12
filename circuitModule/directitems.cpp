@@ -14,6 +14,7 @@
 #define DIRECT_ARROW_OFFSET 10	// 箭头距连接点偏移
 #define DIRECT_BOUND_MARGIN 12	// 交互区域额外边距
 #define DIRECT_DOUBLE_ARROW_GAP_RATIO 1.5	// 双向箭头前后错开比例
+#define DIRECT_LOGIC_FRAME_TITLE_FONT_SIZE 10	// 逻辑链路框 标题字体大小
 // 检修压板相关常量
 #define DIRECT_MAINT_PLATE_CIRCLE_RADIUS 5
 #define DIRECT_MAINT_PLATE_ICON_SPAN 36
@@ -24,13 +25,13 @@
 #define DIRECT_MAINT_PLATE_TEXT_ICON_GAP 30	// 检修压板文本与图标之间的间距
 #define DIRECT_MAINT_PLATE_BOTTOM_MARGIN 6
 
+directItemBase::~directItemBase()
+{}
+
 static QString direct_build_maint_plate_default_text()
 {
 	return QString::fromLocal8Bit("检修压板");
 }
-
-directItemBase::~directItemBase()
-{}
 
 static double direct_angle_by_vec(const QPointF& vec)
 {
@@ -362,7 +363,7 @@ QRectF LogicFrameItem::buildLegendRect() const
 		return QRectF();
 	}
 	QFont font = QApplication::font();
-	font.setPointSize(15);
+	font.setPointSize(DIRECT_LOGIC_FRAME_TITLE_FONT_SIZE);
 	QFontMetrics metrics(font);
 	qreal descWidth = 180.0;
 	qreal descHeight = metrics.height() * 2 + 10;
@@ -389,7 +390,7 @@ void LogicFrameItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* op
 		return;
 	}
 	QFont font = painter->font();
-	font.setPointSize(15);
+	font.setPointSize(DIRECT_LOGIC_FRAME_TITLE_FONT_SIZE);
 	painter->setFont(font);
 	QFontMetrics metrics(font);
 	QPen pen(m_borderColor);

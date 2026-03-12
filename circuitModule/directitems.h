@@ -11,6 +11,7 @@
 #include <QColor>
 #include <QtGlobal>
 
+
 struct PlateRect;
 struct IedRect;
 struct VirtualCircuitLine;

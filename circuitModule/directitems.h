@@ -63,11 +63,16 @@ class LogicFrameItem : public directItemBase
 public:
 	LogicFrameItem(QGraphicsItem* parent = NULL);
 	~LogicFrameItem();
+	static int TitleFontPointSize();
 	QRectF boundingRect() const;
 	void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget);
 	void setFrame(const QRectF& rect, const QString& title, const QColor& borderColor, bool showLegend);
 
 private:
+	enum
+	{
+		LOGIC_FRAME_TITLE_FONT_POINT_SIZE = 15
+	};
 	QRectF buildLegendRect() const;
 
 private:

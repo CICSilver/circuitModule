@@ -115,7 +115,7 @@ static QRectF build_logic_external_rect(const IedRect* rect, const QString& titl
 		return QRectF();
 	}
 	QFont font = QApplication::font();
-	font.setPointSize(DIRECT_LOGIC_FRAME_TITLE_FONT_SIZE);
+	font.setPointSize(LogicFrameItem::TitleFontPointSize());
 	QFontMetrics metrics(font);
 	int titleWidth = metrics.width(title);
 	return QRectF(
@@ -134,7 +134,7 @@ static QRectF build_logic_external_rect(const QList<IedRect*>& rectList, const Q
 	IedRect* firstIed = rectList.first();
 	IedRect* lastIed = rectList.last();
 	QFont font = QApplication::font();
-	font.setPointSize(DIRECT_LOGIC_FRAME_TITLE_FONT_SIZE);
+	font.setPointSize(LogicFrameItem::TitleFontPointSize());
 	QFontMetrics metrics(font);
 	int titleWidth = metrics.width(title);
 	int x = firstIed->x - firstIed->horizontal_margin - titleWidth;

@@ -14,7 +14,6 @@
 #define DIRECT_ARROW_OFFSET 10	// 箭头距连接点偏移
 #define DIRECT_BOUND_MARGIN 12	// 交互区域额外边距
 #define DIRECT_DOUBLE_ARROW_GAP_RATIO 1.5	// 双向箭头前后错开比例
-#define DIRECT_LOGIC_FRAME_TITLE_FONT_SIZE 10	// 逻辑链路框 标题字体大小
 // 检修压板相关常量
 #define DIRECT_MAINT_PLATE_CIRCLE_RADIUS 5
 #define DIRECT_MAINT_PLATE_ICON_SPAN 36
@@ -346,6 +345,11 @@ LogicFrameItem::~LogicFrameItem()
 {
 }
 
+int LogicFrameItem::TitleFontPointSize()
+{
+	return LOGIC_FRAME_TITLE_FONT_POINT_SIZE;
+}
+
 void LogicFrameItem::setFrame(const QRectF& rect, const QString& title, const QColor& borderColor, bool showLegend)
 {
 	prepareGeometryChange();
@@ -363,7 +367,7 @@ QRectF LogicFrameItem::buildLegendRect() const
 		return QRectF();
 	}
 	QFont font = QApplication::font();
-	font.setPointSize(DIRECT_LOGIC_FRAME_TITLE_FONT_SIZE);
+	font.setPointSize(LogicFrameItem::TitleFontPointSize());
 	QFontMetrics metrics(font);
 	qreal descWidth = 180.0;
 	qreal descHeight = metrics.height() * 2 + 10;
@@ -390,7 +394,7 @@ void LogicFrameItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* op
 		return;
 	}
 	QFont font = painter->font();
-	font.setPointSize(DIRECT_LOGIC_FRAME_TITLE_FONT_SIZE);
+	font.setPointSize(LogicFrameItem::TitleFontPointSize());
 	painter->setFont(font);
 	QFontMetrics metrics(font);
 	QPen pen(m_borderColor);

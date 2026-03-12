@@ -7,6 +7,7 @@
 #include <QPointF>
 #include <QLineF>
 #include <QVector>
+#include <QSet>
 #include <QColor>
 #include <QtGlobal>
 
@@ -339,12 +340,24 @@ public:
 	~LineItem();
 	QRectF boundingRect() const;
 	void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget);
+	QPainterPath shape() const;
 	void setPoints(const QVector<QPointF>& pts);
 	void setColor(const QColor& color);
 	void setWidth(int w);
 	void setArrowVisible(bool visible);
 	void setArrowColor(const QColor& color);
 	void setArrowState(quint8 startArrowState, quint8 endArrowState);
+	void setDirectionIedNames(const QString& srcIedName, const QString& destIedName);
+	void setRelatedVirtualCodes(const QSet<quint64>& circuitCodeSet);
+	void setPreferredMainIedName(const QString& iedName);
+	QString srcIedName() const;
+	QString destIedName() const;
+	QString preferredMainIedName() const;
+	const QSet<quint64>& relatedVirtualCodes() const;
+
+protected:
+	void hoverEnterEvent(QGraphicsSceneHoverEvent* event);
+	void hoverLeaveEvent(QGraphicsSceneHoverEvent* event);
 
 private:
 	QVector<QPointF> m_points;
@@ -354,6 +367,11 @@ private:
 	bool m_arrowVisible;
 	quint8 m_startArrowState;
 	quint8 m_endArrowState;
+	bool m_highlighted;
+	QString m_srcIedName;
+	QString m_destIedName;
+	QString m_preferredMainIedName;
+	QSet<quint64> m_relatedVirtualCodeSet;
 };
 
 //class DirectPlateItem : public directItemBase

@@ -483,6 +483,7 @@ LineItem::LineItem(QGraphicsItem* parent)
 	, m_arrowVisible(false)
 	, m_startArrowState(Arrow_None)
 	, m_endArrowState(Arrow_None)
+	, m_highlighted(false)
 {
 	Q_UNUSED(parent);
 	m_itemType = CircuitLine;
@@ -519,7 +520,8 @@ QRectF LineItem::boundingRect() const
 	qreal maxX = m_points[0].x();
 	qreal minY = m_points[0].y();
 	qreal maxY = m_points[0].y();
-	for (int i = 1; i < m_points.size(); ++i) {
+	for (int i = 1; i < m_points.size(); ++i)
+	{
 		const QPointF& p = m_points[i];
 		if (p.x() < minX) minX = p.x();
 		if (p.x() > maxX) maxX = p.x();
@@ -530,16 +532,48 @@ QRectF LineItem::boundingRect() const
 	return QRectF(QPointF(minX - pad, minY - pad), QPointF(maxX + pad, maxY + pad));
 }
 
+QPainterPath LineItem::shape() const
+{
+	QPainterPath path;
+	if (m_points.size() < 2)
+	{
+		return path;
+	}
+	path.moveTo(m_points[0]);
+	for (int i = 1; i < m_points.size(); ++i)
+	{
+		path.lineTo(m_points[i]);
+	}
+	QPainterPathStroker stroker;
+	qreal width = qMax(2, m_width + 2);
+	stroker.setWidth(width);
+	return stroker.createStroke(path);
+}
+
 void LineItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
 	Q_UNUSED(option);
 	Q_UNUSED(widget);
 	if (m_points.size() < 2) return;
 	QPen pen(m_color);
-	pen.setWidth(m_width);
+	int lineWidth = m_width;
+	if (m_highlighted)
+	{
+		lineWidth = m_width * 3;
+		if (lineWidth < 2)
+		{
+			lineWidth = 2;
+		}
+	}
+	else if (lineWidth < 1)
+	{
+		lineWidth = 1;
+	}
+	pen.setWidth(lineWidth);
 	pen.setStyle(Qt::SolidLine);
 	painter->setPen(pen);
-	for (int i = 1; i < m_points.size(); ++i) {
+	for (int i = 1; i < m_points.size(); ++i)
+	{
 		painter->drawLine(m_points[i - 1], m_points[i]);
 	}
 	if (!m_arrowVisible)
@@ -617,6 +651,63 @@ void LineItem::setArrowState(quint8 startArrowState, quint8 endArrowState)
 	update();
 }
 
+void LineItem::setDirectionIedNames(const QString& srcIedName, const QString& destIedName)
+{
+	m_srcIedName = srcIedName;
+	m_destIedName = destIedName;
+}
+
+void LineItem::setRelatedVirtualCodes(const QSet<quint64>& circuitCodeSet)
+{
+	m_relatedVirtualCodeSet = circuitCodeSet;
+}
+
+void LineItem::setPreferredMainIedName(const QString& iedName)
+{
+	m_preferredMainIedName = iedName;
+}
+
+QString LineItem::srcIedName() const
+{
+	return m_srcIedName;
+}
+
+QString LineItem::destIedName() const
+{
+	return m_destIedName;
+}
+
+QString LineItem::preferredMainIedName() const
+{
+	return m_preferredMainIedName;
+}
+
+const QSet<quint64>& LineItem::relatedVirtualCodes() const
+{
+	return m_relatedVirtualCodeSet;
+}
+
+void LineItem::hoverEnterEvent(QGraphicsSceneHoverEvent* event)
+{
+	Q_UNUSED(event);
+	if (QApplication::mouseButtons() & Qt::LeftButton)
+	{
+		return;
+	}
+	m_highlighted = true;
+	update();
+}
+
+void LineItem::hoverLeaveEvent(QGraphicsSceneHoverEvent* event)
+{
+	Q_UNUSED(event);
+	if (QApplication::mouseButtons() & Qt::LeftButton)
+	{
+		return;
+	}
+	m_highlighted = false;
+	update();
+}
 DirectVirtualLineItem::DirectVirtualLineItem(QGraphicsItem* parent)
 	: m_virtualType(0)
 	, m_lineColor(Qt::green)

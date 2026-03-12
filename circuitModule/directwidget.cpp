@@ -143,7 +143,7 @@ public:
 		resize(1200, 800);
 	}
 
-	bool LoadByOpticalCode(const QString& currentIedName, quint64 opticalCode)
+	bool LoadByOpticalCode(const QString& currentIedName, quint64 opticalCode, const QString& srcIedName, const QString& destIedName)
 	{
 		CircuitConfig* circuitConfig = CircuitConfig::Instance();
 		if (!circuitConfig || currentIedName.isEmpty() || opticalCode == 0)
@@ -184,6 +184,18 @@ public:
 			return false;
 		}
 
+		QString pairIedName1 = srcIedName;
+		QString pairIedName2 = destIedName;
+		if (pairIedName1.contains("SW", Qt::CaseInsensitive))
+		{
+			pairIedName1.clear();
+		}
+		if (pairIedName2.contains("SW", Qt::CaseInsensitive))
+		{
+			pairIedName2.clear();
+		}
+		bool hasPairFilter = !pairIedName1.isEmpty() && !pairIedName2.isEmpty() && pairIedName1 != pairIedName2;
+
 		QSet<quint64> circuitCodeSet;
 		QSet<QString> peerIedNameSet;
 		for (int i = 0; i < relatedCircuitList.size(); ++i)
@@ -192,6 +204,15 @@ public:
 			if (!virtualCircuit)
 			{
 				continue;
+			}
+			if (hasPairFilter)
+			{
+				bool isPairMatched = (virtualCircuit->srcIedName == pairIedName1 && virtualCircuit->destIedName == pairIedName2) ||
+					(virtualCircuit->srcIedName == pairIedName2 && virtualCircuit->destIedName == pairIedName1);
+				if (!isPairMatched)
+				{
+					continue;
+				}
 			}
 			circuitCodeSet.insert(virtualCircuit->code);
 			if (virtualCircuit->srcIedName == displayIedName)
@@ -203,9 +224,52 @@ public:
 				peerIedNameSet.insert(virtualCircuit->srcIedName);
 			}
 		}
+		if (hasPairFilter && circuitCodeSet.isEmpty())
+		{
+			for (int i = 0; i < relatedCircuitList.size(); ++i)
+			{
+				VirtualCircuit* virtualCircuit = relatedCircuitList.at(i);
+				if (!virtualCircuit)
+				{
+					continue;
+				}
+				circuitCodeSet.insert(virtualCircuit->code);
+				if (virtualCircuit->srcIedName == displayIedName)
+				{
+					peerIedNameSet.insert(virtualCircuit->destIedName);
+				}
+				else if (virtualCircuit->destIedName == displayIedName)
+				{
+					peerIedNameSet.insert(virtualCircuit->srcIedName);
+				}
+			}
+		}
 
 		CircuitDiagramProxy diagramProxy;
-		VirtualDiagramModel* virtualDiagram = diagramProxy.BuildVirtualDiagramByIedName(displayIedName);
+		VirtualDiagramModel* virtualDiagram = NULL;
+		if (hasPairFilter)
+		{
+			QString mainIedName = displayIedName;
+			QString peerIedName;
+			if (mainIedName == pairIedName1)
+			{
+				peerIedName = pairIedName2;
+			}
+			else if (mainIedName == pairIedName2)
+			{
+				peerIedName = pairIedName1;
+			}
+			else
+			{
+				mainIedName = pairIedName1;
+				peerIedName = pairIedName2;
+			}
+			virtualDiagram = diagramProxy.BuildVirtualDiagramByIedPair(mainIedName, peerIedName);
+		}
+		else
+		{
+			virtualDiagram = diagramProxy.BuildVirtualDiagramByIedName(displayIedName);
+		}
 		if (!virtualDiagram)
 		{
 			return false;
@@ -222,6 +286,66 @@ public:
 		else if (!peerIedNameSet.isEmpty())
 		{
 			setWindowTitle(QString("Virtual Circuits - %1 (%2 peers)").arg(displayIedName).arg(peerIedNameSet.size()));
+		}
+		else
+		{
+			setWindowTitle(QString("Virtual Circuits - %1").arg(displayIedName));
+		}
+		return true;
+	}
+	bool LoadByLogicDirection(const QString& srcIedName, const QString& destIedName, const QSet<quint64>& circuitCodeSet, const QString& preferredMainIedName)
+	{
+		if (circuitCodeSet.isEmpty())
+		{
+			return false;
+		}
+		QString displayIedName = preferredMainIedName;
+		if (displayIedName.isEmpty())
+		{
+			displayIedName = srcIedName;
+		}
+		if (displayIedName.isEmpty())
+		{
+			displayIedName = destIedName;
+		}
+		if (displayIedName.isEmpty())
+		{
+			return false;
+		}
+		CircuitDiagramProxy diagramProxy;
+		VirtualDiagramModel* virtualDiagram = NULL;
+		if (!srcIedName.isEmpty() && !destIedName.isEmpty() && srcIedName != destIedName)
+		{
+			QString mainIedName = displayIedName;
+			QString peerIedName;
+			if (mainIedName == srcIedName)
+			{
+				peerIedName = destIedName;
+			}
+			else if (mainIedName == destIedName)
+			{
+				peerIedName = srcIedName;
+			}
+			else
+			{
+				mainIedName = srcIedName;
+				peerIedName = destIedName;
+			}
+			virtualDiagram = diagramProxy.BuildVirtualDiagramByIedPair(mainIedName, peerIedName);
+		}
+		else
+		{
+			virtualDiagram = diagramProxy.BuildVirtualDiagramByIedName(displayIedName);
+		}
+		if (!virtualDiagram)
+		{
+			return false;
+		}
+		m_directWidget->ParseFromVirtualSvg(*virtualDiagram, circuitCodeSet);
+		delete virtualDiagram;
+		if (!srcIedName.isEmpty() && !destIedName.isEmpty())
+		{
+			setWindowTitle(QString("Virtual Circuits - %1 -> %2").arg(srcIedName, destIedName));
 		}
 		else
 		{
@@ -306,8 +430,15 @@ void DirectView::mouseReleaseEvent(QMouseEvent* event)
 				quint64 opticalCode = opticalLine->data(0).toULongLong();
 				if (opticalCode != 0)
 				{
-					emit opticalLineClicked(opticalCode);
+					QString srcIedName = opticalLine->data(1).toString();
+					QString destIedName = opticalLine->data(2).toString();
+					emit opticalLineClicked(opticalCode, srcIedName, destIedName);
 				}
+			}
+			LineItem* logicLine = dynamic_cast<LineItem*>(item);
+			if (logicLine)
+			{
+				emit logicLineClicked(logicLine);
 			}
 		}
 		m_leftPressed = false;
@@ -394,7 +525,8 @@ DirectWidget::DirectWidget(QWidget *parent)
 	, m_blinkOn(false)
 {
 	initView();
-	connect(m_view, SIGNAL(opticalLineClicked(quint64)), this, SLOT(OnOpticalLineClicked(quint64)));
+	connect(m_view, SIGNAL(opticalLineClicked(quint64, const QString&, const QString&)), this, SLOT(OnOpticalLineClicked(quint64, const QString&, const QString&)));
+	connect(m_view, SIGNAL(logicLineClicked(LineItem*)), this, SLOT(OnLogicLineClicked(LineItem*)));
 	m_statusTimer = new QTimer(this);
 	connect(m_statusTimer, SIGNAL(timeout()), this, SLOT(OnStatusTimeout()));
 	m_statusTimer->start(1000);
@@ -461,6 +593,20 @@ void DirectWidget::ParseFromLogicSvg(const LogicSvg& svg)
 		item->setZValue(-1.0);
 		m_scene->addItem(item);
 	}
+	QSet<QString> centerIedNameSet;
+	for (int centerIndex = 0; centerIndex < svg.centerIedRectList.size(); ++centerIndex)
+	{
+		IedRect* centerRect = svg.centerIedRectList.at(centerIndex);
+		if (!centerRect)
+		{
+			continue;
+		}
+		centerIedNameSet.insert(centerRect->iedName);
+	}
+	if (svg.mainIedRect)
+	{
+		centerIedNameSet.insert(svg.mainIedRect->iedName);
+	}
 	QList<IedRect*> all;
 	all += svg.centerIedRectList;
 	all += svg.leftIedRectList;
@@ -469,6 +615,9 @@ void DirectWidget::ParseFromLogicSvg(const LogicSvg& svg)
 		IedRect* rect = all[i];
 		for (int j = 0; j < rect->logic_line_list.size(); ++j) {
 			LogicCircuitLine* line = rect->logic_line_list[j];
+			if (!line) {
+				continue;
+			}
 			QVector<QPointF> pts;
 			pts.append(line->startPoint);
 			if (!line->turnPointList.isEmpty()) {
@@ -479,6 +628,47 @@ void DirectWidget::ParseFromLogicSvg(const LogicSvg& svg)
 				pts.append(line->midPoint);
 			}
 			pts.append(line->endPoint);
+			QSet<quint64> circuitCodeSet;
+			QString srcIedName;
+			QString destIedName;
+			if (line->pLogicCircuit) {
+				if (line->pLogicCircuit->pSrcIed) {
+					srcIedName = line->pLogicCircuit->pSrcIed->name;
+				}
+				if (line->pLogicCircuit->pDestIed) {
+					destIedName = line->pLogicCircuit->pDestIed->name;
+				}
+				for (int circuitIndex = 0; circuitIndex < line->pLogicCircuit->circuitList.size(); ++circuitIndex) {
+					VirtualCircuit* virtualCircuit = line->pLogicCircuit->circuitList.at(circuitIndex);
+					if (!virtualCircuit) {
+						continue;
+					}
+					circuitCodeSet.insert(virtualCircuit->code);
+				}
+			}
+			if (srcIedName.isEmpty() && line->pSrcIedRect) {
+				srcIedName = line->pSrcIedRect->iedName;
+			}
+			if (destIedName.isEmpty() && line->pDestIedRect) {
+				destIedName = line->pDestIedRect->iedName;
+			}
+			QString preferredMainIedName;
+			if (centerIedNameSet.contains(srcIedName) && !centerIedNameSet.contains(destIedName))
+			{
+				preferredMainIedName = srcIedName;
+			}
+			else if (centerIedNameSet.contains(destIedName) && !centerIedNameSet.contains(srcIedName))
+			{
+				preferredMainIedName = destIedName;
+			}
+			else if (centerIedNameSet.contains(srcIedName))
+			{
+				preferredMainIedName = srcIedName;
+			}
+			else if (centerIedNameSet.contains(destIedName))
+			{
+				preferredMainIedName = destIedName;
+			}
 			LineItem* l = new LineItem();
 			QColor color = (line->pLogicCircuit && line->pLogicCircuit->type == SV) ?
 				utils::ColorHelper::Color(utils::ColorHelper::line_smv) :
@@ -488,6 +678,9 @@ void DirectWidget::ParseFromLogicSvg(const LogicSvg& svg)
 			l->setArrowState(line->srcArrowState, line->destArrowState);
 			l->setWidth(1);
 			l->setPoints(pts);
+			l->setDirectionIedNames(srcIedName, destIedName);
+			l->setRelatedVirtualCodes(circuitCodeSet);
+			l->setPreferredMainIedName(preferredMainIedName);
 			m_scene->addItem(l);
 		}
 	}
@@ -547,6 +740,7 @@ void DirectWidget::ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64
 	bool hasFilter = !circuitCodeSet.isEmpty();
 	QSet<QString> visibleIedNameSet;
 	QSet<QString> visiblePlateRefSet;
+	QSet<quint64> visiblePlateCodeSet;
 	QList<IedRect*> allRectList;
 	allRectList += svg.leftIedRectList;
 	allRectList += svg.rightIedRectList;
@@ -587,9 +781,17 @@ void DirectWidget::ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64
 					{
 						visibleIedNameSet.insert(svg.mainIedRect->iedName);
 					}
+					if (virtualCircuit->srcSoftPlateCode != 0)
+					{
+						visiblePlateCodeSet.insert(virtualCircuit->srcSoftPlateCode);
+					}
 					if (!virtualCircuit->srcSoftPlateRef.isEmpty())
 					{
 						visiblePlateRefSet.insert(virtualCircuit->srcSoftPlateRef);
+					}
+					if (virtualCircuit->destSoftPlateCode != 0)
+					{
+						visiblePlateCodeSet.insert(virtualCircuit->destSoftPlateCode);
 					}
 					if (!virtualCircuit->destSoftPlateRef.isEmpty())
 					{
@@ -684,9 +886,20 @@ void DirectWidget::ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64
 	QHash<QString, PlateRect>::const_iterator plateIt = svg.plateRectHash.constBegin();
 	for (; plateIt != svg.plateRectHash.constEnd(); ++plateIt)
 	{
-		if (hasFilter && !visiblePlateRefSet.contains(plateIt.value().ref))
+		if (hasFilter)
 		{
-			continue;
+			const PlateRect& plateRect = plateIt.value();
+			if (plateRect.code != 0)
+			{
+				if (!visiblePlateCodeSet.contains(plateRect.code))
+				{
+					continue;
+				}
+			}
+			else if (!visiblePlateRefSet.contains(plateRect.ref))
+			{
+				continue;
+			}
 		}
 		DirectPlateItem* item = new DirectPlateItem();
 		item->setFromPlateRect(plateIt.value(), plateIt.key());
@@ -732,6 +945,8 @@ void DirectWidget::ParseFromOpticalSvg(const OpticalSvg& svg)
 		if (line && line->pOpticalCircuit)
 		{
 			lineItem->setData(0, QVariant((qulonglong)line->pOpticalCircuit->code));
+			lineItem->setData(1, QVariant(line->pSrcRect ? line->pSrcRect->iedName : QString()));
+			lineItem->setData(2, QVariant(line->pDestRect ? line->pDestRect->iedName : QString()));
 		}
 		m_scene->addItem(lineItem);
 	}
@@ -747,14 +962,39 @@ void DirectWidget::ParseFromOpticalSvg(const OpticalSvg& svg)
 	}
 }
 
-void DirectWidget::OnOpticalLineClicked(quint64 opticalCode)
+void DirectWidget::OnOpticalLineClicked(quint64 opticalCode, const QString& srcIedName, const QString& destIedName)
 {
 	if (m_currentIedName.isEmpty() || opticalCode == 0)
 	{
 		return;
 	}
 	DirectRelationWindow* relationWindow = new DirectRelationWindow(NULL);
-	if (!relationWindow->LoadByOpticalCode(m_currentIedName, opticalCode))
+	if (!relationWindow->LoadByOpticalCode(m_currentIedName, opticalCode, srcIedName, destIedName))
+	{
+		delete relationWindow;
+		return;
+	}
+	relationWindow->show();
+	relationWindow->raise();
+	relationWindow->activateWindow();
+}
+
+void DirectWidget::OnLogicLineClicked(LineItem* lineItem)
+{
+	if (!lineItem)
+	{
+		return;
+	}
+	const QSet<quint64>& circuitCodeSet = lineItem->relatedVirtualCodes();
+	if (circuitCodeSet.isEmpty())
+	{
+		return;
+	}
+	QString srcIedName = lineItem->srcIedName();
+	QString destIedName = lineItem->destIedName();
+	QString preferredMainIedName = lineItem->preferredMainIedName();
+	DirectRelationWindow* relationWindow = new DirectRelationWindow(NULL);
+	if (!relationWindow->LoadByLogicDirection(srcIedName, destIedName, circuitCodeSet, preferredMainIedName))
 	{
 		delete relationWindow;
 		return;

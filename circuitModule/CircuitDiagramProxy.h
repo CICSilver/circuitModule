@@ -96,6 +96,7 @@ public:
 	// 返回值:	VirtualDiagramModel*
 	//************************************
 	VirtualDiagramModel* BuildVirtualDiagramByIedName(const QString& iedName);
+	VirtualDiagramModel* BuildVirtualDiagramByIedPair(const QString& mainIedName, const QString& peerIedName);
 	//************************************
 	// 函数名称:	BuildWholeDiagramByIedName
 	// 函数全名:	CircuitDiagramProxy::BuildWholeDiagramByIedName

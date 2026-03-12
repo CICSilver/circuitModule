@@ -79,6 +79,15 @@ VirtualDiagramModel* CircuitDiagramProxy::BuildVirtualDiagramByIedName(const QSt
 	return m_pVirtualBuilder->BuildVirtualDiagramByIedName(iedName);
 }
 
+VirtualDiagramModel* CircuitDiagramProxy::BuildVirtualDiagramByIedPair(const QString& mainIedName, const QString& peerIedName)
+{
+	if (!m_pVirtualBuilder)
+	{
+		return NULL;
+	}
+	return m_pVirtualBuilder->BuildVirtualDiagramByIedPair(mainIedName, peerIedName);
+}
+
 WholeDiagramModel* CircuitDiagramProxy::BuildWholeDiagramByIedName(const QString& iedName)
 {
 	if (!m_pWholeBuilder)

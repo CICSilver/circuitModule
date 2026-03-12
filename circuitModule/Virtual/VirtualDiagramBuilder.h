@@ -31,6 +31,7 @@ public:
 	// º¯Êý·µ»Ø:	VirtualSvg*
 	//************************************
 	VirtualSvg* BuildVirtualDiagramByIedName(const QString& iedName);
+	VirtualSvg* BuildVirtualDiagramByIedPair(const QString& mainIedName, const QString& peerIedName);
 
 private:
 	//************************************

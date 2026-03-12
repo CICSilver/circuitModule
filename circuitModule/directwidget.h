@@ -88,7 +88,8 @@ protected:
 	void mouseDoubleClickEvent(QMouseEvent* event);
 
 signals:
-	void opticalLineClicked(quint64 opticalCode);
+	void opticalLineClicked(quint64 opticalCode, const QString& srcIedName, const QString& destIedName);
+	void logicLineClicked(LineItem* lineItem);
 
 private:
 	bool m_dragging;
@@ -149,7 +150,8 @@ private:
 	void UpdateLineStatuses();
 
 private slots:
-	void OnOpticalLineClicked(quint64 opticalCode);
+	void OnOpticalLineClicked(quint64 opticalCode, const QString& srcIedName, const QString& destIedName);
+	void OnLogicLineClicked(LineItem* lineItem);
 	//************************************
 	// 函数名称:	OnStatusTimeout
 	// 函数全名:	DirectWidget::OnStatusTimeout

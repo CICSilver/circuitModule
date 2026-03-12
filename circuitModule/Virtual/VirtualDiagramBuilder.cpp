@@ -21,6 +21,75 @@ VirtualSvg* VirtualDiagramBuilder::BuildVirtualDiagramByIedName(const QString& i
 	return svg;
 }
 
+VirtualSvg* VirtualDiagramBuilder::BuildVirtualDiagramByIedPair(const QString& mainIedName, const QString& peerIedName)
+{
+	if (mainIedName.isEmpty() || peerIedName.isEmpty() || mainIedName == peerIedName)
+	{
+		return NULL;
+	}
+	IED* pMainIed = m_pCircuitConfig->GetIedByName(mainIedName);
+	IED* pPeerIed = m_pCircuitConfig->GetIedByName(peerIedName);
+	if (!pMainIed || !pPeerIed)
+	{
+		return NULL;
+	}
+	VirtualSvg* svg = new VirtualSvg();
+	int svgTopMargin = 50;
+	svg->mainIedRect = utils::GetIedRect(
+		pMainIed->name,
+		pMainIed->desc,
+		(SVG_VIEWBOX_WIDTH - RECT_DEFAULT_WIDTH) / 2,
+		svgTopMargin,
+		RECT_DEFAULT_WIDTH * 1.5,
+		RECT_DEFAULT_HEIGHT,
+		ColorHelper::pure_red
+	);
+	IedRect* peerIedRect = GetOtherIedRect(0, svg->mainIedRect, pPeerIed, ColorHelper::pure_green);
+	QList<LogicCircuit*> inCircuitList = m_pCircuitConfig->GetInLogicCircuitListByIedName(pMainIed->name);
+	QList<LogicCircuit*> outCircuitList = m_pCircuitConfig->GetOutLogicCircuitListByIedName(pMainIed->name);
+	for (int i = 0; i < inCircuitList.size(); ++i)
+	{
+		LogicCircuit* logicCircuit = inCircuitList.at(i);
+		if (!logicCircuit || !logicCircuit->pSrcIed || logicCircuit->pSrcIed->name != pPeerIed->name)
+		{
+			continue;
+		}
+		LogicCircuitLine* line = new LogicCircuitLine();
+		line->pSrcIedRect = peerIedRect;
+		line->pDestIedRect = svg->mainIedRect;
+		line->pLogicCircuit = logicCircuit;
+		peerIedRect->logic_line_list.append(line);
+	}
+	for (int i = 0; i < outCircuitList.size(); ++i)
+	{
+		LogicCircuit* logicCircuit = outCircuitList.at(i);
+		if (!logicCircuit || !logicCircuit->pDestIed || logicCircuit->pDestIed->name != pPeerIed->name)
+		{
+			continue;
+		}
+		LogicCircuitLine* line = new LogicCircuitLine();
+		line->pSrcIedRect = svg->mainIedRect;
+		line->pDestIedRect = peerIedRect;
+		line->pLogicCircuit = logicCircuit;
+		peerIedRect->logic_line_list.append(line);
+	}
+	if (peerIedRect->logic_line_list.isEmpty())
+	{
+		delete peerIedRect;
+		delete svg;
+		return NULL;
+	}
+	svg->leftIedRectList.append(peerIedRect);
+	AdjustExtendRectByCircuit(svg->leftIedRectList, *svg);
+	size_t maxY = svg->leftIedRectList.last()->GetExtendBottomY();
+	svg->mainIedRect->extend_height = maxY;
+	int svgRightMargin = svg->leftIedRectList.first()->x - svg->leftIedRectList.first()->inner_gap;
+	svg->viewBoxHeight = svg->mainIedRect->GetExtendHeight() + svgTopMargin;
+	svg->viewBoxWidth = svg->mainIedRect->x + svg->mainIedRect->width + svgRightMargin;
+	AdjustVirtualCircuitLinePosition(*svg);
+	return svg;
+}
+
 void VirtualDiagramBuilder::GenerateVirtualDiagramByIed(const IED* pIed, VirtualSvg& svg/*, const QString& swName*/)
 {
 	//// 生成图形
@@ -44,10 +113,6 @@ void VirtualDiagramBuilder::GenerateVirtualDiagramByIed(const IED* pIed, Virtual
 	// 主设备高度 = max(侧边IED矩形高度) + margin + IED描述矩形高度;
 	// 关联IED，增加矩形间隔用于显示回路信息
 	ParseCircuitFromIed(svg, pIed);
-	if (pIed->name == "P_B5012A")
-	{
-		int a = 1;
-	}
 	//// 调整矩形位置
 	// 根据单侧关联IED数量和压板高度，调整高度
 	AdjustExtendRectByCircuit(svg.leftIedRectList, svg);

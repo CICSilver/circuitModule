@@ -116,6 +116,7 @@ public:
 	void ParseFromVirtualSvg();
 	void ParseFromVirtualSvg(const VirtualSvg& svg);
 	void ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64>& circuitCodeSet);
+	void ParseFromWholeSvg(const WholeCircuitSvg& svg);
 	void SetMaintainPlateText(const QString& iedName, const QString& text);
 	void SetMaintainPlateState(const QString& iedName, int value);
 

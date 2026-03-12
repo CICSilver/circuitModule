@@ -160,6 +160,44 @@ static QRectF build_virtual_ied_outer_rect(const IedRect* rect)
 	return QRectF(rect->x, rect->y, rect->width, rect->height);
 }
 
+static void whole_build_side_label_layout(const VirtualCircuitLine* virtualLine, const WholeGroupDecor* groupDecor, QString& leftText, QRectF& leftRect, QString& rightText, QRectF& rightRect)
+{
+	leftText.clear();
+	rightText.clear();
+	leftRect = QRectF();
+	rightRect = QRectF();
+	if (!virtualLine || !virtualLine->pVirtualCircuit || !groupDecor)
+	{
+		return;
+	}
+	const VirtualCircuit* virtualCircuit = virtualLine->pVirtualCircuit;
+	QFont font = QApplication::font();
+	font.setPointSize(DirectVirtualLineItem::LabelFontPointSize());
+	QFontMetrics metrics(font);
+	bool startOnLeft = virtualLine->startPoint.x() <= virtualLine->endPoint.x();
+	QString leftName = startOnLeft ? virtualCircuit->srcDesc : virtualCircuit->destDesc;
+	QString rightName = startOnLeft ? virtualCircuit->destDesc : virtualCircuit->srcDesc;
+	qreal verticalPadding = DirectVirtualLineItem::SideLabelVerticalPadding();
+	qreal labelHeight = metrics.lineSpacing() + verticalPadding + verticalPadding;
+	qreal labelTop = virtualLine->startPoint.y() - labelHeight - DirectVirtualLineItem::SideLabelLineGap();
+	qreal leftLineStartX = qMin((qreal)virtualLine->startPoint.x(), (qreal)virtualLine->endPoint.x());
+	qreal leftLineEndX = groupDecor->leftBraceRect.left() - DirectVirtualLineItem::SideLabelBraceGap();
+	qreal rightLineStartX = groupDecor->rightBraceRect.right() + DirectVirtualLineItem::SideLabelBraceGap();
+	qreal rightLineEndX = qMax((qreal)virtualLine->startPoint.x(), (qreal)virtualLine->endPoint.x());
+	if (leftLineEndX > leftLineStartX && !leftName.isEmpty())
+	{
+		int leftWidth = (int)(leftLineEndX - leftLineStartX);
+		leftText = metrics.elidedText(leftName, Qt::ElideRight, leftWidth);
+		leftRect = QRectF(leftLineStartX, labelTop, leftWidth, labelHeight);
+	}
+	if (rightLineEndX > rightLineStartX && !rightName.isEmpty())
+	{
+		int rightWidth = (int)(rightLineEndX - rightLineStartX);
+		rightText = metrics.elidedText(rightName, Qt::ElideRight, rightWidth);
+		rightRect = QRectF(rightLineStartX, labelTop, rightWidth, labelHeight);
+	}
+}
+
 class DirectRelationWindow : public QWidget
 {
 public:
@@ -1045,6 +1083,170 @@ void DirectWidget::ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64
 				continue;
 			}
 		}
+		DirectPlateItem* item = new DirectPlateItem();
+		item->setFromPlateRect(plateIt.value(), plateIt.key());
+		item->setClosed(true);
+		item->setToolTip(build_plate_tooltip(item));
+		m_scene->addItem(item);
+		m_plateItems.insert(plateIt.key(), item);
+	}
+	UpdatePlateStatuses();
+	UpdateLineStatuses();
+	QRectF itemsRect = m_scene->itemsBoundingRect();
+	if (!itemsRect.isNull())
+	{
+		m_scene->setSceneRect(itemsRect.adjusted(-20.0, -20.0, 20.0, 20.0));
+	}
+}
+
+void DirectWidget::ParseFromWholeSvg(const WholeCircuitSvg& svg)
+{
+	if (!m_scene)
+	{
+		return;
+	}
+	ClearScene();
+	m_currentIedName = svg.mainIedRect ? svg.mainIedRect->iedName : QString();
+	m_scene->setSceneRect(0, 0, svg.viewBoxWidth, svg.viewBoxHeight);
+	QMap<QString, QRectF> maintainPlateRectHash;
+	QList<IedRect*> allRectList;
+	allRectList += svg.leftIedRectList;
+	allRectList += svg.rightIedRectList;
+	if (svg.mainIedRect)
+	{
+		IedItem* item = new IedItem();
+		item->setFromIedRect(*svg.mainIedRect, false);
+		m_scene->addItem(item);
+		maintainPlateRectHash.insert(svg.mainIedRect->iedName, build_virtual_ied_outer_rect(svg.mainIedRect));
+	}
+	for (int i = 0; i < svg.leftIedRectList.size(); ++i)
+	{
+		IedRect* rect = svg.leftIedRectList.at(i);
+		if (!rect)
+		{
+			continue;
+		}
+		IedItem* item = new IedItem();
+		item->setFromIedRect(*rect, false);
+		m_scene->addItem(item);
+		maintainPlateRectHash.insert(rect->iedName, build_virtual_ied_outer_rect(rect));
+	}
+	for (int i = 0; i < svg.rightIedRectList.size(); ++i)
+	{
+		IedRect* rect = svg.rightIedRectList.at(i);
+		if (!rect)
+		{
+			continue;
+		}
+		IedItem* item = new IedItem();
+		item->setFromIedRect(*rect, false);
+		m_scene->addItem(item);
+		maintainPlateRectHash.insert(rect->iedName, build_virtual_ied_outer_rect(rect));
+	}
+	QMap<QString, QRectF>::const_iterator maintainIt = maintainPlateRectHash.constBegin();
+	for (; maintainIt != maintainPlateRectHash.constEnd(); ++maintainIt)
+	{
+		DirectMaintainPlateItem* maintainItem = new DirectMaintainPlateItem();
+		maintainItem->setIedName(maintainIt.key());
+		QString displayText = m_maintPlateTextByIed.contains(maintainIt.key()) ?
+			m_maintPlateTextByIed.value(maintainIt.key()) :
+			build_maint_plate_default_text();
+		int stateValue = m_maintPlateStateByIed.contains(maintainIt.key()) ?
+			m_maintPlateStateByIed.value(maintainIt.key()) :
+			1;
+		maintainItem->setDisplayText(displayText);
+		maintainItem->setStateByValue(stateValue);
+		maintainItem->setAnchorRect(maintainIt.value());
+		maintainItem->setToolTip(displayText);
+		maintainItem->setZValue(1.0);
+		m_scene->addItem(maintainItem);
+		m_maintPlateItems.insert(maintainIt.key(), maintainItem);
+	}
+	QMap<quintptr, const WholeGroupDecor*> groupDecorMap;
+	for (int i = 0; i < svg.groupDecorList.size(); ++i)
+	{
+		const WholeGroupDecor* groupDecor = svg.groupDecorList.at(i);
+		if (!groupDecor || !groupDecor->pLogicLine)
+		{
+			continue;
+		}
+		groupDecorMap.insert((quintptr)groupDecor->pLogicLine, groupDecor);
+		if (groupDecor->groupMode == WholeGroupMode_Fallback)
+		{
+			continue;
+		}
+		DirectWholeGroupItem* groupItem = new DirectWholeGroupItem();
+		groupItem->setFromWholeGroupDecor(*groupDecor);
+		groupItem->setLineColor(utils::ColorHelper::Color(utils::ColorHelper::pure_green));
+		if (groupDecor->hasSwitchIcon && !groupDecor->switchIedName.isEmpty())
+		{
+			groupItem->setToolTip(groupDecor->switchIedName);
+		}
+		groupItem->setZValue(0.5);
+		m_scene->addItem(groupItem);
+	}
+	for (int i = 0; i < allRectList.size(); ++i)
+	{
+		IedRect* rect = allRectList.at(i);
+		if (!rect)
+		{
+			continue;
+		}
+		for (int j = 0; j < rect->logic_line_list.size(); ++j)
+		{
+			LogicCircuitLine* logic = rect->logic_line_list.at(j);
+			if (!logic)
+			{
+				continue;
+			}
+			const WholeGroupDecor* groupDecor = groupDecorMap.value((quintptr)logic, NULL);
+			for (int k = 0; k < logic->virtual_line_list.size(); ++k)
+			{
+				VirtualCircuitLine* virtualLine = logic->virtual_line_list.at(k);
+				if (!virtualLine)
+				{
+					continue;
+				}
+				VirtualCircuit* virtualCircuit = virtualLine->pVirtualCircuit;
+				DirectVirtualLineItem* lineItem = new DirectVirtualLineItem();
+				int virtualType = virtualCircuit ? virtualCircuit->type : 0;
+				lineItem->setFromVirtualLine(*virtualLine, virtualType);
+				lineItem->setVirtualType(virtualType);
+				if (virtualCircuit)
+				{
+					lineItem->setCircuitCode(virtualCircuit->code);
+				}
+				lineItem->setLineColor(utils::ColorHelper::Color(utils::ColorHelper::pure_green));
+				lineItem->setArrowColor(utils::ColorHelper::Color(utils::ColorHelper::pure_green));
+				lineItem->setLineStyle(Qt::SolidLine);
+				lineItem->setValueVisible(true);
+				if (groupDecor && groupDecor->groupMode != WholeGroupMode_Fallback)
+				{
+					QString leftText;
+					QString rightText;
+					QRectF leftRect;
+					QRectF rightRect;
+					lineItem->setArrowVisible(true);
+					lineItem->setMiddleGap(groupDecor->gapStartX, groupDecor->gapEndX);
+					whole_build_side_label_layout(virtualLine, groupDecor, leftText, leftRect, rightText, rightRect);
+					lineItem->setSideLabels(leftText, leftRect, rightText, rightRect);
+				}
+				else
+				{
+					lineItem->setArrowVisible(true);
+					lineItem->clearMiddleGap();
+					lineItem->clearSideLabels();
+				}
+				lineItem->setToolTip(build_virtual_tooltip(virtualLine));
+				lineItem->setZValue(1.0);
+				m_scene->addItem(lineItem);
+				m_virtualLines.append(lineItem);
+			}
+		}
+	}
+	QHash<QString, PlateRect>::const_iterator plateIt = svg.plateRectHash.constBegin();
+	for (; plateIt != svg.plateRectHash.constEnd(); ++plateIt)
+	{
 		DirectPlateItem* item = new DirectPlateItem();
 		item->setFromPlateRect(plateIt.value(), plateIt.key());
 		item->setClosed(true);

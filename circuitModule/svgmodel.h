@@ -2,6 +2,7 @@
 #include "basemodel.h"
 #include <QPoint>
 #include <QRect>
+#include <QLineF>
 #ifndef SVG_DEFAULT_VALUE
 #define SVG_DEFAULT_VALUE
 // 默认IED矩形宽高
@@ -368,6 +369,40 @@ struct VirtualSvg : public LogicSvg
 	QHash<QString, PlateRect> plateRectHash;	// 软压板矩形列表，key为软压板路径
 };
 // 完整虚实回路svg图
+enum WholeGroupMode
+{
+	WholeGroupMode_Fallback = 0,
+	WholeGroupMode_Direct,
+	WholeGroupMode_Switch
+};
+
+struct WholeGroupDecor
+{
+	WholeGroupDecor()
+	{
+		pLogicLine = NULL;
+		groupMode = WholeGroupMode_Fallback;
+		leftBraceRect = QRectF();
+		rightBraceRect = QRectF();
+		centerArrowLine = QLineF();
+		switchIconRect = QRectF();
+		gapStartX = 0;
+		gapEndX = 0;
+		hasSwitchIcon = false;
+	}
+
+	LogicCircuitLine* pLogicLine;
+	WholeGroupMode groupMode;
+	QRectF leftBraceRect;
+	QRectF rightBraceRect;
+	QLineF centerArrowLine;
+	QRectF switchIconRect;
+	qreal gapStartX;
+	qreal gapEndX;
+	bool hasSwitchIcon;
+	QString switchIedName;
+};
+
 struct WholeCircuitSvg : public LogicSvg
 {
 	WholeCircuitSvg()
@@ -375,5 +410,9 @@ struct WholeCircuitSvg : public LogicSvg
 	}
 	~WholeCircuitSvg()
 	{
+		qDeleteAll(groupDecorList);
+		groupDecorList.clear();
 	}
+	QHash<QString, PlateRect> plateRectHash;
+	QList<WholeGroupDecor*> groupDecorList;
 };

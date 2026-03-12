@@ -79,6 +79,7 @@ CircuitModuleWidget::CircuitModuleWidget(QWidget *parent)
 	, m_directLogicWidget(NULL)
 	, m_directOpticalWidget(NULL)
 	, m_directVirtualWidget(NULL)
+	, m_directWholeWidget(NULL)
 {
 	InitializeWindow();
 }
@@ -92,6 +93,7 @@ CircuitModuleWidget::CircuitModuleWidget(bool useSvgBytes, QWidget* parent)
 	, m_directLogicWidget(NULL)
 	, m_directOpticalWidget(NULL)
 	, m_directVirtualWidget(NULL)
+	, m_directWholeWidget(NULL)
 {
 	InitializeWindow();
 }
@@ -349,6 +351,8 @@ void CircuitModuleWidget::onStationTreeItemClicked(const QModelIndex& index)
 		m_directLogicWidget = CreateDirectWidget(ui.tab, ui.logicView, "directLogicWidget");
 		ReleaseDirectWidget(ui.tab_3, m_directVirtualWidget);
 		m_directVirtualWidget = CreateDirectWidget(ui.tab_3, ui.wholeView, "directVirtualWidget");
+		ReleaseDirectWidget(ui.tab_4, m_directWholeWidget);
+		m_directWholeWidget = CreateDirectWidget(ui.tab_4, ui.wholeRealView, "directWholeWidget");
 		ui.tabWidget->setCurrentWidget(ui.tab_2);
 		return;
 	}
@@ -358,6 +362,8 @@ void CircuitModuleWidget::onStationTreeItemClicked(const QModelIndex& index)
 		DisplayBayOptical(nodeKey);
 		ReleaseDirectWidget(ui.tab_3, m_directVirtualWidget);
 		m_directVirtualWidget = CreateDirectWidget(ui.tab_3, ui.wholeView, "directVirtualWidget");
+		ReleaseDirectWidget(ui.tab_4, m_directWholeWidget);
+		m_directWholeWidget = CreateDirectWidget(ui.tab_4, ui.wholeRealView, "directWholeWidget");
 		ui.tabWidget->setCurrentWidget(ui.tab_2);
 		return;
 	}
@@ -375,6 +381,7 @@ void CircuitModuleWidget::DisplayIed(const QString& iedName)
 	DisplayLogicIed(key);
 	DisplayOpticalIed(key);
 	DisplayVirtualIed(key);
+	DisplayWholeIed(key);
 }
 
 void CircuitModuleWidget::InitializeDirectWidgets()
@@ -391,6 +398,10 @@ void CircuitModuleWidget::InitializeDirectWidgets()
 	{
 		m_directVirtualWidget = CreateDirectWidget(ui.tab_3, ui.wholeView, "directVirtualWidget");
 	}
+	if (!m_directWholeWidget)
+	{
+		m_directWholeWidget = CreateDirectWidget(ui.tab_4, ui.wholeRealView, "directWholeWidget");
+	}
 }
 
 void CircuitModuleWidget::ResetDirectWidgets()
@@ -398,6 +409,7 @@ void CircuitModuleWidget::ResetDirectWidgets()
 	ReleaseDirectWidget(ui.tab, m_directLogicWidget);
 	ReleaseDirectWidget(ui.tab_2, m_directOpticalWidget);
 	ReleaseDirectWidget(ui.tab_3, m_directVirtualWidget);
+	ReleaseDirectWidget(ui.tab_4, m_directWholeWidget);
 	InitializeDirectWidgets();
 }
 
@@ -479,6 +491,26 @@ void CircuitModuleWidget::DisplayVirtualIed(const QString& iedName)
 
 	m_directVirtualWidget->ParseFromVirtualSvg(*virtualDiagram);
 	delete virtualDiagram;
+}
+
+void CircuitModuleWidget::DisplayWholeIed(const QString& iedName)
+{
+	if (!m_directWholeWidget)
+	{
+		InitializeDirectWidgets();
+	}
+
+	CircuitDiagramProxy diagramProxy;
+	WholeDiagramModel* wholeDiagram = diagramProxy.BuildWholeDiagramByIedName(iedName);
+	if (!wholeDiagram)
+	{
+		ReleaseDirectWidget(ui.tab_4, m_directWholeWidget);
+		m_directWholeWidget = CreateDirectWidget(ui.tab_4, ui.wholeRealView, "directWholeWidget");
+		return;
+	}
+
+	m_directWholeWidget->ParseFromWholeSvg(*wholeDiagram);
+	delete wholeDiagram;
 }
 
 void CircuitModuleWidget::DisplayStationOptical()

@@ -16,6 +16,7 @@ struct PlateRect;
 struct IedRect;
 struct VirtualCircuitLine;
 struct OpticalCircuitLine;
+struct WholeGroupDecor;
 class directItemBase  : public QGraphicsItem
 {
 public:
@@ -69,10 +70,6 @@ public:
 	void setFrame(const QRectF& rect, const QString& title, const QColor& borderColor, bool showLegend);
 
 private:
-	enum
-	{
-		LOGIC_FRAME_TITLE_FONT_POINT_SIZE = 15
-	};
 	QRectF buildLegendRect() const;
 
 private:
@@ -150,6 +147,11 @@ class DirectVirtualLineItem : public directItemBase
 public:
 	DirectVirtualLineItem(QGraphicsItem* parent = NULL);
 	~DirectVirtualLineItem();
+	static int LabelFontPointSize();
+	static qreal SideLabelVerticalPadding();
+	static qreal SideLabelLineGap();
+	static qreal SideLabelBraceGap();
+	static qreal SideLabelBottomPadding();
 	QRectF boundingRect() const;
 	void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget);
 	//************************************
@@ -271,6 +273,12 @@ public:
 	// 返回值:	void
 	//************************************
 	void setArrowColor(const QColor& color);
+	void setArrowVisible(bool visible);
+	void setLineStyle(Qt::PenStyle style);
+	void setMiddleGap(qreal gapStartX, qreal gapEndX);
+	void clearMiddleGap();
+	void setSideLabels(const QString& leftText, const QRectF& leftRect, const QString& rightText, const QRectF& rightRect);
+	void clearSideLabels();
 	//************************************
 	// 函数名称:	setValueVisible
 	// 函数全名:	DirectVirtualLineItem::setValueVisible
@@ -308,18 +316,58 @@ private:
 	QRectF m_startValRect;
 	QRectF m_endValRect;
 	QRectF m_descRect;
+	QRectF m_leftLabelRect;
+	QRectF m_rightLabelRect;
 	QString m_outValStr;
 	QString m_inValStr;
 	QString m_descStr;
+	QString m_leftLabelStr;
+	QString m_rightLabelStr;
 	quint64 m_circuitCode;
 	int m_virtualType;
 	QColor m_lineColor;
 	QColor m_arrowColor;
 	int m_lineWidth;
+	Qt::PenStyle m_lineStyle;
+	bool m_arrowVisible;
+	bool m_hasMiddleGap;
+	qreal m_gapStartX;
+	qreal m_gapEndX;
 	bool m_valueVisible;
 	bool m_blinking;
 	bool m_blinkOn;
 	bool m_highlighted;
+};
+
+class DirectWholeGroupItem : public directItemBase
+{
+public:
+	DirectWholeGroupItem(QGraphicsItem* parent = NULL);
+	~DirectWholeGroupItem();
+	QRectF boundingRect() const;
+	void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget);
+	void setFromWholeGroupDecor(const WholeGroupDecor& groupDecor);
+	void setLineColor(const QColor& color);
+	void setBraceColor(const QColor& color);
+	void setCenterLineColor(const QColor& color);
+	void setBraceBlinking(bool blinking);
+	void setBraceBlinkOn(bool on);
+	void setCenterLineBlinking(bool blinking);
+	void setCenterLineBlinkOn(bool on);
+
+private:
+	QRectF m_leftBraceRect;
+	QRectF m_rightBraceRect;
+	QLineF m_centerArrowLine;
+	QRectF m_switchIconRect;
+	QColor m_braceColor;
+	QColor m_centerLineColor;
+	bool m_braceBlinking;
+	bool m_braceBlinkOn;
+	bool m_centerLineBlinking;
+	bool m_centerLineBlinkOn;
+	bool m_hasSwitchIcon;
+	QString m_switchIedName;
 };
 
 class DirectOpticalLineItem : public directItemBase

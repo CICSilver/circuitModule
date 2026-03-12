@@ -1,4 +1,6 @@
 <RCC>
-    <qresource prefix="MainWindow">
+    <qresource prefix="/MainWindow">
+        <file>Resources/switcher.png</file>
+        <file alias="virtual_real_switch.png">Resources/switcher.png</file>
     </qresource>
 </RCC>

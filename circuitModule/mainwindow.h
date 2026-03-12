@@ -42,6 +42,7 @@ protected:
 	void DisplayBayLogic(const QString& bayName);
 	void DisplayOpticalIed(const QString& iedName);
 	void DisplayVirtualIed(const QString& iedName);
+	void DisplayWholeIed(const QString& iedName);
 	void DisplayStationOptical();
 	void DisplayBayOptical(const QString& bayName);
 
@@ -62,6 +63,7 @@ private:
 	DirectWidget* m_directLogicWidget;
 	DirectWidget* m_directOpticalWidget;
 	DirectWidget* m_directVirtualWidget;
+	DirectWidget* m_directWholeWidget;
 };
 
 #endif // MAINWINDOW_H

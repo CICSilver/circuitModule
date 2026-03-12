@@ -52,6 +52,16 @@
        </item>
       </layout>
      </widget>
+     <widget class="QWidget" name="tab_4">
+      <attribute name="title">
+       <string>二次虚实回路</string>
+      </attribute>
+      <layout class="QGridLayout" name="gridLayout_4">
+       <item row="0" column="0">
+        <widget class="QGraphicsView" name="wholeRealView"/>
+       </item>
+      </layout>
+     </widget>
     </widget>
    </item>
   </layout>

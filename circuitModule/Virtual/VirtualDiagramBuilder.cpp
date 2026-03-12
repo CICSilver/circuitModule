@@ -2,6 +2,8 @@
 #include <QFont>
 #include <QFontMetrics>
 
+#define VIRTUAL_MAINT_PLATE_OUTER_GAP 30	// 虚回路区与检修压板整体的间距
+
 using utils::ColorHelper;
 
 VirtualDiagramBuilder::VirtualDiagramBuilder()
@@ -81,6 +83,15 @@ VirtualSvg* VirtualDiagramBuilder::BuildVirtualDiagramByIedPair(const QString& m
 	}
 	svg->leftIedRectList.append(peerIedRect);
 	AdjustExtendRectByCircuit(svg->leftIedRectList, *svg);
+	for (int i = 0; i < svg->leftIedRectList.size(); ++i)
+	{
+		IedRect* rect = svg->leftIedRectList.at(i);
+		if (!rect)
+		{
+			continue;
+		}
+		rect->extend_height += VIRTUAL_MAINT_PLATE_OUTER_GAP;
+	}
 	size_t maxY = svg->leftIedRectList.last()->GetExtendBottomY();
 	svg->mainIedRect->extend_height = maxY;
 	int svgRightMargin = svg->leftIedRectList.first()->x - svg->leftIedRectList.first()->inner_gap;
@@ -117,12 +128,30 @@ void VirtualDiagramBuilder::GenerateVirtualDiagramByIed(const IED* pIed, Virtual
 	// 根据单侧关联IED数量和压板高度，调整高度
 	AdjustExtendRectByCircuit(svg.leftIedRectList, svg);
 	AdjustExtendRectByCircuit(svg.rightIedRectList, svg);
+	for (int i = 0; i < svg.leftIedRectList.size(); ++i)
+	{
+		IedRect* rect = svg.leftIedRectList.at(i);
+		if (!rect)
+		{
+			continue;
+		}
+		rect->extend_height += VIRTUAL_MAINT_PLATE_OUTER_GAP;
+	}
+	for (int i = 0; i < svg.rightIedRectList.size(); ++i)
+	{
+		IedRect* rect = svg.rightIedRectList.at(i);
+		if (!rect)
+		{
+			continue;
+		}
+		rect->extend_height += VIRTUAL_MAINT_PLATE_OUTER_GAP;
+	}
 	// 计算两侧IED的链路数量()
 	size_t leftCircuitSize = svg.GetLeftCircuitSize();
 	size_t rightCircuitSize = svg.GetRightCircuitSize();
 	// 计算主IED高度
 	size_t maxY = qMax(
-		svg.leftIedRectList.size() > 0 ? svg.leftIedRectList.last()->GetExtendBottomY() : 0, 
+		svg.leftIedRectList.size() > 0 ? svg.leftIedRectList.last()->GetExtendBottomY() : 0,
 		svg.rightIedRectList.size() > 0 ? svg.rightIedRectList.last()->GetExtendBottomY() : 0);
 	svg.mainIedRect->extend_height = maxY;
 	// 根据IED位置调整SVG视图大小
@@ -147,25 +176,25 @@ void VirtualDiagramBuilder::AdjustVirtualCircuitLinePosition(VirtualSvg& svg)
 
 void VirtualDiagramBuilder::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QList<IedRect*>& rectList, IedRect* mainIed, bool isLeft)
 {
-    foreach(IedRect* rect, rectList)
-    {
-        foreach(LogicCircuitLine* pLogicLine, rect->logic_line_list)
-        {
-            foreach(VirtualCircuit* pCircuit, pLogicLine->pLogicCircuit->circuitList)
-            {
-                // 设备当前逻辑链路下所属的全部通道
-                VirtualCircuitLine* pVtLine = new VirtualCircuitLine(pCircuit);
-                // 确定源矩形和目标矩形
-                bool isSideSource = (pCircuit->srcIedName == rect->iedName);
-                IedRect* srcRect = isSideSource ? rect : mainIed;
-                IedRect* destRect = isSideSource ? mainIed : rect;
-                pVtLine->pSrcIedRect = srcRect;
-                pVtLine->pDestIedRect = destRect;
-                // 确定连接点索引
-                quint8* pConnectPtIndex = isLeft ? &rect->right_connect_index : &rect->left_connect_index;
-                quint8* pMainConnectPtIndex = isLeft ? &mainIed->right_connect_index : &mainIed->left_connect_index;
-                // 确定起始点X坐标和结束点X坐标
-                quint16 startPt_X, endPt_X, startIconPt_X, endIconPt_X, startVal_X, endVal_X;
+	foreach(IedRect* rect, rectList)
+	{
+		foreach(LogicCircuitLine* pLogicLine, rect->logic_line_list)
+		{
+			foreach(VirtualCircuit* pCircuit, pLogicLine->pLogicCircuit->circuitList)
+			{
+				// 设备当前逻辑链路下所属的全部通道
+				VirtualCircuitLine* pVtLine = new VirtualCircuitLine(pCircuit);
+				// 确定源矩形和目标矩形
+				bool isSideSource = (pCircuit->srcIedName == rect->iedName);
+				IedRect* srcRect = isSideSource ? rect : mainIed;
+				IedRect* destRect = isSideSource ? mainIed : rect;
+				pVtLine->pSrcIedRect = srcRect;
+				pVtLine->pDestIedRect = destRect;
+				// 确定连接点索引
+				quint8* pConnectPtIndex = isLeft ? &rect->right_connect_index : &rect->left_connect_index;
+				quint8* pMainConnectPtIndex = isLeft ? &mainIed->right_connect_index : &mainIed->left_connect_index;
+				// 确定起始点X坐标和结束点X坐标
+				quint16 startPt_X, endPt_X, startIconPt_X, endIconPt_X, startVal_X, endVal_X;
 				QFont font;
 				font.setPointSize(18);
 				QFontMetrics fm(font);
@@ -174,7 +203,8 @@ void VirtualDiagramBuilder::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QL
 				int iconOffset = ICON_LENGTH + rect->inner_gap;
 				int valGap = rect->inner_gap * 2 + valWidth;
 				int iedDistance = IED_HORIZONTAL_DISTANCE - rect->inner_gap * 4;
-				if (isSideSource) {
+				if (isSideSource)
+				{
 					// 侧边设备是输出（源）设备，主设备是输入（目标）设备
 					startPt_X = isLeft ?
 						rect->x + rect->width - startOffset :
@@ -200,7 +230,8 @@ void VirtualDiagramBuilder::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QL
 						QString("%1 -> %2").arg(pCircuit->srcDesc, pCircuit->destDesc) :
 						QString("%1 <- %2").arg(pCircuit->destDesc, pCircuit->srcDesc);
 				}
-				else {
+				else
+				{
 					// 侧边设备是输入（目标）设备，主设备是输出（源）设备
 					startPt_X = isLeft ?
 						mainIed->x + startOffset :
@@ -233,7 +264,7 @@ void VirtualDiagramBuilder::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QL
 					// 若描述信息过长，则在右侧进行省略
 					pVtLine->circuitDesc = fm.elidedText(pVtLine->circuitDesc, Qt::ElideRight, iedDistance);
 				}
-                // 计算Y坐标，全部链路平行所以均以侧边设备位置计算
+				// 计算Y坐标，全部链路平行所以均以侧边设备位置计算
 				quint16 pt_Y = rect->GetInnerBottomY() + CIRCUIT_VERTICAL_DISTANCE + ICON_LENGTH +
 					*pConnectPtIndex * (CIRCUIT_VERTICAL_DISTANCE + ICON_LENGTH);
 				quint16 icon_Y = pt_Y - ICON_LENGTH / 2;	// 保持中心与线段对齐
@@ -241,15 +272,15 @@ void VirtualDiagramBuilder::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QL
 				{
 					int a = 1;
 				}
-                // 设置线路起止点
-                pVtLine->startPoint = QPoint(startPt_X, pt_Y);
-                pVtLine->endPoint = QPoint(endPt_X, pt_Y);
+				// 设置线路起止点
+				pVtLine->startPoint = QPoint(startPt_X, pt_Y);
+				pVtLine->endPoint = QPoint(endPt_X, pt_Y);
 				pVtLine->startIconPt = QPoint(startIconPt_X, icon_Y);
 				pVtLine->endIconPt = QPoint(endIconPt_X, icon_Y);
 				pVtLine->startValRect = QRect(QPoint(startVal_X, icon_Y), QPoint(startVal_X + valWidth, icon_Y));
 				pVtLine->endValRect = QRect(QPoint(endVal_X, icon_Y), QPoint(endVal_X + valWidth, icon_Y));
 				pVtLine->circuitDescRect = QRect(QPoint(descRect_X, pt_Y - fm.height() * 1.2), QSize(iedDistance, fm.height()));
-                pLogicLine->virtual_line_list.append(pVtLine);
+				pLogicLine->virtual_line_list.append(pVtLine);
 				// 生成并调整当前通道的压板矩形位置
 				QString key = QString("%1+%2").arg(srcRect->iedName).arg(destRect->iedName);	// 输出+输入
 				if (!pCircuit->destSoftPlateDesc.isEmpty() || !pCircuit->srcSoftPlateDesc.isEmpty())
@@ -260,11 +291,11 @@ void VirtualDiagramBuilder::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QL
 				AdjustVirtualCircuitPlatePosition(svg.plateRectHash, key, pVtLine->endPoint, pCircuit->destSoftPlateDesc, pCircuit->destSoftPlateRef, pCircuit->destSoftPlateCode, false, isSideSource, isLeft);
 				// 开出软压板，图形位于回路起点
 				AdjustVirtualCircuitPlatePosition(svg.plateRectHash, key, pVtLine->startPoint, pCircuit->srcSoftPlateDesc, pCircuit->srcSoftPlateRef, pCircuit->srcSoftPlateCode, true, isSideSource, isLeft);
-                // 增加连接点索引
-                ++(*pConnectPtIndex);
-            }
-        }
-    }
+				// 增加连接点索引
+				++(*pConnectPtIndex);
+			}
+		}
+	}
 	// m_painter->restore();
 }
 
@@ -286,7 +317,7 @@ void VirtualDiagramBuilder::AdjustVirtualCircuitPlatePosition(QHash<QString, Pla
 		int rectWidth = PLATE_WIDTH + 2 * PLATE_GAP;
 		if (isSideSrc)
 		{
-			plate_X = 
+			plate_X =
 				isLeft ?
 					isSrcPlate ?
 						linePt.x() + startOffset :					// 左侧设备开出压板
@@ -297,7 +328,7 @@ void VirtualDiagramBuilder::AdjustVirtualCircuitPlatePosition(QHash<QString, Pla
 		}
 		else
 		{
-			plate_X = 
+			plate_X =
 				isLeft ?
 					isSrcPlate ?
 						linePt.x() - startOffset - rectWidth :	// 左侧设备开出压板

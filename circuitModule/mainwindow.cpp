@@ -222,7 +222,7 @@ void CircuitModuleWidget::InitTree()
 	QStringList iedNameList;
 
 	for (std::list<CRtdbEleModelVoltLevel*>::const_iterator voltIt = station->m_listVoltLevel.begin();
-		 voltIt != station->m_listVoltLevel.end(); ++voltIt)
+		voltIt != station->m_listVoltLevel.end(); ++voltIt)
 	{
 		const CRtdbEleModelVoltLevel* volt = *voltIt;
 		if (!volt)
@@ -252,7 +252,7 @@ void CircuitModuleWidget::InitTree()
 		stationItem->appendRow(voltItem);
 
 		for (std::list<CRtdbEleModelBay*>::const_iterator bayIt = volt->m_listBay.begin();
-			 bayIt != volt->m_listBay.end(); ++bayIt)
+			bayIt != volt->m_listBay.end(); ++bayIt)
 		{
 			const CRtdbEleModelBay* bay = *bayIt;
 			if (!bay)
@@ -285,7 +285,7 @@ void CircuitModuleWidget::InitTree()
 			voltItem->appendRow(bayItem);
 
 			for (std::list<CRtdbEleModelIed*>::const_iterator iedIt = bay->m_listIed.begin();
-				 iedIt != bay->m_listIed.end(); ++iedIt)
+				iedIt != bay->m_listIed.end(); ++iedIt)
 			{
 				const CRtdbEleModelIed* ied = *iedIt;
 				if (!ied)

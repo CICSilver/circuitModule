@@ -13,7 +13,7 @@ class SecWidget : public QWidget
 	Q_OBJECT
 
 public:
-	explicit SecWidget(QWidget *parent = nullptr);
+	explicit SecWidget(QWidget *parent = NULL);
 	~SecWidget();
 
 	void displayCircuit(const QString& srcIed, const QString& destIed);

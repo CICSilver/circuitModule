@@ -1233,7 +1233,7 @@ void OpticalDiagramBuilder::GenerateOpticalDiagramByIed(const IED* pIed, Optical
 	if(pIed->name.contains("SW"))
 	{
 		// 交换机作为中心设备时，不生成光纤链路图
-		return;	
+		return;
 	}
 	const int switcherWidth = SVG_VIEWBOX_WIDTH * IED_OPTICAL_SWITCHER_WIDTH_RATIO;
 	QList<IedRect*> directRectList;		// 直连IED列表
@@ -1400,7 +1400,7 @@ void OpticalDiagramBuilder::GenerateOpticalDiagramByIed(const IED* pIed, Optical
 			rect->y = belowIedY;
 	}
 	// 有直连情况则主IED与直连IED对齐，否则主IED居中
-	svg.mainIedRect->x = directRectList.isEmpty() ? (SVG_VIEWBOX_WIDTH - RECT_DEFAULT_WIDTH) / 2 : directRectList.last()->x + directRectList.last()->width;	
+	svg.mainIedRect->x = directRectList.isEmpty() ? (SVG_VIEWBOX_WIDTH - RECT_DEFAULT_WIDTH) / 2 : directRectList.last()->x + directRectList.last()->width;
 	int switcherX = svg.mainIedRect->x;		// 交换机起始X，默认为与主IED对齐
 	int totalWidth = 0;
 	if (!indirectRectList.isEmpty())
@@ -1408,7 +1408,7 @@ void OpticalDiagramBuilder::GenerateOpticalDiagramByIed(const IED* pIed, Optical
 		if(indirectRectList.size() == 1)
 		{
 			// 只有一个过交换机的IED，放在主IED右侧，交换机与主IED对齐
-			// 位置关系为: 
+			// 位置关系为:
 			//			主IED	对侧IED
 			//			交    换    机
 			// 直连IED
@@ -1419,8 +1419,8 @@ void OpticalDiagramBuilder::GenerateOpticalDiagramByIed(const IED* pIed, Optical
 		}else
 		{
 			// 不止一个过交换机的IED，位置关系为：
-			// 位置关系为: 
-			//			主IED	
+			// 位置关系为:
+			//			主IED
 			//			交换机
 			// 直连IED  对侧IED
 			for (size_t i = 0; i < indirectRectList.size(); ++i)
@@ -1495,7 +1495,7 @@ void OpticalDiagramBuilder::GenerateOpticalDiagramByIed(const IED* pIed, Optical
 			optLine->endPoint = QPoint(endPt_X, endPt_Y);
 			//添加中间转折点
 			// 转折点X = 起始点X
-			// 转折点Y = 
+			// 转折点Y =
 			// (交换机Y - 主IED底部Y) / 2 + 主IED底部Y + midPointDistance * midPtCnt，有交换机时，即主IED与交换机间隔的中部
 			// (底部IED Y - 主IED底部Y) / 2 + 主IED底部Y + midPointDistance * midPtCnt，无交换机时，即上下IED间隔的中部
 			int mainIedBottomY = svg.mainIedRect->y + svg.mainIedRect->height;
@@ -1510,16 +1510,17 @@ void OpticalDiagramBuilder::GenerateOpticalDiagramByIed(const IED* pIed, Optical
 		}
 	}
 	// 重新计算光纤图 viewBox：考虑主 IED、下方 IED 及交换机
-	if (svg.mainIedRect) {
+	if (svg.mainIedRect)
+	{
 		int minX = directRectList.isEmpty() ?			// 直连IED在左侧，若为空则最左侧是主IED/交换机
 			qMin(svg.mainIedRect->x, svg.switcherRectList.first()->x) : directRectList.first()->x;
 		int minY = svg.mainIedRect->y - svg.mainIedRect->vertical_margin;	// 主IED上侧边距
 		int maxX = svg.switcherRectList.isEmpty() ? // 交换机在右侧，若为空则最右侧是主IED
 			svg.mainIedRect->x + svg.mainIedRect->width + svg.mainIedRect->horizontal_margin * 2 :
 			svg.switcherRectList.last()->x + svg.switcherRectList.last()->width + svg.switcherRectList.last()->horizontal_margin * 2;
-		int maxY = 
+		int maxY =
 			directRectList.isEmpty() ?	// 下方IED在主IED下方，若为空则最下侧是主IED
-				svg.switcherRectList.isEmpty() ?	
+				svg.switcherRectList.isEmpty() ?
 				svg.mainIedRect->GetInnerBottomY() + svg.mainIedRect->vertical_margin * 2 :	// 若交换机也为空，则下方为主IED
 			indirectRectList.size() > 1 ?
 				indirectRectList.last()->GetInnerBottomY() + indirectRectList.last()->vertical_margin * 2 :	// 若有多个经过交换机的IED，则下方为最后一个IED

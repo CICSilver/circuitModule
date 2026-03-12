@@ -7,7 +7,7 @@
 #include "basemodel.h"
 #include "RtdbClient.h"
 //#include "boost/smart_ptr/shared_ptr.hpp"
-// SCL	- 
+// SCL	-
 //		- Header
 //		- Substation
 //			- VoltageLevel(n) [name, desc]
@@ -21,7 +21,7 @@
 //				- GSE(n) [ldInst, cbName]
 //					- Address
 //						- P
-// 
+//
 //		- IED(n) [name, desc, type, manufacturer, configVersion, virtual_terminal_conn_crc]		(DLT/860 第六部分 p42)
 //			- Services	(skip)
 //			- AccessPoint(n) [name, router(bool), clock(bool)] name对应ConnectedAp的apName
@@ -41,7 +41,7 @@
 //								- ExtRef [iedName, ldInst, prefix, lnClass, lnInst, doName, daName, intAddr] 接入位置：intAddr, 来源：ldInst/lnClass$lnInst.doName.daName
 //							- GSEControl [name, datset, conRef, type, appID] datset 对应 DataSet.name，GSEControl.name在ied中唯一
 //						- LN(n) [prefix, lnClass, lnType, inst, desc]
-// 
+//
 
 // DOI [name, dexc]
 //		- SDI(n) [name] (optional)	可能多层SDI嵌套
@@ -51,7 +51,7 @@
 //			- Val
 // 虚/实回路查找：
 // 入： 遍历指定IED - LDevice - LN0 - Inputs - ExtRef节点，ExtRef.iedName为src，当前指定ied为dest
-//		Communication - SubNetwork - ConnectedAP - PhysConn - P.type == Port，当前指定ied的端口号。 或 在ExtRef节点的intAddress中，用/分割两个端口号 
+//		Communication - SubNetwork - ConnectedAP - PhysConn - P.type == Port，当前指定ied的端口号。 或 在ExtRef节点的intAddress中，用/分割两个端口号
 // 压板判断 <DataSet desc="保护压板" name="dsRelayEna">
 // 虚回路通断位置：XCBR.Pos.stVal@sAddr
 
@@ -72,7 +72,7 @@ public:
 	//************************************
 	// 函数名称:    LoadFile
 	// 函数全名:	CircuitConfig::LoadFile
-	// 访问权限:	public 
+	// 访问权限:	public
 	// 函数说明:	从scd文件解析数据到内存，再进行关系建立。若失败，可调用GetErrorMsg获取错误信息
 	// 函数参数:	QString file
 	// 返回值:		bool
@@ -82,7 +82,7 @@ public:
 	//************************************
 	// 函数名称:	LoadCimeFile
 	// 函数全名:	CircuitConfig::LoadCimeFile
-	// 访问权限:	public 
+	// 访问权限:	public
 	// 函数说明:	从Cime配置文件读取数据
 	// 函数参数:	QString file
 	// 返回值:		bool
@@ -103,7 +103,7 @@ public:
 	//************************************
 	// 函数名称:	LoadOpticalCimeFile
 	// 函数全名:	CircuitConfig::LoadOpticalCimeFile
-	// 访问权限:	public 
+	// 访问权限:	public
 	// 函数说明:	解析光纤链路配置文件
 	// 函数参数:	QString file
 	// 返回值:		bool
@@ -114,7 +114,7 @@ public:
 	//************************************
 	// 函数名称:	SaveConfigFile
 	// 函数全名:	CircuitConfig::SaveConfigFile
-	// 访问权限:	public 
+	// 访问权限:	public
 	// 函数说明:	创建xml格式配置文件
 	// 函数参数:	QString file
 	// 返回值:		bool
@@ -124,7 +124,7 @@ public:
 	//************************************
 	// 函数名称:	SaveConfigAsCIME
 	// 函数全名:	CircuitConfig::SaveConfigAsCIME
-	// 访问权限:	public 
+	// 访问权限:	public
 	// 函数说明:	创建CIME格式的配置文件
 	// 函数参数:	QString file
 	// 返回值:		bool
@@ -134,18 +134,21 @@ public:
 	//************************************
 	// 函数名称:    ParseIed
 	// 函数全名:	CircuitConfig::ParseIed
-	// 访问权限:	public 
+	// 访问权限:	public
 	// 函数说明:	解析IED相关信息，包括Communication节点中于IED相关的GSE/SMV及链路信息
 	// 函数参数:	pugi::xml_node & sclNode
 	// 返回值:		bool
 	//************************************
 	//bool ParseIed(pugi::xml_node& sclNode);
 
-	QString GetErrorMsg() { return m_errMsg; }
+	QString GetErrorMsg()
+	{
+		return m_errMsg;
+	}
 	//************************************
 	// 函数名称:	GetCircuitListBySrcAndDest
 	// 函数全名:	CircuitConfig::GetCircuitListBySrcAndDest
-	// 访问权限:	public 
+	// 访问权限:	public
 	// 函数说明:	根据源IED和目的IED名称获取链路列表，不区分方向
 	// 函数参数:	const QString & srcIedName
 	// 函数参数:	const QString & destIedName
@@ -185,15 +188,17 @@ public:
 	QList<VirtualCircuit*> GetAllVirtualCircuitListByIEDName(const QString& iedName)
 	{
 		return m_inVirtualCircuitHash.values(iedName) + m_outVirtualCircuitHash.values(iedName);
-	}	
+	}
 
 	QList<VirtualCircuit*> GetAllVirtualCircuitListByIEDPair(const QString& srcIedName, const QString& destIedName)
 	{
 		QList<VirtualCircuit*> result;
 		QMultiHash<QString, VirtualCircuit*>::const_iterator it = m_outVirtualCircuitHash.find(srcIedName);
-		while (it != m_outVirtualCircuitHash.end() && it.key() == srcIedName) {
+		while (it != m_outVirtualCircuitHash.end() && it.key() == srcIedName)
+		{
 			VirtualCircuit* pVC = it.value();
-			if (pVC && pVC->destIedName == destIedName) {
+			if (pVC && pVC->destIedName == destIedName)
+			{
 				result.append(pVC);
 			}
 			++it;
@@ -210,7 +215,8 @@ public:
 		return m_opticalVirtualCircuitHash.values(opticalCode);
 	}
 
-	QList<OpticalCircuit*> getOpticalByIeds(const QString& ied_1, const QString& ied_2) {
+	QList<OpticalCircuit*> getOpticalByIeds(const QString& ied_1, const QString& ied_2)
+	{
 		// 获取指定两端设备的所有光纤链路
 		if (ied_1.isEmpty() || ied_2.isEmpty())
 			return QList<OpticalCircuit*>();
@@ -239,7 +245,7 @@ public:
 	//		if (connectedIedName == swName)
 	//			continue;
 	//		QList<LogicCircuit*> list = GetCircuitListBySrcAndDest(iedName, connectedIedName);
-	//		if (!list.isEmpty())  
+	//		if (!list.isEmpty())
 	//			return list;
 	//	}
 	//	return QList<LogicCircuit*>();
@@ -250,18 +256,21 @@ public:
 		return m_iedHash.value(name, NULL);
 	}
 
-	QList<IED*> GetIedList() { return m_iedList; }
+	QList<IED*> GetIedList()
+	{
+		return m_iedList;
+	}
 protected:
 	//// 辅助函数组
 
 	// 解析SV、GSE的CIME文件
 	bool LoadVirtualCircuitFile(xcime::Cime& cime, VirtualType type);
 	//void SaveIedAsCime(xcime::Cime& cime, const IED* pIed);
-	
+
 	//************************************
 	// 函数名称:	ParseFcda
 	// 函数全名:	CircuitConfig::ParseFcda
-	// 访问权限:	protected 
+	// 访问权限:	protected
 	// 函数说明:	解析DataSet下的FCDA节点
 	// 函数参数:	pugi::xml_node & dataesetNode
 	// 函数参数:	QString iedName
@@ -272,7 +281,7 @@ protected:
 	//************************************
 	// 函数名称:	ParsePhysConn
 	// 函数全名:	CircuitConfig::ParsePhysConn
-	// 访问权限:	protected 
+	// 访问权限:	protected
 	// 函数说明:	解析PhysConn节点
 	// 函数参数:	pugi::xml_node & sclNode
 	// 函数参数:	Circuit * pCircuit
@@ -283,7 +292,7 @@ protected:
 	//************************************
 	// 函数名称:	CompleteDataDesc
 	// 函数全名:	CircuitConfig::CompleteDataDesc
-	// 访问权限:	protected 
+	// 访问权限:	protected
 	// 函数说明:	基于dataset节点，通过pData的地址查询DAI节点，补全pData结构信息
 	// 函数参数:	pugi::xml_node & datasetNode
 	// 函数参数:	Data * pData
@@ -385,7 +394,7 @@ private:
 	//************************************
 	// 函数名称:	setChlDesc
 	// 函数全名:	CircuitConfig::setChlDesc
-	// 访问权限:	private 
+	// 访问权限:	private
 	// 函数说明:	根据实时库通道元素类型，将其描述写入虚回路源/目的端描述字段。
 	//				isSrc为true时写入pVC->srcDesc，否则写入pVC->destDesc；
 	//				依据pChl->eType进行安全向下转型并读取各派生类型的desc字段。
@@ -397,7 +406,10 @@ private:
 	//************************************
 	void setChlDesc(VirtualCircuit* pVC, stuRtdbEle* pChl, bool isSrc)
 	{
-		if (!pChl) return;
+		if (!pChl)
+		{
+			return;
+		}
 		QString& desc = isSrc ? pVC->srcDesc : pVC->destDesc;
 		switch (pChl->eType)
 		{
@@ -437,7 +449,7 @@ private:
 	//************************************
 	// 函数名称:	buildCircuitRelations
 	// 函数全名:	CircuitConfig::buildCircuitRelations
-	// 访问权限:	private 
+	// 访问权限:	private
 	// 函数说明:	将单条虚回路与对应逻辑回路建立关联；若目标逻辑回路不存在则创建。
 	//				维护IED互联关系、入/出逻辑链路与虚回路的多重映射，以及全局链路列表。
 	//				当源/目的IED不存在时，记录错误并释放pVtCircuit。
@@ -501,8 +513,8 @@ private:
 		};
 		std::ptrdiff_t GetOffsetByIedName(QString iedName) const
 		{
-			return leftIedInfo.name == iedName ? 
-				0 : rightIedInfo.name == iedName ? 
+			return leftIedInfo.name == iedName ?
+				0 : rightIedInfo.name == iedName ?
 				1 : -1;
 		}
 		IedInfo* GetIedInfoByOffset(const std::ptrdiff_t offset)
@@ -516,7 +528,7 @@ private:
 	//************************************
 	// 函数名称:	GetCableListByQuery
 	// 函数全名:	CircuitConfig::GetCableListByQuery
-	// 访问权限:	private 
+	// 访问权限:	private
 	// 函数说明:	根据xpath查询语句，获取指定的物理链路信息（已去重）
 	// 函数参数:	pugi::xml_node & root
 	// 函数参数:	QString & query
@@ -530,7 +542,10 @@ private:
 		for (nodeSetConstIterator it = node_set.begin(); it != node_set.end(); ++it)
 		{
 			QString nodeText = it->node().text().as_string();
-			if (temp.contains(nodeText)) continue;
+			if (temp.contains(nodeText))
+			{
+				continue;
+			}
 			CableInfo cable = ParseCableInfo(nodeText);
 			temp.append(nodeText);
 			res.append(cable);

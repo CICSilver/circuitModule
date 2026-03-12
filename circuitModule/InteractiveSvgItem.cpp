@@ -28,7 +28,8 @@
 #ifndef SVG_PIXMAP_REGEN_MAX_DIM
 #define SVG_PIXMAP_REGEN_MAX_DIM 8192
 #endif
-namespace utils {
+namespace utils
+{
 	static double toDouble(const char* val)
 	{
 		return (val && val[0] != '\0') ? atof(val) : 0.0;
@@ -63,7 +64,8 @@ InteractiveSvgMapItem::InteractiveSvgMapItem(const QByteArray& svgBytes)
 	parseSvgAndInit(svgBytes);
 }
 
-void InteractiveSvgMapItem::initCommon() {
+void InteractiveSvgMapItem::initCommon()
+{
 	setAcceptHoverEvents(true);
 	m_circuitConfig = CircuitConfig::Instance();
 	m_blinkTimer = new QTimer(this);
@@ -96,11 +98,13 @@ QRectF InteractiveSvgMapItem::boundingRect() const
 
 void InteractiveSvgMapItem::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget*)
 {
-	if (!m_bgPixmap.isNull() && !m_itemSize.isEmpty()) {
+	if (!m_bgPixmap.isNull() && !m_itemSize.isEmpty())
+	{
 		painter->drawPixmap(QRectF(0, 0, m_itemSize.width(), m_itemSize.height()), m_bgPixmap, QRectF(0, 0, m_bgPixmap.width(), m_bgPixmap.height()));
 	}
 	// 先画回路
-	for (int i = 0; i < m_allLines.size(); ++i) {
+	for (int i = 0; i < m_allLines.size(); ++i)
+	{
 		const MapLine& line = m_allLines[i];
 		paintLine(painter, line, i == m_highlightedLineIdx);
 	}
@@ -111,13 +115,17 @@ void InteractiveSvgMapItem::paint(QPainter* painter, const QStyleOptionGraphicsI
 }
 void InteractiveSvgMapItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
 {
-	if (event->button() == Qt::LeftButton) {
+	if (event->button() == Qt::LeftButton)
+	{
 		m_dragging = true;
-		if (scene() && !scene()->views().isEmpty()) {
+		if (scene() && !scene()->views().isEmpty())
+		{
 			QGraphicsView* v = scene()->views().first();
 			// 记录按下时的视图坐标位置（像素）
 			m_lastViewPos = v->mapFromScene(event->scenePos());
-		} else {
+		}
+		else
+		{
 			m_lastViewPos = event->screenPos();
 		}
 		event->accept();
@@ -128,8 +136,10 @@ void InteractiveSvgMapItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
 
 void InteractiveSvgMapItem::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
 {
-	if (m_dragging) {
-		if (scene() && !scene()->views().isEmpty()) {
+	if (m_dragging)
+	{
+		if (scene() && !scene()->views().isEmpty())
+		{
 			QGraphicsView* v = scene()->views().first();
 			// 当前鼠标对应的视图坐标
 			QPoint curViewPos = v->mapFromScene(event->scenePos());
@@ -149,7 +159,8 @@ void InteractiveSvgMapItem::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
 
 void InteractiveSvgMapItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 {
-	if (event->button() == Qt::LeftButton) {
+	if (event->button() == Qt::LeftButton)
+	{
 		m_dragging = false;
 		event->accept();
 		return;
@@ -159,9 +170,10 @@ void InteractiveSvgMapItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 
 void InteractiveSvgMapItem::wheelEvent(QGraphicsSceneWheelEvent* event)
 {
-	if (scene() && !scene()->views().isEmpty()) {
+	if (scene() && !scene()->views().isEmpty())
+	{
 		QGraphicsView* v = scene()->views().first();
-		
+
 		// 独立窗口中的缩放处理
 		const double factor = (event->delta() > 0) ? 1.15 : 1.0 / 1.15;
 		double sX = v->transform().m11();
@@ -171,7 +183,8 @@ void InteractiveSvgMapItem::wheelEvent(QGraphicsSceneWheelEvent* event)
 		double targetX = sX * factor;
 		double targetY = sY * factor;
 		if ((event->delta() > 0 && (targetX > maxTarget || targetY > maxTarget)) ||
-			(event->delta() <= 0 && (targetX < minTarget || targetY < minTarget))) {
+			(event->delta() <= 0 && (targetX < minTarget || targetY < minTarget)))
+		{
 			event->accept();
 			return;
 		}
@@ -190,7 +203,8 @@ void InteractiveSvgMapItem::onBlinkTimeout()
 
 void InteractiveSvgMapItem::onTooltipTimeout()
 {
-	if (m_currentHoverPart == Hover_None) {
+	if (m_currentHoverPart == Hover_None)
+	{
 		m_tooltipTimer->stop();
 		QToolTip::hideText();
 		m_tooltipTimer->setSingleShot(true);
@@ -222,17 +236,27 @@ void InteractiveSvgMapItem::onStatusTimeout()
 
 void InteractiveSvgMapItem::fitToViewIfPossible()
 {
-	if (!scene() || scene()->views().isEmpty()) return;
+	if (!scene() || scene()->views().isEmpty())
+	{
+		return;
+	}
 	QGraphicsView* v = scene()->views().first();
-	if (!v) return;
+	if (!v)
+	{
+		return;
+	}
 	QRectF rect = boundingRect();
-	if (rect.isEmpty()) return;
+	if (rect.isEmpty())
+	{
+		return;
+	}
 }
 
 // 设置高亮线路
 void InteractiveSvgMapItem::setHighlightedLine(int idx)
 {
-	if (m_highlightedLineIdx != idx) {
+	if (m_highlightedLineIdx != idx)
+	{
 		m_highlightedLineIdx = idx;
 		update();
 	}
@@ -243,8 +267,10 @@ void InteractiveSvgMapItem::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
 	QPointF pos = event->pos();
 	// 1) 压板悬停提示（优先级高于线路高亮）
 	int plateIdx = hitTestPlate(pos);
-	if (plateIdx >= 0) {
-		if (plateIdx != m_hoverPlateIdx) {
+	if (plateIdx >= 0)
+	{
+		if (plateIdx != m_hoverPlateIdx)
+		{
 			m_hoverPlateIdx = plateIdx;
 			const PlateItem& plate = m_allPlates[plateIdx];
 			m_tooltipText = buildPlateTooltip(plate);
@@ -262,7 +288,9 @@ void InteractiveSvgMapItem::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
 		m_tooltipTimer->setSingleShot(true);
 		m_tooltipTimer->start(100);
 		return;
-	} else if (m_hoverPlateIdx != -1) {
+	}
+	else if (m_hoverPlateIdx != -1)
+	{
 		// 离开压板区域时，隐藏 tip
 		m_hoverPlateIdx = -1;
 		m_currentHoverPart = Hover_None;
@@ -274,12 +302,15 @@ void InteractiveSvgMapItem::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
 	// 2) 线路最近高亮
 	int closest = -1;
 	double minDist = 99999.0;
-	for (int i = 0; i < m_allLines.size(); ++i) {
+	for (int i = 0; i < m_allLines.size(); ++i)
+	{
 		const QVector<QPointF>& pts = m_allLines[i].points;
-		for (int j = 1; j < pts.size(); ++j) {
+		for (int j = 1; j < pts.size(); ++j)
+		{
 			QLineF seg(pts[j - 1], pts[j]);
 			double dist = seg.p1() == seg.p2() ? QLineF(pos, seg.p1()).length() : utils::pointToSegmentDistance(pos, seg.p1(), seg.p2());
-			if (dist < minDist) {
+			if (dist < minDist)
+			{
 				minDist = dist;
 				closest = i;
 			}
@@ -298,7 +329,7 @@ void InteractiveSvgMapItem::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
 		return;
 	}
 
-	if (m_currentHoverPart != Hover_None) 
+	if (m_currentHoverPart != Hover_None)
 	{
 		m_currentHoverPart = Hover_None;
 		m_hoverPlateIdx = -1;
@@ -312,7 +343,8 @@ void InteractiveSvgMapItem::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
 void InteractiveSvgMapItem::hoverLeaveEvent(QGraphicsSceneHoverEvent* event)
 {
 	Q_UNUSED(event);
-	if (m_hoverPlateIdx != -1) {
+	if (m_hoverPlateIdx != -1)
+	{
 		m_hoverPlateIdx = -1;
 		m_tooltipTimer->stop();
 		QToolTip::hideText();
@@ -325,20 +357,28 @@ void InteractiveSvgMapItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* even
 
 	int closest = -1;
 	double minDist = 1e100;
-	for (int i = 0; i < m_allLines.size(); ++i) {
+	for (int i = 0; i < m_allLines.size(); ++i)
+	{
 		const QVector<QPointF>& pts = m_allLines[i].points;
-		for (int j = 1; j < pts.size(); ++j) {
+		for (int j = 1; j < pts.size(); ++j)
+		{
 			const QLineF seg(pts[j - 1], pts[j]);
 			const double dist = (seg.p1() == seg.p2())
 				? QLineF(pos, seg.p1()).length()
 				: utils::pointToSegmentDistance(pos, seg.p1(), seg.p2());
-			if (dist < minDist) { minDist = dist; closest = i; }
+			if (dist < minDist)
+			{
+				minDist = dist;
+				closest = i;
+			}
 		}
 	}
 
-	if (closest >= 0 && minDist < 15.0) {
+	if (closest >= 0 && minDist < 15.0)
+	{
 		const MapLine& line = m_allLines[closest];
-		if (line.type == LineType_Optical && !line.attrs.isNull()) {
+		if (line.type == LineType_Optical && !line.attrs.isNull())
+		{
 			// 选中光纤链路 跳转到关联设备图
 			showOpticalRelatedCircuits(line);
 			// 显示光纤链路信息
@@ -371,7 +411,8 @@ void InteractiveSvgMapItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* even
 
 void InteractiveSvgMapItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
-	if(m_svgType != LineType_Virtual) {
+	if(m_svgType != LineType_Virtual)
+	{
 		// 仅虚回路支持压板操作
 		event->ignore();
 		return;
@@ -379,26 +420,32 @@ void InteractiveSvgMapItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* eve
 	const QPointF pos = event->pos();
 	int pi = hitTestPlate(pos);
 	QMenu menu;
-	if (pi >= 0) {
+	if (pi >= 0)
+	{
 		PlateItem& plate = m_allPlates[pi];
 		QAction* act = plate.isClosed
 			? menu.addAction(QString::fromLocal8Bit("置分"))
 			: menu.addAction(QString::fromLocal8Bit("置合"));
 		QAction* chosen = menu.exec(event->screenPos());
-		if (chosen == act) {
+		if (chosen == act)
+		{
 			plate.isClosed = !plate.isClosed;
 			stuRtdbStatus* plateEle = m_rtdb.getRyb(plate.attrs.code.toULongLong());
-			if (plateEle) {
+			if (plateEle)
+			{
 				const char* newVal = plate.isClosed ? "1" : "0";
 				strcpy(plateEle->val, newVal);
 			}
 			update();
 		}
-	} else {
+	}
+	else
+	{
 		QAction* actAllClose = menu.addAction(QString::fromLocal8Bit("全部置合"));
 		QAction* actAllOpen  = menu.addAction(QString::fromLocal8Bit("全部置分"));
 		QAction* chosen = menu.exec(event->screenPos());
-		if (chosen == actAllClose || chosen == actAllOpen) {
+		if (chosen == actAllClose || chosen == actAllOpen)
+		{
 			bool toClosed = (chosen == actAllClose);
 			for (int i = 0; i < m_allPlates.size(); ++i) m_allPlates[i].isClosed = toClosed;
 			update();
@@ -408,7 +455,8 @@ void InteractiveSvgMapItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* eve
 
 int InteractiveSvgMapItem::hitTestPlate(const QPointF& pos) const
 {
-	for (int i = 0; i < m_allPlates.size(); ++i) {
+	for (int i = 0; i < m_allPlates.size(); ++i)
+	{
 		if (m_allPlates[i].rect.contains(pos)) return i;
 	}
 	return -1;
@@ -426,12 +474,21 @@ QString InteractiveSvgMapItem::buildPlateTooltip(const PlateItem& plate) const
 
 void InteractiveSvgMapItem::showOpticalRelatedCircuits(const MapLine& line)
 {
-	if (line.type != LineType_Optical || line.attrs.isNull()) return;
+	if (line.type != LineType_Optical || line.attrs.isNull())
+	{
+		return;
+	}
 	const MapLine::OpticalAttrs* a = static_cast<const MapLine::OpticalAttrs*>(line.attrs.data());
-	if (!a) return;
+	if (!a)
+	{
+		return;
+	}
 	QString iedName1 = a->srcIed;
 	QString iedName2 = a->destIed;
-	if (iedName1.isEmpty() && iedName2.isEmpty()) return;
+	if (iedName1.isEmpty() && iedName2.isEmpty())
+	{
+		return;
+	}
 	if (!iedName1.contains("SW"))
 	{
 		// 输出设备非交换机，显示该设备与对端设备（若对端为交换机则显示跨交换机的对端设备）间的所有虚回路
@@ -452,9 +509,9 @@ void InteractiveSvgMapItem::showOpticalRelatedCircuits(const MapLine& line)
 		return;
 	}
 	Q_UNUSED(totalVtList);
-	
+
 	//m_secWidget = new SecWidget();
-	
+
 	//m_secWidget->displayCircuit(iedName1, iedName2);
 	//m_secWidget->show();
 	//m_secWidget->activateWindow();
@@ -462,7 +519,8 @@ void InteractiveSvgMapItem::showOpticalRelatedCircuits(const MapLine& line)
 
 void InteractiveSvgMapItem::paintLine(QPainter* painter, const MapLine& line, bool isHighLight) const
 {
-	if(line.isBlinking && !m_blinkOn) {
+	if(line.isBlinking && !m_blinkOn)
+	{
 		// 闪烁状态且当前为隐藏周期，不绘制
 		return;
 	}
@@ -471,11 +529,13 @@ void InteractiveSvgMapItem::paintLine(QPainter* painter, const MapLine& line, bo
 	QPen pen(stroke);
 	int baseW = int(line.style.strokeWidth);
 	int w = baseW;
-	if (isHighLight) {
+	if (isHighLight)
+	{
 		w = baseW * 3;
 		if (w < 2) w = 2;
 	}
-	else if (w < 1) {
+	else if (w < 1)
+	{
 		w = 1;
 	}
 	pen.setWidth(w);
@@ -484,9 +544,13 @@ void InteractiveSvgMapItem::paintLine(QPainter* painter, const MapLine& line, bo
 		painter->drawLine(line.points[j - 1], line.points[j]);
 
 	// 画此回路的箭头
-	for (int k = 0; k < line.arrows.size(); ++k) {
+	for (int k = 0; k < line.arrows.size(); ++k)
+	{
 		const ArrowHead& ah = line.arrows[k];
-		if (ah.points.size() < 3) continue;
+		if (ah.points.size() < 3)
+		{
+			continue;
+		}
 
 		QPen apen(pen.color());
 		// 高亮时箭头笔宽与线路一致；否则用基础宽
@@ -499,12 +563,14 @@ void InteractiveSvgMapItem::paintLine(QPainter* painter, const MapLine& line, bo
 		painter->setPen(apen);
 
 		// 高亮时填充同色，未高亮保持空心
-		if (isHighLight) {
+		if (isHighLight)
+		{
 			QColor fill = apen.color();
 			fill.setAlpha(255); // 确保不透明
 			painter->setBrush(fill);
 		}
-		else {
+		else
+		{
 			painter->setBrush(Qt::NoBrush);
 		}
 
@@ -524,7 +590,7 @@ QColor InteractiveSvgMapItem::colorForLine(const MapLine& line) const
 	if (line.type == LineType_Optical)
 	{
 		// 光纤链路状态色
-		// 连接：绿色 
+		// 连接：绿色
 		// 断开：红色
 		// 告警：黄色
 		//const MapLine::OpticalAttrs* attrs = static_cast<const MapLine::OpticalAttrs*>(line.attrs.data());
@@ -534,7 +600,7 @@ QColor InteractiveSvgMapItem::colorForLine(const MapLine& line) const
 	if (line.type == LineType_Virtual)
 	{
 		// 虚回路状态色，断开优先级高于压板
-		// 连接：绿色 
+		// 连接：绿色
 		// 断开：红色
 		// 告警：黄色
 		// 压板断开：灰色
@@ -544,8 +610,10 @@ QColor InteractiveSvgMapItem::colorForLine(const MapLine& line) const
 		{
 			return QColor(Qt::red);
 		}
-		if (va) {
-			if (!va->srcSoftPlateRef.isEmpty()) {
+		if (va)
+		{
+			if (!va->srcSoftPlateRef.isEmpty())
+			{
 				QMap<QString, PlateItem*>::const_iterator it = m_plateMap.find(va->srcSoftPlateCode);
 				const PlateItem* plateItem = it.value();
 				if (it != m_plateMap.end() && it.value())
@@ -554,7 +622,8 @@ QColor InteractiveSvgMapItem::colorForLine(const MapLine& line) const
 					if (!it.value()->isClosed) return QColor(Qt::gray);
 				}
 			}
-			if (!va->destSoftPlateRef.isEmpty()) {
+			if (!va->destSoftPlateRef.isEmpty())
+			{
 				QMap<QString, PlateItem*>::const_iterator it = m_plateMap.find(va->destSoftPlateCode);
 				if (it != m_plateMap.end() && it.value())
 				{
@@ -570,39 +639,47 @@ QColor InteractiveSvgMapItem::colorForLine(const MapLine& line) const
 
 void InteractiveSvgMapItem::Clean()
 {
-    // 通知图形视图 Item 的几何可能改变（boundingRect 变为 0x0）
-    prepareGeometryChange();
+	// 通知图形视图 Item 的几何可能改变（boundingRect 变为 0x0）
+	prepareGeometryChange();
 
-    m_bgPixmap = QPixmap();
-    m_svgCache.clear();
-    m_svgCache.squeeze();
-    m_svgSourcePath.clear();
-    m_baseRasterSize = QSize();
-    m_itemSize = QSizeF();
-    m_pixmapScaleFactor = 1.0;
+	m_bgPixmap = QPixmap();
+	m_svgCache.clear();
+	m_svgCache.squeeze();
+	m_svgSourcePath.clear();
+	m_baseRasterSize = QSize();
+	m_itemSize = QSizeF();
+	m_pixmapScaleFactor = 1.0;
 
-    m_allLines.clear();
-    m_allPlates.clear();
-    m_plateMap.clear();
-    m_svLineIdByCode.clear();
+	m_allLines.clear();
+	m_allPlates.clear();
+	m_plateMap.clear();
+	m_svLineIdByCode.clear();
 	m_gseLineIdByCode.clear();
-    m_valuePairs.clear();
+	m_valuePairs.clear();
 
-    m_highlightedLineIdx = -1;
-    m_hoverPlateIdx = -1;
-    m_dragging = false;
+	m_highlightedLineIdx = -1;
+	m_hoverPlateIdx = -1;
+	m_dragging = false;
 
-    update();
+	update();
 }
 
 void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
 {
-    QFile file(svgPath);
-    if (!file.open(QIODevice::ReadOnly)) { qWarning("SVG文件打开失败"); return; }
-    QByteArray svgData = file.readAll();
+	QFile file(svgPath);
+	if (!file.open(QIODevice::ReadOnly))
+	{
+		qWarning("SVG文件打开失败");
+		return;
+	}
+	QByteArray svgData = file.readAll();
 	m_svgSourcePath = svgPath;
 	pugi::xml_document doc;
-	if (!doc.load_buffer(svgData.data(), svgData.size())) { qWarning("SVG加载失败"); return; }
+	if (!doc.load_buffer(svgData.data(), svgData.size()))
+	{
+		qWarning("SVG加载失败");
+		return;
+	}
 	m_svgCache = svgData;
 	m_svgCache.detach();
 	// 释放原始 SVG 字节以降低峰值内存
@@ -617,23 +694,29 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
 		pugi::xml_node root = doc.child("svg");
 		if (!root) root = doc.document_element();
 		const char* vb = root.attribute("viewBox").value();
-		if (vb && *vb) {
+		if (vb && *vb)
+		{
 			// 解析 viewBox: "minX minY width height"
 			QStringList parts = QString::fromLatin1(vb).simplified().split(' ');
-			if (parts.size() >= 4) {
+			if (parts.size() >= 4)
+			{
 				vbMinX = parts[0].toDouble();
 				vbMinY = parts[1].toDouble();
 				vbW    = parts[2].toDouble();
 				vbH    = parts[3].toDouble();
-			} else if (parts.size() >= 2) {
+			}
+			else if (parts.size() >= 2)
+			{
 				vbMinX = parts[0].toDouble();
 				vbMinY = parts[1].toDouble();
 			}
 		}
 		// 背景最大边限制，防止占用过多内存
 		const int kMaxBgDim = SVG_PIXMAP_REGEN_MAX_DIM;
-		if (vbW > 0.0 && vbH > 0.0) {
-			if (vbW > kMaxBgDim || vbH > kMaxBgDim) {
+		if (vbW > 0.0 && vbH > 0.0)
+		{
+			if (vbW > kMaxBgDim || vbH > kMaxBgDim)
+			{
 				viewScale = qMin(double(kMaxBgDim) / vbW, double(kMaxBgDim) / vbH);
 			}
 		}
@@ -643,29 +726,36 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
 
 	// 解析时隐藏链路及箭头的底图显示
 	clearLineIdMap();
-    if (svgPath.contains("virtual")) {
+	if (svgPath.contains("virtual"))
+	{
 	parseVirtualSvg(doc);
-        m_svgType = LineType_Virtual;
-    } else if (svgPath.contains("logic")) {
+		m_svgType = LineType_Virtual;
+	}
+	else if (svgPath.contains("logic"))
+	{
 	parseLogicSvg(doc);
-        m_svgType = LineType_Logic;
-    } else if (svgPath.contains("optical")) {
+		m_svgType = LineType_Logic;
+	}
+	else if (svgPath.contains("optical"))
+	{
 	parseOpticalSvg(doc);
-        m_svgType = LineType_Optical;
-    }
+		m_svgType = LineType_Optical;
+	}
 
 	std::ostringstream oss;
 	doc.save(oss, "", pugi::format_raw, pugi::encoding_utf8);
 	const std::string s = oss.str();
 	QByteArray modifiedSvg(s.data(), int(s.size()));
 
-   // 修改后的内存 SVG 渲染到底图
+	// 修改后的内存 SVG 渲染到底图
 	QSvgRenderer renderer;
-	if (!renderer.load(modifiedSvg)) {
+	if (!renderer.load(modifiedSvg))
+	{
 		// 如果内存加载失败，回退到原文件
 		renderer.load(svgPath);
 	}
-	else {
+	else
+	{
 		m_svgCache = modifiedSvg;
 		m_svgCache.detach();
 	}
@@ -675,34 +765,46 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QString& svgPath)
 	// 基于 viewBox 与缩放计算背景图尺寸
 	QRectF viewBox = renderer.viewBoxF();
 	QSize imageSize;
-	if (viewBox.isValid()) {
-		if (vbW <= 0.0 || vbH <= 0.0) { vbW = viewBox.width(); vbH = viewBox.height(); }
+	if (viewBox.isValid())
+	{
+		if (vbW <= 0.0 || vbH <= 0.0)
+		{
+			vbW = viewBox.width();
+			vbH = viewBox.height();
+		}
 		imageSize = QSize(int(vbW * viewScale), int(vbH * viewScale));
-		if (imageSize.width() <= 0 || imageSize.height() <= 0) {
+		if (imageSize.width() <= 0 || imageSize.height() <= 0)
+		{
 			imageSize = QSize(int(viewBox.width()), int(viewBox.height()));
 		}
-	} else {
+	}
+	else
+	{
 		imageSize = QSize(2000, 2000);
 	}
 
-    QPixmap pixmap(imageSize);
-    pixmap.fill(Qt::black);
-    QPainter painter(&pixmap);
-    renderer.render(&painter);
-    painter.end();
+	QPixmap pixmap(imageSize);
+	pixmap.fill(Qt::black);
+	QPainter painter(&pixmap);
+	renderer.render(&painter);
+	painter.end();
 
-    prepareGeometryChange();
-    m_baseRasterSize = pixmap.size();
-    m_itemSize = QSizeF(pixmap.width(), pixmap.height());
-    m_pixmapScaleFactor = 1.0;
-    m_bgPixmap = pixmap;
+	prepareGeometryChange();
+	m_baseRasterSize = pixmap.size();
+	m_itemSize = QSizeF(pixmap.width(), pixmap.height());
+	m_pixmapScaleFactor = 1.0;
+	m_bgPixmap = pixmap;
 }
 
 void InteractiveSvgMapItem::parseSvgAndInit(const QByteArray& svgBytes)
 {
 	m_svgSourcePath.clear();
 	pugi::xml_document doc;
-	if (!doc.load_buffer(svgBytes.constData(), svgBytes.size())) { qWarning("SVG加载失败"); return; }
+	if (!doc.load_buffer(svgBytes.constData(), svgBytes.size()))
+	{
+		qWarning("SVG加载失败");
+		return;
+	}
 	m_svgCache = svgBytes;
 	m_svgCache.detach();
 
@@ -712,14 +814,27 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QByteArray& svgBytes)
 		pugi::xml_node root = doc.child("svg");
 		if (!root) root = doc.document_element();
 		const char* vb = root.attribute("viewBox").value();
-		if (vb && *vb) {
+		if (vb && *vb)
+		{
 			QStringList parts = QString::fromLatin1(vb).simplified().split(' ');
-			if (parts.size() >= 4) { vbMinX = parts[0].toDouble(); vbMinY = parts[1].toDouble(); vbW = parts[2].toDouble(); vbH = parts[3].toDouble(); }
-			else if (parts.size() >= 2) { vbMinX = parts[0].toDouble(); vbMinY = parts[1].toDouble(); }
+			if (parts.size() >= 4)
+			{
+				vbMinX = parts[0].toDouble();
+				vbMinY = parts[1].toDouble();
+				vbW = parts[2].toDouble();
+				vbH = parts[3].toDouble();
+			}
+			else if (parts.size() >= 2)
+			{
+				vbMinX = parts[0].toDouble();
+				vbMinY = parts[1].toDouble();
+			}
 		}
 		const int kMaxBgDim = SVG_PIXMAP_REGEN_MAX_DIM;
-		if (vbW > 0.0 && vbH > 0.0) {
-			if (vbW > kMaxBgDim || vbH > kMaxBgDim) {
+		if (vbW > 0.0 && vbH > 0.0)
+		{
+			if (vbW > kMaxBgDim || vbH > kMaxBgDim)
+			{
 				viewScale = qMin(double(kMaxBgDim) / vbW, double(kMaxBgDim) / vbH);
 			}
 		}
@@ -729,11 +844,16 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QByteArray& svgBytes)
 
 	// 类型识别：根据 type 节点选择分支
 	clearLineIdMap();
-	if (!doc.select_nodes("//g[@type='virtual']").empty()) {
+	if (!doc.select_nodes("//g[@type='virtual']").empty())
+	{
 		parseVirtualSvg(doc); m_svgType = LineType_Virtual;
-	} else if (!doc.select_nodes("//g[@type='logic']").empty()) {
+	}
+	else if (!doc.select_nodes("//g[@type='logic']").empty())
+	{
 		parseLogicSvg(doc); m_svgType = LineType_Logic;
-	} else if (!doc.select_nodes("//g[@type='optical']").empty()) {
+	}
+	else if (!doc.select_nodes("//g[@type='optical']").empty())
+	{
 		parseOpticalSvg(doc); m_svgType = LineType_Optical;
 	}
 
@@ -751,7 +871,8 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QByteArray& svgBytes)
 	//}
 #endif
 	QSvgRenderer renderer;
-	if (!renderer.load(modifiedSvg)) {
+	if (!renderer.load(modifiedSvg))
+	{
 		// 纯内存失败则直接返回
 		qWarning("QSvgRenderer 内存加载失败");
 		return;
@@ -761,13 +882,21 @@ void InteractiveSvgMapItem::parseSvgAndInit(const QByteArray& svgBytes)
 	m_svgCache.detach();
 	QRectF viewBox = renderer.viewBoxF();
 	QSize imageSize;
-	if (viewBox.isValid()) {
-		if (vbW <= 0.0 || vbH <= 0.0) { vbW = viewBox.width(); vbH = viewBox.height(); }
+	if (viewBox.isValid())
+	{
+		if (vbW <= 0.0 || vbH <= 0.0)
+		{
+			vbW = viewBox.width();
+			vbH = viewBox.height();
+		}
 		imageSize = QSize(int(vbW * viewScale), int(vbH * viewScale));
-		if (imageSize.width() <= 0 || imageSize.height() <= 0) {
+		if (imageSize.width() <= 0 || imageSize.height() <= 0)
+		{
 			imageSize = QSize(int(viewBox.width()), int(viewBox.height()));
 		}
-	} else {
+	}
+	else
+	{
 		imageSize = QSize(2000, 2000);
 	}
 
@@ -793,14 +922,16 @@ void InteractiveSvgMapItem::parseVirtualSvg(const pugi::xml_document& doc)
 	// 解析压板（仅 virtual 存在）
 	QMap<QString, PlateItem> plateMap;
 	pugi::xpath_node_set plateNodeSet = doc.select_nodes("//g[@type='plate-component' or @type='plate']");
-	for (int i = 0; i < plateNodeSet.size(); ++i) {
+	for (int i = 0; i < plateNodeSet.size(); ++i)
+	{
 		pugi::xml_node plateNode = plateNodeSet[i].node();
 		QString plate_id = plateNode.attribute("id").as_string();
 		PlateItem& p = plateMap[plate_id];
 		p.svgGrpId = plate_id;
 		if (p.rect.isNull()) p.isClosed = true; // 默认置合
 
-		if (strcmp(plateNode.attribute("type").value(), "plate") == 0) {
+		if (strcmp(plateNode.attribute("type").value(), "plate") == 0)
+		{
 			// 读取 plate 的语义属性
 			const char* plateCode = plateNode.attribute("plate-code").value();
 			const char* iedName = plateNode.attribute("ied-name").value();
@@ -826,28 +957,37 @@ void InteractiveSvgMapItem::parseVirtualSvg(const pugi::xml_document& doc)
 			}
 			//p.isClosed = true;
 			QRectF bbox;
-			if (utils::computePathBoundingRect(plateNode, m_docToPix, bbox)) {
+			if (utils::computePathBoundingRect(plateNode, m_docToPix, bbox))
+			{
 				p.rect = bbox;
 			}
-		} else if (strcmp(plateNode.attribute("type").value(), "plate-component") == 0) {
+		}
+		else if (strcmp(plateNode.attribute("type").value(), "plate-component") == 0)
+		{
 			pugi::xml_node pathNode = plateNode.child("path");
-			if (pathNode) {
+			if (pathNode)
+			{
 				const char* strokeAttr = plateNode.attribute("stroke").value();
 				const char* fillAttr   = plateNode.attribute("fill").value();
 				// 1) 外部矩形（覆盖回路）：fill="#233f4f" + stroke="#ffffff"
-				if (fillAttr && qstrcmp(fillAttr, "#233f4f") == 0 && strokeAttr && qstrcmp(strokeAttr, "#ffffff") == 0) {
+				if (fillAttr && qstrcmp(fillAttr, "#233f4f") == 0 && strokeAttr && qstrcmp(strokeAttr, "#ffffff") == 0)
+				{
 					QRectF bbox;
 					if (utils::computePathBoundingRect(plateNode, m_docToPix, bbox)) p.outerRect = bbox;
 				}
 				// 2) 内部矩形组件：黑色描边
-				else if (strokeAttr && qstrcmp(strokeAttr, "#000000") == 0) {
+				else if (strokeAttr && qstrcmp(strokeAttr, "#000000") == 0)
+				{
 					p.rects = parsePlateRects(plateNode);
 				}
 				// 3) 圆组件：绿色描边
-				else if (strokeAttr && qstrcmp(strokeAttr, "#00ff00") == 0) {
+				else if (strokeAttr && qstrcmp(strokeAttr, "#00ff00") == 0)
+				{
 					p.circles = parsePlateCircles(plateNode);
 				}
-			} else if (plateNode.child("polyline")) {
+			}
+			else if (plateNode.child("polyline"))
+			{
 				p.lines = parsePlateLines(plateNode);
 			}
 		}
@@ -856,7 +996,8 @@ void InteractiveSvgMapItem::parseVirtualSvg(const pugi::xml_document& doc)
 	// 收集压板
 	m_allPlates = plateMap.values().toVector();
 	// 压缩内部容器容量以节省内存
-	for (int i = 0; i < m_allPlates.size(); ++i) {
+	for (int i = 0; i < m_allPlates.size(); ++i)
+	{
 		m_allPlates[i].circles.squeeze();
 		m_allPlates[i].lines.squeeze();
 		m_allPlates[i].rects.squeeze();
@@ -864,7 +1005,8 @@ void InteractiveSvgMapItem::parseVirtualSvg(const pugi::xml_document& doc)
 	m_allPlates.squeeze();
 	// ref -> PlateItem* 映射
 	m_plateMap.clear();
-	for (int i = 0; i < m_allPlates.size(); ++i) {
+	for (int i = 0; i < m_allPlates.size(); ++i)
+	{
 		PlateItem& p = m_allPlates[i];
 		//QString key = QString("%1/%2").arg(p.attrs.iedName).arg(p.attrs.ref);
 		QString key = p.attrs.code;
@@ -892,7 +1034,8 @@ QVector<MapLine> InteractiveSvgMapItem::parseCircuitLines(const pugi::xml_docume
 	QVector<MapLine> linesOut;
 	QString xPath = QString("//g[@type='%1']").arg(type);
 	pugi::xpath_node_set groups = doc.select_nodes(xPath.toLocal8Bit());
-	for (int i = 0; i < groups.size(); ++i) {
+	for (int i = 0; i < groups.size(); ++i)
+	{
 		pugi::xml_node g = groups[i].node();
 		// 聚合该组内的所有 polyline 段，作为同一条回路
 		MapLine line;
@@ -908,11 +1051,16 @@ QVector<MapLine> InteractiveSvgMapItem::parseCircuitLines(const pugi::xml_docume
 	// 统一应用：文档->像素 以及 节点自身 transform
 	QTransform tf = m_docToPix * utils::parseTransformMatrix(g);
 		bool hasAnyPolyline = false;
-		for (pugi::xml_node polyline = g.child("polyline"); polyline; polyline = polyline.next_sibling("polyline")) {
+		for (pugi::xml_node polyline = g.child("polyline"); polyline; polyline = polyline.next_sibling("polyline"))
+		{
 			const char* ptsAttr = polyline.attribute("points").value();
-			if (!ptsAttr || !*ptsAttr) continue;
+			if (!ptsAttr || !*ptsAttr)
+			{
+				continue;
+			}
 			QVector<QPointF> pts = utils::parsePointsAttr(QString::fromLatin1(ptsAttr));
-			for (int pi = 0; pi < pts.size(); ++pi) {
+			for (int pi = 0; pi < pts.size(); ++pi)
+			{
 				QPointF mapped = tf.map(pts[pi]);
 				if (!line.points.isEmpty() && line.points.last() == mapped) continue; // 去重相邻重复点
 				line.points.append(mapped);
@@ -921,15 +1069,20 @@ QVector<MapLine> InteractiveSvgMapItem::parseCircuitLines(const pugi::xml_docume
 			g.attribute("stroke-opacity").set_value(0);
 		}
 		// 兼容极少数 polyline 直接作为组的情况
-		if (!hasAnyPolyline && QString::fromLatin1(g.name()) == "polyline") {
+		if (!hasAnyPolyline && QString::fromLatin1(g.name()) == "polyline")
+		{
 			const char* ptsAttr = g.attribute("points").value();
-			if (ptsAttr && *ptsAttr) {
+			if (ptsAttr && *ptsAttr)
+			{
 				QVector<QPointF> pts = utils::parsePointsAttr(QString::fromLatin1(ptsAttr));
 		for (int pi = 0; pi < pts.size(); ++pi) line.points.append(tf.map(pts[pi]));
 				hasAnyPolyline = !pts.isEmpty();
 			}
 		}
-		if (!hasAnyPolyline || line.points.size() < 2) continue;
+		if (!hasAnyPolyline || line.points.size() < 2)
+		{
+			continue;
+		}
 
 		// 简化并收缩点集，按像素容差（与线宽相关）
 		{
@@ -948,7 +1101,8 @@ QVector<MapLine> InteractiveSvgMapItem::parseCircuitLines(const pugi::xml_docume
 		}
 
 		// 记录 code -> id 映射（若可用）
-		if (!line.code.isEmpty()) {
+		if (!line.code.isEmpty())
+		{
 			lineIdMapByType(static_cast<MapLine::VirtualAttrs*>(line.attrs.data())->circuitType).insert(line.code, grp_id);
 		}
 		linesOut.append(line);
@@ -961,10 +1115,14 @@ void InteractiveSvgMapItem::parseVirtualValueBoxes(const pugi::xml_document& doc
 	m_valuePairs.clear();
 	// 选择所有虚拟数值组，每个组内包含两侧的空矩形
 	pugi::xpath_node_set groups = doc.select_nodes("//g[@type='virtual-value']");
-	for (int i = 0; i < groups.size(); ++i) {
+	for (int i = 0; i < groups.size(); ++i)
+	{
 		pugi::xml_node g = groups[i].node();
 		int lineId = g.attribute("id").as_int(-1);
-		if (lineId < 0) continue;
+		if (lineId < 0)
+		{
+			continue;
+		}
 
 	QTransform gtf = m_docToPix * utils::parseTransformMatrix(g);
 		QVector<QRectF> rects;
@@ -1007,12 +1165,21 @@ void InteractiveSvgMapItem::parseVirtualValueBoxes(const pugi::xml_document& doc
 		QTransform rectTransform = gtf * utils::parseTransformMatrix(g);
 		rects.append(rectTransform.mapRect(rect));
 
-		if (rects.isEmpty()) continue;
+		if (rects.isEmpty())
+		{
+			continue;
+		}
 
 		//ValuePair vp;
 		ValuePair& vp = m_valuePairs[lineId];
-		if (textType == "out") { vp.out.rect = rect; }
-		if (textType == "in") { vp.in.rect = rect; }
+		if (textType == "out")
+		{
+			vp.out.rect = rect;
+		}
+		if (textType == "in")
+		{
+			vp.in.rect = rect;
+		}
 		m_valuePairs.insert(lineId, vp);
 	}
 }
@@ -1026,11 +1193,16 @@ QVector<ArrowHead> InteractiveSvgMapItem::parseArrowHeadsForGroup(const pugi::xm
 	{
 		pugi::xml_node gnode = arrowNode.node();
 	QTransform tf = m_docToPix * utils::parseTransformMatrix(gnode);
-		for (pugi::xml_node path = gnode.child("path"); path; path = path.next_sibling("path")) {
+		for (pugi::xml_node path = gnode.child("path"); path; path = path.next_sibling("path"))
+		{
 			const char* dAttr = path.attribute("d").value();
-			if (!dAttr || !*dAttr) continue;
+			if (!dAttr || !*dAttr)
+			{
+				continue;
+			}
 			QVector<QPointF> local = utils::parseSvgPathToPolyline(QString::fromLatin1(dAttr));
-			if (local.size() >= 3) {
+			if (local.size() >= 3)
+			{
 				ArrowHead a;
 				for (int i = 0; i < local.size(); ++i) a.points.append(tf.map(local[i]));
 				a.points.squeeze();
@@ -1051,7 +1223,8 @@ QVector<ArrowHead> InteractiveSvgMapItem::parseArrowHeadsForGroup(const pugi::xm
 void InteractiveSvgMapItem::normalizeAttrsForBaseModel(MapLine& line, const pugi::xml_node& g) const
 {
 	// 填充类型化属性（惰性分配，仅占用一种）
-	if (line.type == LineType_Optical) {
+	if (line.type == LineType_Optical)
+	{
 		if (line.attrs.isNull()) line.attrs = QSharedPointer<MapLine::AttrBase>(new MapLine::OpticalAttrs);
 		MapLine::OpticalAttrs* a = static_cast<MapLine::OpticalAttrs*>(line.attrs.data());
 		if (g.attribute("src-ied"))			a->srcIed   = g.attribute("src-ied").value();
@@ -1062,15 +1235,26 @@ void InteractiveSvgMapItem::normalizeAttrsForBaseModel(MapLine& line, const pugi
 		if (g.attribute("code"))			line.code	= g.attribute("code").value();
 		//if (g.attribute("status"))    a->status   = g.attribute("status").value();
 		//if (g.attribute("remote-id")) a->remoteId = g.attribute("remote-id").value();
-	} else if (line.type == LineType_Logic) {
+	}
+	else if (line.type == LineType_Logic)
+	{
 		if (line.attrs.isNull()) line.attrs = QSharedPointer<MapLine::AttrBase>(new MapLine::LogicAttrs);
 		MapLine::LogicAttrs* a = static_cast<MapLine::LogicAttrs*>(line.attrs.data());
 		if (g.attribute("src-iedname"))  a->srcIedName  = g.attribute("src-iedname").value();
 		if (g.attribute("src-cbname"))   a->srcCbName   = g.attribute("src-cbname").value();
 		if (g.attribute("dest-iedname")) a->destIedName = g.attribute("dest-iedname").value();
-		if (g.attribute("circuit-code")) { a->circuitCode = g.attribute("circuit-code").value(); line.code = a->circuitCode; }
-	} else { // LineType_Virtual
-		if (line.attrs.isNull()) line.attrs = QSharedPointer<MapLine::AttrBase>(new MapLine::VirtualAttrs);
+		if (g.attribute("circuit-code"))
+		{
+			a->circuitCode = g.attribute("circuit-code").value();
+			line.code = a->circuitCode;
+		}
+	}
+	else // LineType_Virtual
+	{
+		if (line.attrs.isNull())
+		{
+			line.attrs = QSharedPointer<MapLine::AttrBase>(new MapLine::VirtualAttrs);
+		}
 		MapLine::VirtualAttrs* a = static_cast<MapLine::VirtualAttrs*>(line.attrs.data());
 		if (g.attribute("srcIedName"))        a->srcIedName				= g.attribute("srcIedName").value();
 		if (g.attribute("destIedName"))       a->destIedName			= g.attribute("destIedName").value();
@@ -1078,9 +1262,9 @@ void InteractiveSvgMapItem::normalizeAttrsForBaseModel(MapLine& line, const pugi
 		if (g.attribute("destSoftPlateCode"))	a->destSoftPlateCode	= g.attribute("destSoftPlateCode").value();
 		if (g.attribute("srcSoftPlateDesc"))  a->srcSoftPlateDesc		= g.attribute("srcSoftPlateDesc").value();
 		if (g.attribute("destSoftPlateDesc")) a->destSoftPlateDesc		= g.attribute("destSoftPlateDesc").value();
-		if (g.attribute("srcSoftPlateRef") && *g.attribute("srcSoftPlateRef").value())   
+		if (g.attribute("srcSoftPlateRef") && *g.attribute("srcSoftPlateRef").value())
 			a->srcSoftPlateRef = QString("%1/%2").arg(a->srcIedName).arg(g.attribute("srcSoftPlateRef").value());
-		if (g.attribute("destSoftPlateRef") && *g.attribute("destSoftPlateRef").value())  
+		if (g.attribute("destSoftPlateRef") && *g.attribute("destSoftPlateRef").value())
 			a->destSoftPlateRef = QString("%1/%2").arg(a->destIedName).arg(g.attribute("destSoftPlateRef").value());
 		//if (g.attribute("remoteId"))          a->remoteId          = g.attribute("remoteId").value();
 		if (g.attribute("remoteSigId_A"))     a->remoteSigId_A			= g.attribute("remoteSigId_A").value();
@@ -1100,7 +1284,10 @@ void InteractiveSvgMapItem::setVirtualValuesByCode(const MapLine& line, double v
 {
 	QMap<QString, int> lineIdMap = lineIdMapByType(static_cast<MapLine::VirtualAttrs*>(line.attrs.data())->circuitType);
 	QMap<QString, int>::const_iterator it = lineIdMap.find(line.code);
-	if (it == lineIdMap.end()) return;
+	if (it == lineIdMap.end())
+	{
+		return;
+	}
 	setVirtualValues(it.value(), value, value, precision);
 }
 
@@ -1108,7 +1295,10 @@ void InteractiveSvgMapItem::setOutVirtualValue(const MapLine& line, double value
 {
 	QMap<QString, int> lineIdMap = lineIdMapByType(static_cast<MapLine::VirtualAttrs*>(line.attrs.data())->circuitType);
 	QMap<QString, int>::const_iterator it = lineIdMap.find(line.code);
-	if (it == lineIdMap.end()) return;
+	if (it == lineIdMap.end())
+	{
+		return;
+	}
 	setVirtualValue(it.value(), true, value, precision);
 }
 
@@ -1116,7 +1306,10 @@ void InteractiveSvgMapItem::setInVirtualValue(const MapLine& line, double value,
 {
 	QMap<QString, int> lineIdMap = lineIdMapByType(static_cast<MapLine::VirtualAttrs*>(line.attrs.data())->circuitType);
 	QMap<QString, int>::const_iterator it = lineIdMap.find(line.code);
-	if (it == lineIdMap.end()) return;
+	if (it == lineIdMap.end())
+	{
+		return;
+	}
 	setVirtualValue(it.value(), false, value, precision);
 }
 
@@ -1125,7 +1318,10 @@ void InteractiveSvgMapItem::updatePlateStatuses()
 	for (QVector<PlateItem>::iterator it = m_allPlates.begin(); it != m_allPlates.end(); ++it)
 	{
 		PlateItem& p = *it;
-		if (p.attrs.code.isEmpty()) continue;
+		if (p.attrs.code.isEmpty())
+		{
+			continue;
+		}
 		stuRtdbStatus* plateEle = m_rtdb.getRyb(p.attrs.code.toULongLong());
 		if (plateEle)
 		{
@@ -1157,7 +1353,10 @@ void InteractiveSvgMapItem::UpdateOpticalCircuitStatus(MapLine& line)
 {
 	MapLine::OpticalAttrs* attrs = static_cast<MapLine::OpticalAttrs*>(line.attrs.data());
 	stuRtdbRealCircuit* realCircuit = m_rtdb.getRealCircuit(line.code.toULongLong());
-	if (!realCircuit || !realCircuit->m_pLinkChl) return;
+	if (!realCircuit || !realCircuit->m_pLinkChl)
+	{
+		return;
+	}
 	if (realCircuit->m_pLinkChl->eType == CODE_TYPE_STATUS)
 	{
 		stuRtdbStatus* statusChl = static_cast<stuRtdbStatus*>(realCircuit->m_pLinkChl);
@@ -1201,22 +1400,22 @@ void InteractiveSvgMapItem::UpdateVirtualCircuitStatus(const MapLine& line)
 
 void InteractiveSvgMapItem::drawPlateIcon(QPainter* painter, const QPointF& center) const
 {
-        painter->save();
-        QPen pen(QColor(0x00ff00));
-        pen.setWidth(2);
-        painter->setPen(pen);
-        int distance = PLATE_WIDTH - PLATE_CIRCLE_RADIUS * 4;
-        painter->drawEllipse(center, PLATE_CIRCLE_RADIUS, PLATE_CIRCLE_RADIUS);
-        painter->drawEllipse(center + QPointF(distance, 0), PLATE_CIRCLE_RADIUS, PLATE_CIRCLE_RADIUS);
-        painter->save();
-        painter->translate(center);
-        int rectHeight = PLATE_CIRCLE_RADIUS * 2;
-        QPointF p1(0, -rectHeight / 2), p2(distance, -rectHeight / 2);
-        QPointF p3(distance, rectHeight / 2), p4(0, rectHeight / 2);
-        painter->drawLine(p1, p2);
-        painter->drawLine(p3, p4);
-        painter->restore();
-        painter->restore();
+		painter->save();
+		QPen pen(QColor(0x00ff00));
+		pen.setWidth(2);
+		painter->setPen(pen);
+		int distance = PLATE_WIDTH - PLATE_CIRCLE_RADIUS * 4;
+		painter->drawEllipse(center, PLATE_CIRCLE_RADIUS, PLATE_CIRCLE_RADIUS);
+		painter->drawEllipse(center + QPointF(distance, 0), PLATE_CIRCLE_RADIUS, PLATE_CIRCLE_RADIUS);
+		painter->save();
+		painter->translate(center);
+		int rectHeight = PLATE_CIRCLE_RADIUS * 2;
+		QPointF p1(0, -rectHeight / 2), p2(distance, -rectHeight / 2);
+		QPointF p3(distance, rectHeight / 2), p4(0, rectHeight / 2);
+		painter->drawLine(p1, p2);
+		painter->drawLine(p3, p4);
+		painter->restore();
+		painter->restore();
 }
 
 // drawArrows 已内聚到 paint 中 per-line 绘制
@@ -1230,19 +1429,27 @@ QVector<PlateCircleItem> InteractiveSvgMapItem::parsePlateCircles(const pugi::xm
 	QTransform transform = m_docToPix * utils::parseTransformMatrix(plateCircleNode);
 
 	// d="
-	// M980,375 C980,377.761 977.761,380 975,380 
-	// C972.239,380 970,377.761 970,375 
-	// C970,372.239 972.239,370 975,370 
+	// M980,375 C980,377.761 977.761,380 975,380
+	// C972.239,380 970,377.761 970,375
+	// C970,372.239 972.239,370 975,370
 	// C977.761,370 980,372.239 980,375 "
-	for (pugi::xml_node path = plateCircleNode.child("path"); path; path = path.next_sibling("path")) {
+	for (pugi::xml_node path = plateCircleNode.child("path"); path; path = path.next_sibling("path"))
+	{
 		const char* d = path.attribute("d").value();
-		if (!d || !*d) continue;
+		if (!d || !*d)
+		{
+			continue;
+		}
 
 		QVector<QPointF> local = utils::parseSvgPathToPolyline(QString::fromLatin1(d));
-		if (local.size() < 4) continue;
+		if (local.size() < 4)
+		{
+			continue;
+		}
 		double minX = 1e100, minY = 1e100;
 		double maxX = -1e100, maxY = -1e100;
-		for (int i = 0; i < local.size(); ++i) {
+		for (int i = 0; i < local.size(); ++i)
+		{
 			double x = local[i].x(), y = local[i].y();
 			if (x < minX) minX = x; if (x > maxX) maxX = x;
 			if (y < minY) minY = y; if (y > maxY) maxY = y;
@@ -1277,9 +1484,11 @@ QVector<PlateLineItem> InteractiveSvgMapItem::parsePlateLines(const pugi::xml_no
 		// 本地解析 points（不使用 parsePointsAttr，避免重复应用 m_docToPix）
 		QVector<QPointF> points;
 		const char* ptsAttr = polyline.attribute("points").as_string();
-		if (ptsAttr && *ptsAttr) {
+		if (ptsAttr && *ptsAttr)
+		{
 			QStringList ptList = QString::fromLatin1(ptsAttr).split(' ', QString::SkipEmptyParts);
-			for (int i = 0; i < ptList.size(); ++i) {
+			for (int i = 0; i < ptList.size(); ++i)
+			{
 				QStringList xy = ptList[i].split(',');
 				if (xy.size() == 2) points.append(QPointF(xy[0].toDouble(), xy[1].toDouble()));
 			}
@@ -1300,20 +1509,27 @@ QVector<PlateRectItem> InteractiveSvgMapItem::parsePlateRects(const pugi::xml_no
 {
 	QVector<PlateRectItem> rects;
 	SvgNodeStyle style = parseNodeStyle(plateRectNode);
-	//style.fill = 
+	//style.fill =
 	// 统一与 computePathBoundingRect 的顺序：先节点变换，再文档到像素
 	QTransform transform = m_docToPix * utils::parseTransformMatrix(plateRectNode);
 
 	for (pugi::xml_node path = plateRectNode.child("path"); path; path = path.next_sibling("path"))
 	{
 		const char* d = path.attribute("d").value();
-		if (!d || !*d) continue;
+		if (!d || !*d)
+		{
+			continue;
+		}
 
 		QVector<QPointF> local = utils::parseSvgPathToPolyline(QString::fromLatin1(d));
-		if (local.isEmpty()) continue;
+		if (local.isEmpty())
+		{
+			continue;
+		}
 		double minX = 1e100, minY = 1e100;
 		double maxX = -1e100, maxY = -1e100;
-		for (int i = 0; i < local.size(); ++i) {
+		for (int i = 0; i < local.size(); ++i)
+		{
 			double x = local[i].x(), y = local[i].y();
 			if (x < minX) minX = x;
 			if (x > maxX) maxX = x;
@@ -1335,7 +1551,8 @@ QVector<PlateRectItem> InteractiveSvgMapItem::parsePlateRects(const pugi::xml_no
 
 void InteractiveSvgMapItem::drawPlateCircles(QPainter* p, const QVector<PlateCircleItem>& cs)
 {
-	for (int i = 0; i < cs.size(); ++i) {
+	for (int i = 0; i < cs.size(); ++i)
+	{
 		const PlateCircleItem& c = cs[i];
 		p->save();
 		QPen pen(c.style.stroke);
@@ -1353,7 +1570,8 @@ void InteractiveSvgMapItem::drawPlateCircles(QPainter* p, const QVector<PlateCir
 
 void InteractiveSvgMapItem::drawPlateLines(QPainter* p, const QVector<PlateLineItem>& ls)
 {
-	for (int i = 0; i < ls.size(); ++i) {
+	for (int i = 0; i < ls.size(); ++i)
+	{
 		const PlateLineItem& l = ls[i];
 		p->save();
 		QPen pen(Qt::green);
@@ -1403,20 +1621,20 @@ void InteractiveSvgMapItem::drawPlateRects(QPainter* p, const QVector<PlateRectI
 
 SvgNodeStyle InteractiveSvgMapItem::parseNodeStyle(const pugi::xml_node& node)
 {
-    SvgNodeStyle style;
-    
-    // 解析样式属性
-    const char* strokeAttr = node.attribute("stroke").value();
-    style.strokeWidth = node.attribute("stroke-width").as_int(1);
-    style.strokeOpacity = node.attribute("stroke-opacity").as_double(1.0);
-    const char* fillAttr = node.attribute("fill").value();
-    style.fillOpacity = node.attribute("fill-opacity").as_double(1.0);
-    style.dashArray = node.attribute("stroke-dasharray").as_string("");
-    
-    // 解析颜色
+	SvgNodeStyle style;
+
+	// 解析样式属性
+	const char* strokeAttr = node.attribute("stroke").value();
+	style.strokeWidth = node.attribute("stroke-width").as_int(1);
+	style.strokeOpacity = node.attribute("stroke-opacity").as_double(1.0);
+	const char* fillAttr = node.attribute("fill").value();
+	style.fillOpacity = node.attribute("fill-opacity").as_double(1.0);
+	style.dashArray = node.attribute("stroke-dasharray").as_string("");
+
+	// 解析颜色
 	style.stroke = utils::parseColor(strokeAttr, style.strokeOpacity);
 	style.fill = utils::parseColor(fillAttr, style.fillOpacity);
-    return style;
+	return style;
 }
 
 LineStyle InteractiveSvgMapItem::parseLineStyle(const pugi::xml_node& node)
@@ -1467,9 +1685,11 @@ QString InteractiveSvgMapItem::buildLineTooltip(const MapLine& line) const
 
 void InteractiveSvgMapItem::paintPlates(QPainter* painter)
 {
-	for (int i = 0; i < m_allPlates.size(); ++i) {
+	for (int i = 0; i < m_allPlates.size(); ++i)
+	{
 		const PlateItem& plate = m_allPlates[i];
-		if (!plate.outerRect.isNull()) {
+		if (!plate.outerRect.isNull())
+		{
 			painter->save();
 			QPen pen;
 			QBrush brush;
@@ -1484,7 +1704,8 @@ void InteractiveSvgMapItem::paintPlates(QPainter* painter)
 			painter->restore();
 		}
 	}
-	for (int i = 0; i < m_allPlates.size(); ++i) {
+	for (int i = 0; i < m_allPlates.size(); ++i)
+	{
 		paintSinglePlate(painter, m_allPlates[i]);
 	}
 }
@@ -1492,18 +1713,23 @@ void InteractiveSvgMapItem::paintPlates(QPainter* painter)
 void InteractiveSvgMapItem::paintSinglePlate(QPainter* painter, const PlateItem& plate)
 {
 	// 内部组件
-	if (!plate.isClosed) {
+	if (!plate.isClosed)
+	{
 		// 置分：线隐藏、圆红色空心，矩形照常
 		//drawPlateRects(painter, plate.rects);
-		if (!plate.circles.isEmpty()) {
+		if (!plate.circles.isEmpty())
+		{
 			QVector<PlateCircleItem> red = plate.circles;
-			for (int k = 0; k < red.size(); ++k) {
+			for (int k = 0; k < red.size(); ++k)
+			{
 				red[k].style.stroke = Qt::red;
 				red[k].style.fill = Qt::NoBrush;
 			}
 			drawPlateCircles(painter, red);
 		}
-	} else {
+	}
+	else
+	{
 		//drawPlateRects(painter, plate.rects);
 		drawPlateLines(painter, plate.lines);
 		drawPlateCircles(painter, plate.circles);
@@ -1527,7 +1753,10 @@ void InteractiveSvgMapItem::paintSinglePlate(QPainter* painter, const PlateItem&
 
 void InteractiveSvgMapItem::paintVirtualValues(QPainter* painter)
 {
-	if (m_valuePairs.isEmpty()) return;
+	if (m_valuePairs.isEmpty())
+	{
+		return;
+	}
 	painter->save();
 	QFont font = painter->font();
 	font.setPointSize(qMax(10, font.pointSize()));
@@ -1536,7 +1765,8 @@ void InteractiveSvgMapItem::paintVirtualValues(QPainter* painter)
 	QFontMetricsF fm(font);
 	//QRectF
 	QMap<int, ValuePair>::iterator it = m_valuePairs.begin();
-	for (; it != m_valuePairs.end(); ++it) {
+	for (; it != m_valuePairs.end(); ++it)
+	{
 		ValuePair& vp = it.value();
 		vp.in.rect.setHeight(fm.height());
 		vp.in.rect.setWidth(fm.width(vp.in.text));
@@ -1552,7 +1782,10 @@ void InteractiveSvgMapItem::paintVirtualValues(QPainter* painter)
 void InteractiveSvgMapItem::setVirtualValues(int lineId, double inVal, double outVal, int precision)
 {
 	QMap<int, ValuePair>::iterator it = m_valuePairs.find(lineId);
-	if (it == m_valuePairs.end()) return;
+	if (it == m_valuePairs.end())
+	{
+		return;
+	}
 	ValuePair& vp = it.value();
 	vp.in.text  = QString::number(inVal, 'f', precision);
 	vp.out.text = QString::number(outVal, 'f', precision);
@@ -1562,12 +1795,14 @@ void InteractiveSvgMapItem::setVirtualValues(int lineId, double inVal, double ou
 void InteractiveSvgMapItem::setVirtualValue(int lineId, bool isOut, double value, int precision)
 {
 	QMap<int, ValuePair>::iterator it = m_valuePairs.find(lineId);
-	if (it == m_valuePairs.end()) return;
+	if (it == m_valuePairs.end())
+	{
+		return;
+	}
 	ValuePair& vp = it.value();
-	if (isOut) 
+	if (isOut)
 		vp.out.text = QString::number(value, 'f', precision);
 	else
 		vp.in.text = QString::number(value, 'f', precision);
-	auto map = m_valuePairs.toStdMap();
 	update();
 }

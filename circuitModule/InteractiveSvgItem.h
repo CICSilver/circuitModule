@@ -26,21 +26,25 @@ class QScrollBar;
 class SecWidget;
 struct SvgNodeStyle
 {
-    QColor stroke;
-    int strokeWidth;
-    QString dashArray;
-    double strokeOpacity;
-    QColor fill;
-    double fillOpacity;
-    
-    SvgNodeStyle() : strokeWidth(1), strokeOpacity(1.0), fillOpacity(1.0) {}
+	QColor stroke;
+	int strokeWidth;
+	QString dashArray;
+	double strokeOpacity;
+	QColor fill;
+	double fillOpacity;
+
+	SvgNodeStyle() : strokeWidth(1), strokeOpacity(1.0), fillOpacity(1.0)
+	{
+	}
 };
 
 struct LineStyle
 {
 	QRgb strokeRgb;         // 只存颜色值，绘制时组装 QColor
 	unsigned short strokeWidth; // 线宽（像素）
-	LineStyle() : strokeRgb(0), strokeWidth(1) {}
+	LineStyle() : strokeRgb(0), strokeWidth(1)
+	{
+	}
 };
 
 struct PlateCircleItem
@@ -75,13 +79,16 @@ struct PlateItem
 	QVector<PlateRectItem> rects;
 
 	// 压板的语义属性
-	struct Attrs {
+	struct Attrs
+	{
 		QString code;
 		QString iedName;
 		QString ref;   // 软压板引用，作为关联键
 		QString desc;
 		QString id;
-		Attrs() {}
+		Attrs()
+		{
+		}
 	} attrs;
 };
 
@@ -93,9 +100,9 @@ struct ArrowHead
 
 enum LineType
 {
-    LineType_Virtual = 0,
-    LineType_Logic   = 1,
-    LineType_Optical = 2
+	LineType_Virtual = 0,
+	LineType_Logic   = 1,
+	LineType_Optical = 2
 };
 enum CircuitType
 {
@@ -121,24 +128,36 @@ struct MapLine
 	LineStatus status;					// 线路状态
 	bool isBlinking;					// 是否闪烁
 	// 显式回路属性（按类型划分），仅保留一类；使用单一多态指针以减小内存
-	struct AttrBase { virtual ~AttrBase() {} };
-	struct OpticalAttrs : AttrBase {
+	struct AttrBase
+	{
+		virtual ~AttrBase()
+		{
+		}
+	};
+	struct OpticalAttrs : AttrBase
+	{
 		QString srcIed;
 		QString destIed;
 		QString srcPort;
 		QString destPort;
 		QString loopCode;	// 回路编号#后部分，同光纤回路LoopCode相同
 		QString remoteId;   // 原为整数
-		OpticalAttrs() {}
+		OpticalAttrs()
+		{
+		}
 	};
-	struct LogicAttrs : AttrBase {
+	struct LogicAttrs : AttrBase
+	{
 		QString srcIedName;
 		QString destIedName;
 		QString srcCbName;
 		QString circuitCode; // circuit-code
-		LogicAttrs() {}
+		LogicAttrs()
+		{
+		}
 	};
-	struct VirtualAttrs : AttrBase {
+	struct VirtualAttrs : AttrBase
+	{
 		QString srcSoftPlateCode;
 		QString destSoftPlateCode;
 		QString srcIedName;
@@ -152,30 +171,43 @@ struct MapLine
 		QString remoteSigId_A;
 		QString remoteSigId_B;
 		CircuitType circuitType;
-		VirtualAttrs() {}
+		VirtualAttrs()
+		{
+		}
 	};
 	QSharedPointer<AttrBase> attrs; // 仅分配一种属性结构
 
-	MapLine() : type(LineType_Virtual), svgGrpId(-1), status(Status_Connected) {}
+	MapLine() : type(LineType_Virtual), svgGrpId(-1), status(Status_Connected)
+	{
+	}
 };
 
-static QVector<double> extractNumbers(const QString& d) {
+static QVector<double> extractNumbers(const QString& d)
+{
 	QVector<double> out;
 	QString num; num.reserve(d.size());
-	for (int i = 0; i < d.size(); ++i) {
+	for (int i = 0; i < d.size(); ++i)
+	{
 		const QChar c = d[i];
-		if (c.isDigit() || c == '-' || c == '.') {
+		if (c.isDigit() || c == '-' || c == '.')
+		{
 			num.append(c);
 		}
-		else {
-			if (!num.isEmpty()) { out.append(num.toDouble()); num.clear(); }
+		else
+		{
+			if (!num.isEmpty())
+			{
+				out.append(num.toDouble());
+				num.clear();
+			}
 		}
 	}
 	if (!num.isEmpty()) out.append(num.toDouble());
 	return out;
 }
 
-static QColor parseColor(const char* s, double opacity = 1.0) {
+static QColor parseColor(const char* s, double opacity = 1.0)
+{
 	if (!s || !*s) return Qt::transparent;
 	QColor c(QString::fromLatin1(s));
 	if (!c.isValid()) return Qt::transparent;
@@ -204,7 +236,7 @@ public:
 	QMap<QString, int>& lineIdMapByType(CircuitType type)
 	{
 		return type == CircuitType_SV ? m_svLineIdByCode :
-			   type == CircuitType_GSE ? m_gseLineIdByCode :
+			type == CircuitType_GSE ? m_gseLineIdByCode :
 			m_svLineIdByCode;
 	}
 	void clearLineIdMap()
@@ -255,7 +287,7 @@ private:
 	QColor colorForLine(const MapLine& line) const;
 	// 命中测试：返回点击命中的压板索引，未命中返回 -1
 	int hitTestPlate(const QPointF& pos) const;
-    void drawPlateIcon(QPainter* painter, const QPointF& center) const;
+	void drawPlateIcon(QPainter* painter, const QPointF& center) const;
 	QString buildPlateTooltip(const PlateItem& plate) const;
 
 	/// 跳转
@@ -306,13 +338,24 @@ private:
 	QSizeF m_itemSize;
 	double m_pixmapScaleFactor;
 	QVector<MapLine> m_allLines;
-    QVector<PlateItem> m_allPlates;
+	QVector<PlateItem> m_allPlates;
 	QMap<QString, PlateItem*> m_plateMap; // plateRef -> PlateItem*
 	QMap<QString, int> m_svLineIdByCode;    // 线路 code -> 组 id
 	QMap<QString, int> m_gseLineIdByCode;    // 线路 code -> 组 id
 	// 每条线路（组 id）对应两侧数值框
-	struct ValueBox { QRectF rect; QString text; };
-	struct ValuePair { ValueBox out; ValueBox in; ValuePair() {} };
+	struct ValueBox
+	{
+		QRectF rect;
+		QString text;
+	};
+	struct ValuePair
+	{
+		ValueBox out;
+		ValueBox in;
+		ValuePair()
+		{
+		}
+	};
 	QMap<int, ValuePair> m_valuePairs; // lineId -> {left,right}
 	//QVector<ValueBox> m_circuitDescBoxes; // 线路描述文本框
 	int m_highlightedLineIdx;

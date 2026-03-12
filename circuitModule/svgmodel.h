@@ -56,7 +56,7 @@ struct SvgRect
 	//************************************
 	// 函数名称:	GetY
 	// 函数全名:	SvgRect::GetY
-	// 访问权限:	public 
+	// 访问权限:	public
 	// 函数说明:	获取底部Y坐标
 	// 返回值:		quint16
 	//************************************
@@ -187,7 +187,7 @@ struct OpticalCircuitLine
 //// SVG描述结构，管理内存释放
 struct BaseSvg
 {
-	BaseSvg() 
+	BaseSvg()
 	{
 		mainIedRect = NULL;
 		viewBoxWidth = SVG_VIEWBOX_WIDTH;
@@ -195,7 +195,7 @@ struct BaseSvg
 		viewBoxX = 0;
 		viewBoxY = 0;
 	}
-	~BaseSvg() 
+	~BaseSvg()
 	{
 		if(mainIedRect)
 		{
@@ -226,7 +226,7 @@ public:
 	//************************************
 	// 函数名称:	GetLeftCircuitSize
 	// 函数全名:	LogicSvg::GetLeftCircuitSize
-	// 访问权限:	public 
+	// 访问权限:	public
 	// 函数说明:	获取左侧链路数量，包含全部数据引用
 	// 返回值:		size_t
 	//************************************
@@ -238,7 +238,7 @@ public:
 	//************************************
 	// 函数名称:	GetRightCircuitSize
 	// 函数全名:	LogicSvg::GetRightCircuitSize
-	// 访问权限:	public 
+	// 访问权限:	public
 	// 函数说明:	获取右侧链路数量，包含全部数据引用
 	// 返回值:		size_t
 	//************************************
@@ -287,7 +287,9 @@ public:
 // 光纤SVG
 struct OpticalSvg : public BaseSvg
 {
-	OpticalSvg() {}
+	OpticalSvg()
+	{
+	}
 	~OpticalSvg();
 
 	IedRect* GetIedRectByIedName(QString iedName) const
@@ -305,7 +307,7 @@ struct OpticalSvg : public BaseSvg
 	{
 		foreach(OpticalCircuitLine* pLine, opticalCircuitLineList)
 		{
-			if (pLine->pSrcRect->iedName.compare(iedName, Qt::CaseInsensitive) == 0 || 
+			if (pLine->pSrcRect->iedName.compare(iedName, Qt::CaseInsensitive) == 0 ||
 				pLine->pDestRect->iedName.compare(iedName, Qt::CaseInsensitive) == 0)
 			{
 				return pLine;
@@ -331,7 +333,7 @@ struct OpticalSvg : public BaseSvg
 struct VirtualCircuitLine : public BaseCircuitLine
 {
 	VirtualCircuitLine(VirtualCircuit* _circuit) :
-		pVirtualCircuit(_circuit) 
+		pVirtualCircuit(_circuit)
 	{
 		valStr = QString::number(pVirtualCircuit->val);
 	}
@@ -356,7 +358,9 @@ struct PlateRect
 
 struct VirtualSvg : public LogicSvg
 {
-	VirtualSvg() {}
+	VirtualSvg()
+	{
+	}
 	~VirtualSvg()
 	{
 	}
@@ -366,7 +370,9 @@ struct VirtualSvg : public LogicSvg
 // 完整虚实回路svg图
 struct WholeCircuitSvg : public LogicSvg
 {
-	WholeCircuitSvg() {}
+	WholeCircuitSvg()
+	{
+	}
 	~WholeCircuitSvg()
 	{
 	}

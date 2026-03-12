@@ -14,7 +14,7 @@
 #endif
 #include <math.h>
 
-CustomSvgItem::CustomSvgItem(const QString& fileName, QGraphicsItem* parent /*= nullptr*/)
+CustomSvgItem::CustomSvgItem(const QString& fileName, QGraphicsItem* parent )
 	: QGraphicsSvgItem(fileName, parent)
 {
 	//setAcceptHoverEvents(true);
@@ -156,7 +156,7 @@ QRectF CustomSvgItem::GetRectFromGNode(pugi::xml_node& gNode)
 		points.append(QPointF(x, y));
 		pos += lineToPattern.matchedLength();
 	}
-	if (points.size() != 4) 
+	if (points.size() != 4)
 	{
 		qDebug() << QString::fromLocal8Bit("IED矩形读取出错，当前读取矩形为：%1").arg(gNode.parent().attribute("iedname").as_string());
 		return QRectF();
@@ -185,21 +185,25 @@ QPainterPath CustomSvgItem::ParseSvgPath(const QString& d)
 	QRegExp cmdExp("([MLZmlz])([^MLZmlz]*)");
 	int pos = 0;
 	QPointF lastPoint;
-	while ((pos = cmdExp.indexIn(d, pos)) != -1) {
+	while ((pos = cmdExp.indexIn(d, pos)) != -1)
+	{
 		QString cmd = cmdExp.cap(1);
 		QStringList params = cmdExp.cap(2).split(QRegExp("[ ,]"));
 		params.removeAll("");
-		if (cmd == "M" || cmd == "m") {
+		if (cmd == "M" || cmd == "m")
+		{
 			float x = params[0].toFloat(), y = params[1].toFloat();
 			path.moveTo(x, y);
 			lastPoint = QPointF(x, y);
 		}
-		else if (cmd == "L" || cmd == "l") {
+		else if (cmd == "L" || cmd == "l")
+		{
 			float x = params[0].toFloat(), y = params[1].toFloat();
 			path.lineTo(x, y);
 			lastPoint = QPointF(x, y);
 		}
-		else if (cmd == "Z" || cmd == "z") {
+		else if (cmd == "Z" || cmd == "z")
+		{
 			path.closeSubpath();
 		}
 		pos += cmdExp.matchedLength();
@@ -207,13 +211,18 @@ QPainterPath CustomSvgItem::ParseSvgPath(const QString& d)
 	return path;
 }
 
-QPainterPath CustomSvgItem::ParseSvgPolyLine(const QString& points) {
+QPainterPath CustomSvgItem::ParseSvgPolyLine(const QString& points)
+{
 	QPainterPath path;
 	QStringList pointList = points.split(' ', QString::SkipEmptyParts);
 	if (pointList.size() < 2) return path;
-	for (int i = 0; i < pointList.size(); ++i) {
+	for (int i = 0; i < pointList.size(); ++i)
+	{
 		QStringList xy = pointList[i].split(',');
-		if (xy.size() != 2) continue;
+		if (xy.size() != 2)
+		{
+			continue;
+		}
 		float x = xy[0].toFloat(), y = xy[1].toFloat();
 		if (i == 0)
 			path.moveTo(x, y);
@@ -230,7 +239,8 @@ void CustomSvgItem::LoadInteractiveLines(const QString& fileName, QGraphicsScene
 	doc.load_file(fileName.toLocal8Bit());
 
 	// 支持三种类型
-	struct TypeInfo {
+	struct TypeInfo
+	{
 		const char* type;
 		InteractiveLineItem::LineType ltype;
 		QColor color;
@@ -241,18 +251,22 @@ void CustomSvgItem::LoadInteractiveLines(const QString& fileName, QGraphicsScene
 		{ "optical", InteractiveLineItem::Optical, QColor(200, 80, 180) }
 	};
 	const int g_types_count = sizeof(g_types) / sizeof(g_types[0]);
-	for (int i = 0; i < g_types_count; ++i) {
+	for (int i = 0; i < g_types_count; ++i)
+	{
 		QString xpath = QString("//g[@type='%1']//path | //g[@type='%1']//polyline").arg(g_types[i].type);
 		QByteArray xpathBytes = xpath.toLocal8Bit();
 		pugi::xpath_node_set paths = doc.select_nodes(xpathBytes.constData());
-		for (pugi::xpath_node_set::const_iterator it = paths.begin(); it != paths.end(); ++it) {
+		for (pugi::xpath_node_set::const_iterator it = paths.begin(); it != paths.end(); ++it)
+		{
 			pugi::xml_node n = it->node();
 			QPainterPath path;
-			if (QString(n.name()) == "path") {
+			if (QString(n.name()) == "path")
+			{
 				QString d = n.attribute("d").as_string();
 				path = ParseSvgPath(d);
 			}
-			else if (QString(n.name()) == "polyline") {
+			else if (QString(n.name()) == "polyline")
+			{
 				QString points = n.attribute("points").as_string();
 				path = ParseSvgPolyLine(points);
 			}

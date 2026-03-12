@@ -12,25 +12,53 @@
 
 #include "Common/SvgTransformerCommon.h"
 
-namespace utils {
-	inline QString toQString(const QString& str) { return str; }
-	inline QString toQString(const QStringRef& str) { return str.toString(); }
-	inline QString toQString(const QChar& c) { return QString(c); }
-	inline QString toQString(quint64 value) { return QString::number(value); }
-	inline QString toQString(int value) { return QString::number(value); }
-	inline QString toQString(double value) { return QString::number(value); }
-	inline QString toQString(bool value) { return value ? "true" : "false"; }
-	inline QString toQString(const char* s) { return s ? QString::fromUtf8(s) : QString(); }
+namespace utils
+{
+	inline QString toQString(const QString& str)
+	{
+		return str;
+	}
+	inline QString toQString(const QStringRef& str)
+	{
+		return str.toString();
+	}
+	inline QString toQString(const QChar& c)
+	{
+		return QString(c);
+	}
+	inline QString toQString(quint64 value)
+	{
+		return QString::number(value);
+	}
+	inline QString toQString(int value)
+	{
+		return QString::number(value);
+	}
+	inline QString toQString(double value)
+	{
+		return QString::number(value);
+	}
+	inline QString toQString(bool value)
+	{
+		return value ? "true" : "false";
+	}
+	inline QString toQString(const char* s)
+	{
+		return s ? QString::fromUtf8(s) : QString();
+	}
 	// 信息组合/拆分辅助类
-	class FieldJoiner {
+	class FieldJoiner
+	{
 	public:
 		Q_DISABLE_COPY(FieldJoiner)
 		FieldJoiner(const QChar& sep = FIELD_SEPARATE_CHAR)
-			: separator(sep), first(true), stream(&buffer) {
+			: separator(sep), first(true), stream(&buffer)
+			{
 		}
 
 		template<typename T>
-		FieldJoiner& operator<<(const T& value) {
+		FieldJoiner& operator<<(const T& value)
+		{
 			if (!first)
 				stream << separator;
 
@@ -67,16 +95,25 @@ class SvgTransformer
 private:
 	typedef pugi::xpath_node_set::const_iterator nodeSetConstIterator;
 	// 组合为子串信息
-	inline utils::FieldJoiner joinFields() { return utils::FieldJoiner(FIELD_SEPARATE_CHAR); }
+	inline utils::FieldJoiner joinFields()
+	{
+		return utils::FieldJoiner(FIELD_SEPARATE_CHAR);
+	}
 	// 组合为组信息
-	inline utils::FieldJoiner joinGroups() { return utils::FieldJoiner(GROUP_SEPARATE_CHAR); }
-	inline QList<QStringList> splitGroupAndFields(const QString& packed) {
+	inline utils::FieldJoiner joinGroups()
+	{
+		return utils::FieldJoiner(GROUP_SEPARATE_CHAR);
+	}
+	inline QList<QStringList> splitGroupAndFields(const QString& packed)
+	{
 		QList<QStringList> result;
 		QStringList groups = packed.split(GROUP_SEPARATE_CHAR);
 
-		for (int i = 0; i < groups.size(); ++i) {
+		for (int i = 0; i < groups.size(); ++i)
+		{
 			QStringList fields = groups[i].split(FIELD_SEPARATE_CHAR);
-			for (int j = 0; j < fields.size(); ++j) {
+			for (int j = 0; j < fields.size(); ++j)
+			{
 				if (fields[j] == "NULL")
 					fields[j] = "";
 			}
@@ -85,7 +122,8 @@ private:
 		return result;
 	}
 
-	inline QString getField(const QList<QStringList>& groups, int groupIndex, int fieldIndex, const QString& defaultValue = "") {
+	inline QString getField(const QList<QStringList>& groups, int groupIndex, int fieldIndex, const QString& defaultValue = "")
+	{
 		if (groupIndex < 0 || groupIndex >= groups.size())
 			return defaultValue;
 		const QStringList& fields = groups[groupIndex];
@@ -173,7 +211,10 @@ protected:
 	template <typename SvgType>
 	void GenerateSvg(const IED* pIed, const QString& filePath, void (SvgTransformer::* generateSvgFunc)(const IED*, SvgType&), void (SvgTransformer::* drawSvgFunc)(SvgType&))
 	{
-		if (!pIed || filePath.isEmpty()) return;
+		if (!pIed || filePath.isEmpty())
+		{
+			return;
+		}
 		QSvgGenerator svgGenerator;
 
 		svgGenerator.setFileName(filePath);
@@ -193,7 +234,7 @@ protected:
 	//************************************
 	// 函数名称:	GenerateLogicSvgByIed
 	// 函数全名:	SvgTransformer::GenerateLogicSvgByIed
-	// 访问权限:	protected 
+	// 访问权限:	protected
 	// 函数说明:	生成逻辑图SVG描述结构
 	// 函数参数:	const IED * pIed
 	// 函数参数:	LogicSvg & svg
@@ -204,7 +245,7 @@ protected:
 	//************************************
 	// 函数名称:	ParseCircuitFromIed
 	// 函数全名:	SvgTransformer::ParseCircuitFromIed
-	// 访问权限:	protected 
+	// 访问权限:	protected
 	// 函数说明:	从IED结构中获取逻辑链路及相关IED，填充svg描述
 	// 函数参数:	LogicSvg & svg
 	// 函数参数:	const IED * pIed
@@ -217,7 +258,7 @@ protected:
 	//************************************
 	// 函数名称:	GenerateOpticalSvgByIed
 	// 函数全名:	SvgTransformer::GenerateOpticalSvgByIed
-	// 访问权限:	protected 
+	// 访问权限:	protected
 	// 函数说明:	生成光纤图SVG描述结构，上下结构，上下为IED，中间为交换机
 	// 函数参数:	const IED * pIed
 	// 函数参数:	OpticalSvg & svg
@@ -228,7 +269,7 @@ protected:
 	//************************************
 	// 函数名称:	GenerateOpticalSvgByIed_old
 	// 函数全名:	SvgTransformer::GenerateOpticalSvgByIed_old
-	// 访问权限:	protected 
+	// 访问权限:	protected
 	// 函数说明:	生成光纤图SVG描述结构，上下结构，主IED在上层中心，中间为交换机，下层为周边IED
 	// 函数参数:	const IED * pIed
 	// 函数参数:	OpticalSvg & svg
@@ -240,7 +281,7 @@ protected:
 	//************************************
 	// 函数名称:	GenerateVirtualSvgByIed
 	// 函数全名:	SvgTransformer::GenerateVirtualSvgByIed
-	// 访问权限:	protected 
+	// 访问权限:	protected
 	// 函数说明:	生成虚回路图SVG描述结构（相较于完整二次回路图，不显示交换机连接关系）
 	// 函数参数:	const IED * pIed
 	// 函数参数:	VirtualSvg & svg
@@ -250,7 +291,7 @@ protected:
 	//************************************
 	// 函数名称:	GenerateVirtualSvgByIed
 	// 函数全名:	SvgTransformer::GenerateVirtualSvgByIed
-	// 访问权限:	protected 
+	// 访问权限:	protected
 	// 函数说明:	生成完整二次回路图SVG描述结构
 	// 函数参数:	const IED * pIed
 	// 函数参数:	VirtualSvg & svg
@@ -261,7 +302,7 @@ protected:
 	//************************************
 	// 函数名称:	DrawLogicSvg
 	// 函数全名:	SvgTransformer::DrawLogicSvg
-	// 访问权限:	protected 
+	// 访问权限:	protected
 	// 函数说明:	绘制指定逻辑链路svg描述结构
 	// 函数参数:	LogicSvg & svg
 	// 返回值:		void
@@ -270,7 +311,7 @@ protected:
 	//************************************
 	// 函数名称:	DrawOpticalSvg
 	// 函数全名:	SvgTransformer::DrawOpticalSvg
-	// 访问权限:	protected 
+	// 访问权限:	protected
 	// 函数说明:	绘制光纤链路svg描述结构
 	// 函数参数:	OpticalSvg & svg
 	// 返回值:		void
@@ -280,7 +321,7 @@ protected:
 	//************************************
 	// 函数名称:	DrawVirtualSvg
 	// 函数全名:	SvgTransformer::DrawVirtualSvg
-	// 访问权限:	protected 
+	// 访问权限:	protected
 	// 函数说明:	绘制虚回路svg描述结构
 	// 函数参数:	VirtualSvg & svg
 	// 返回值:		void
@@ -290,7 +331,7 @@ protected:
 	//************************************
 	// 函数名称:	DrawWholeSvg
 	// 函数全名:	SvgTransformer::DrawVirtualSvg
-	// 访问权限:	protected 
+	// 访问权限:	protected
 	// 函数说明:	绘制虚回路svg描述结构（相较于完整二次回路，不显示交换机部分）
 	// 函数参数:	WholeCircuitSvg & svg
 	// 返回值:		void
@@ -300,7 +341,7 @@ protected:
 	//************************************
 	// 函数名称:	DrawConnCircle
 	// 函数全名:	SvgTransformer::DrawConnCircle
-	// 访问权限:	protected 
+	// 访问权限:	protected
 	// 函数说明:	对于指定点绘制连接点
 	// 函数参数:	const QPoint & pt 指定点
 	// 函数参数:	int radius 连接点半径
@@ -312,7 +353,7 @@ protected:
 	//************************************
 	// 函数名称:	AdjustOtherIedRectPosition
 	// 函数全名:	SvgTransformer::AdjustOtherIedRectPosition
-	// 访问权限:	protected 
+	// 访问权限:	protected
 	// 函数说明:	生成全部IED后，根据关联IED数量，将其调整到主IED两侧位置
 	// 函数参数:	QList<IedRect * > & rectList
 	// 函数参数:	const IedRect & mainIedRect
@@ -323,7 +364,7 @@ protected:
 	//************************************
 	// 函数名称:	AdjustCircuitLinePosition
 	// 函数全名:	SvgTransformer::AdjustCircuitLinePosition
-	// 访问权限:	protected 
+	// 访问权限:	protected
 	// 函数说明:	在确定IED位置后，调整链路位置
 	// 函数参数:	LogicSvg & svg
 	// 返回值:		void
@@ -333,7 +374,7 @@ protected:
 	//************************************
 	// 函数名称:	AdjustVirtualCircuitLinePosition
 	// 函数全名:	SvgTransformer::AdjustVirtualCircuitLinePosition
-	// 访问权限:	protected 
+	// 访问权限:	protected
 	// 函数说明:	调整虚回路位置
 	// 函数参数:	VirtualSvg & svg
 	// 返回值:		void
@@ -343,7 +384,7 @@ protected:
 	//************************************
 	// 函数名称:	AdjustExtendRectByCircuit
 	// 函数全名:	SvgTransformer::AdjustExtendRectByCircuit
-	// 访问权限:	protected 
+	// 访问权限:	protected
 	// 函数说明:	根据IED的链路数量，调整外部矩形高度
 	// 函数参数:	IedRect & pRect
 	// 返回值:		void
@@ -373,7 +414,7 @@ private:
 	//************************************
 	// 函数名称:	drawArrowHeader
 	// 函数全名:	SvgTransformer::drawArrowHeader
-	// 访问权限:	private 
+	// 访问权限:	private
 	// 函数说明:	绘制箭头头部
 	// 函数参数:	const QPoint & endPoint
 	// 函数参数:	double arrowAngle
@@ -397,8 +438,8 @@ private:
 	//************************************
 	// 函数名称:	AdjustVirtualCircuitPlatePosition
 	// 函数全名:	SvgTransformer::AdjustVirtualCircuitPlatePosition
-	// 访问权限:	private 
-	// 函数说明:	
+	// 访问权限:	private
+	// 函数说明:
 	// 函数参数:	QHash<QString
 	// 函数参数:	PlateRect> & hash			svg描述中的软压板矩形索引
 	// 函数参数:	QString iedName				压板对侧IED名称
@@ -455,7 +496,7 @@ private:
 	//************************************
 	// 函数名称:	DrawGseIcon
 	// 函数全名:	SvgTransformer::DrawGseIcon
-	// 访问权限:	private 
+	// 访问权限:	private
 	// 函数说明:	绘制GSE图标，输入点为图标左上角坐标
 	// 函数参数:	const QPoint & pt
 	// 函数参数:	const quint32 color
@@ -466,7 +507,7 @@ private:
 	//************************************
 	// 函数名称:	DrawSvIcon
 	// 函数全名:	SvgTransformer::DrawSvIcon
-	// 访问权限:	private 
+	// 访问权限:	private
 	// 函数说明:	绘制SV图标，输入点为图标左上角坐标
 	// 函数参数:	const QPoint & pt
 	// 函数参数:	const quint32 color
@@ -476,14 +517,14 @@ private:
 	//************************************
 	// 函数名称:	DrawPlateIcon
 	// 函数全名:	SvgTransformer::DrawPlateIcon
-	// 访问权限:	private 
+	// 访问权限:	private
 	// 函数说明:	绘制检修压板图标，输入点为左侧圆的圆心位置。
 	// 函数参数:	const QPoint & pt
 	// 函数参数:    bool status 通断状态
 	// 函数参数:    const QString & info 压板描述和引用信息
 	// 返回值:		void
 	//************************************
-    void DrawPlateIcon(const QPoint& pt, bool status, const QString& info);
+	void DrawPlateIcon(const QPoint& pt, bool status, const QString& info);
 
 	// 对SVG文件进行解析重标识
 	void ReSignSvg(const QString&filename, BaseSvg& svg);

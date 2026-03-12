@@ -109,6 +109,36 @@ private:
 	quint64 m_code;
 };
 
+class DirectMaintainPlateItem : public directItemBase
+{
+public:
+	DirectMaintainPlateItem(QGraphicsItem* parent = NULL);
+	~DirectMaintainPlateItem();
+	QRectF boundingRect() const;
+	void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget);
+	void setIedName(const QString& iedName);
+	QString iedName() const { return m_iedName; }
+	void setDisplayText(const QString& text);
+	void setStateByValue(int value);
+	void setClosed(bool closed);
+	bool isClosed() const { return m_closed; }
+	void setAnchorRect(const QRectF& iedRect);
+
+private:
+	void rebuildGeometry();
+
+private:
+	QRectF m_anchorRect;
+	QRectF m_textRect;
+	QRectF m_iconRect;
+	QRectF m_bodyRect;
+	QPointF m_leftCircleCenter;
+	QPointF m_rightCircleCenter;
+	QString m_iedName;
+	QString m_displayText;
+	bool m_closed;
+};
+
 class DirectVirtualLineItem : public directItemBase
 {
 public:

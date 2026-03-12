@@ -109,5 +109,13 @@ File references
 - format your file link as `/e:/XXX/XXX`.
 - If a clickable editor link cannot be generated reliably, always include a plain text file path with line numbers.
 
+String literals and encoding
+- Source files in this repository use GB2312-compatible local encoding.
+- When Chinese text is needed in C++ source, write the Chinese characters directly in the source file.
+- Prefer `QString::fromLocal8bit("ÖÐÎÄ")` for Chinese string literals when conversion is needed.
+- Do NOT encode Chinese text as UTF-8 byte escapes such as `"\xE6\x..."`.
+- Do NOT use `QString::fromUtf8("\x...")` for Chinese literals in this repository.
+- Do not replace readable Chinese literals with escaped byte sequences.
+
 Before writing code
-- Restate constraints in one line: Qt 4.8.6 / C++03 / GB2312 / TAB(4) / Allman braces / Qt containers default / m_ members / no assignment in conditions / Chinese comments.
+- Restate constraints in one line: Qt 4.8.6 / C++03 / GB2312 / CRLF / TAB(4) / strict Allman braces / no same-line `{` / compact spacing / Qt containers default / m_ members / no assignment in conditions / Chinese comments / readable Chinese literals via fromLocal8bit when needed.

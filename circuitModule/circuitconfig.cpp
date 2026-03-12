@@ -11,11 +11,11 @@
 bool debug = false;
 
 CircuitConfig::CircuitConfig()
-    : m_rtdb(RtdbClient::Instance())
-    , m_stationModel(NULL)
+	: m_rtdb(RtdbClient::Instance())
+	, m_stationModel(NULL)
 {
-    if(!m_rtdb.isOpen())
-        m_rtdb.refresh();
+	if(!m_rtdb.isOpen())
+		m_rtdb.refresh();
 }
 
 bool CircuitConfig::LoadCimeFile(QString path)
@@ -130,7 +130,7 @@ bool CircuitConfig::LoadIedFromRtdb()
 		return false;
 	}
 	const CRtdbEleModelStation* station = m_rtdb.stationModel();
-	for (std::map<std::string, CRtdbEleModelBay*>::const_iterator bayIt = station->m_mapStationBay.cbegin(); bayIt != station->m_mapStationBay.cend(); ++bayIt)
+	for (std::map<std::string, CRtdbEleModelBay*>::const_iterator bayIt = station->m_mapStationBay.begin(); bayIt != station->m_mapStationBay.end(); ++bayIt)
 	{
 		foreach(CRtdbEleModelIed * pIed, bayIt->second->m_listIed)
 		{
@@ -152,147 +152,147 @@ bool CircuitConfig::LoadIedFromRtdb()
 
 bool CircuitConfig::LoadGseFromRtdb()
 {
-    if (!m_rtdb.isOpen())
-    {
-        qDebug() << "RTDB is not open";
-        return false;
-    }
-    const CRtdbEleModelCircuit* circuitModel = m_rtdb.circuitModel();
-    QHash<QString, LogicCircuit*> logicHash;
+	if (!m_rtdb.isOpen())
+	{
+		qDebug() << "RTDB is not open";
+		return false;
+	}
+	const CRtdbEleModelCircuit* circuitModel = m_rtdb.circuitModel();
+	QHash<QString, LogicCircuit*> logicHash;
 
-    const std::list<stuRtdbGseCircuit*>& gseList = circuitModel->m_listGseCircuit;
-    for (std::list<stuRtdbGseCircuit*>::const_iterator it = gseList.cbegin();
-         it != gseList.cend(); ++it)
-    {
-        stuRtdbGseCircuit* pRtdbGseCircuit = *it;
-        if (!pRtdbGseCircuit || !pRtdbGseCircuit->m_pOutIed || !pRtdbGseCircuit->m_pInIed || !pRtdbGseCircuit->m_pGseCurcuitInfo)
-            continue;
-        VirtualCircuit* pGse = new VirtualCircuit(GOOSE);
+	const std::list<stuRtdbGseCircuit*>& gseList = circuitModel->m_listGseCircuit;
+	for (std::list<stuRtdbGseCircuit*>::const_iterator it = gseList.begin();
+		it != gseList.end(); ++it)
+	{
+		stuRtdbGseCircuit* pRtdbGseCircuit = *it;
+		if (!pRtdbGseCircuit || !pRtdbGseCircuit->m_pOutIed || !pRtdbGseCircuit->m_pInIed || !pRtdbGseCircuit->m_pGseCurcuitInfo)
+			continue;
+		VirtualCircuit* pGse = new VirtualCircuit(GOOSE);
 
-        pGse->code = pRtdbGseCircuit->m_pGseCurcuitInfo->code;
+		pGse->code = pRtdbGseCircuit->m_pGseCurcuitInfo->code;
 		pGse->linkCode = pRtdbGseCircuit->m_pGseCurcuitInfo->linkCode;
-        const CRtdbEleModelIed* pRtdbOutIed = utils::asModelIed(pRtdbGseCircuit->m_pOutIed);
-        const CRtdbEleModelIed* pRtdbInIed  = utils::asModelIed(pRtdbGseCircuit->m_pInIed);
-        // src
-        pGse->srcIedName = QString::fromLocal8Bit(pRtdbGseCircuit->m_pGseCurcuitInfo->outIedName);
-        pGse->srcIedDesc = pRtdbOutIed ? QString::fromLocal8Bit(pRtdbOutIed->m_pIedHead->iedDesc) : "";
-        pGse->srcRef = QString::fromLocal8Bit(pRtdbGseCircuit->m_pGseCurcuitInfo->outRef);
-        setChlDesc(pGse, pRtdbGseCircuit->m_pOutChl, true);
-        setChlDesc(pGse, pRtdbGseCircuit->m_pInChl, false);
-        const stuRtdbStatus* pSrcPlateStatus = utils::asPlateStatus(pRtdbGseCircuit->m_pOutRyb);
+		const CRtdbEleModelIed* pRtdbOutIed = utils::asModelIed(pRtdbGseCircuit->m_pOutIed);
+		const CRtdbEleModelIed* pRtdbInIed  = utils::asModelIed(pRtdbGseCircuit->m_pInIed);
+		// src
+		pGse->srcIedName = QString::fromLocal8Bit(pRtdbGseCircuit->m_pGseCurcuitInfo->outIedName);
+		pGse->srcIedDesc = pRtdbOutIed ? QString::fromLocal8Bit(pRtdbOutIed->m_pIedHead->iedDesc) : "";
+		pGse->srcRef = QString::fromLocal8Bit(pRtdbGseCircuit->m_pGseCurcuitInfo->outRef);
+		setChlDesc(pGse, pRtdbGseCircuit->m_pOutChl, true);
+		setChlDesc(pGse, pRtdbGseCircuit->m_pInChl, false);
+		const stuRtdbStatus* pSrcPlateStatus = utils::asPlateStatus(pRtdbGseCircuit->m_pOutRyb);
 		pGse->srcSoftPlateCode = pSrcPlateStatus ? pSrcPlateStatus->code : 0;
-        pGse->srcSoftPlateRef  = pSrcPlateStatus ? QString::fromLocal8Bit(pSrcPlateStatus->ref)  : "";
-        pGse->srcSoftPlateDesc = pSrcPlateStatus ? QString::fromLocal8Bit(pSrcPlateStatus->desc) : "";
-        const CRtdbEleModelGse* pRtdbOutGocb = utils::asModelGse(pRtdbGseCircuit->m_pOutGocb);
-        pGse->srcCbName = pRtdbOutGocb ? QString::fromLocal8Bit(pRtdbOutGocb->m_pGseHead->name) : "";
-        // dest
-        const stuRtdbStatus* pDestPlateStatus = utils::asPlateStatus(pRtdbGseCircuit->m_pInRyb);
+		pGse->srcSoftPlateRef  = pSrcPlateStatus ? QString::fromLocal8Bit(pSrcPlateStatus->ref)  : "";
+		pGse->srcSoftPlateDesc = pSrcPlateStatus ? QString::fromLocal8Bit(pSrcPlateStatus->desc) : "";
+		const CRtdbEleModelGse* pRtdbOutGocb = utils::asModelGse(pRtdbGseCircuit->m_pOutGocb);
+		pGse->srcCbName = pRtdbOutGocb ? QString::fromLocal8Bit(pRtdbOutGocb->m_pGseHead->name) : "";
+		// dest
+		const stuRtdbStatus* pDestPlateStatus = utils::asPlateStatus(pRtdbGseCircuit->m_pInRyb);
 		pGse->destSoftPlateCode = pDestPlateStatus ? pDestPlateStatus->code : 0;
-        pGse->destSoftPlateRef  = pDestPlateStatus ? QString::fromLocal8Bit(pDestPlateStatus->ref)  : "";
-        pGse->destSoftPlateDesc = pDestPlateStatus ? QString::fromLocal8Bit(pDestPlateStatus->desc) : "";
-        pGse->destRef     = QString::fromLocal8Bit(pRtdbGseCircuit->m_pGseCurcuitInfo->inRef);
-        pGse->destIedName = QString::fromLocal8Bit(pRtdbGseCircuit->m_pGseCurcuitInfo->inIedName);
-        pGse->destIedDesc = pRtdbInIed ? QString::fromLocal8Bit(pRtdbInIed->m_pIedHead->iedDesc) : "";
-        pGse->inRemoteCode  = pRtdbGseCircuit->m_pGseCurcuitInfo->inCode;
-        pGse->outRemoteCode = pRtdbGseCircuit->m_pGseCurcuitInfo->outCode;
-        pGse->pRtdbCircuit = pRtdbGseCircuit;
-        buildCircuitRelations(pGse, logicHash);
-    }
-    return true;
+		pGse->destSoftPlateRef  = pDestPlateStatus ? QString::fromLocal8Bit(pDestPlateStatus->ref)  : "";
+		pGse->destSoftPlateDesc = pDestPlateStatus ? QString::fromLocal8Bit(pDestPlateStatus->desc) : "";
+		pGse->destRef     = QString::fromLocal8Bit(pRtdbGseCircuit->m_pGseCurcuitInfo->inRef);
+		pGse->destIedName = QString::fromLocal8Bit(pRtdbGseCircuit->m_pGseCurcuitInfo->inIedName);
+		pGse->destIedDesc = pRtdbInIed ? QString::fromLocal8Bit(pRtdbInIed->m_pIedHead->iedDesc) : "";
+		pGse->inRemoteCode  = pRtdbGseCircuit->m_pGseCurcuitInfo->inCode;
+		pGse->outRemoteCode = pRtdbGseCircuit->m_pGseCurcuitInfo->outCode;
+		pGse->pRtdbCircuit = pRtdbGseCircuit;
+		buildCircuitRelations(pGse, logicHash);
+	}
+	return true;
 }
 
 bool CircuitConfig::LoadSvFromRtdb()
 {
-    if (!m_rtdb.isOpen())
-    {
-        qDebug() << "RTDB is not open";
-        return false;
-    }
-    const CRtdbEleModelCircuit* circuitModel = m_rtdb.circuitModel();
-    QHash<QString, LogicCircuit*> logicHash;
+	if (!m_rtdb.isOpen())
+	{
+		qDebug() << "RTDB is not open";
+		return false;
+	}
+	const CRtdbEleModelCircuit* circuitModel = m_rtdb.circuitModel();
+	QHash<QString, LogicCircuit*> logicHash;
 
-    const std::list<stuRtdbSvCircuit*>& svList = circuitModel->m_listSvCircuit;
-    for (std::list<stuRtdbSvCircuit*>::const_iterator it = svList.cbegin();
-         it != svList.cend(); ++it)
-    {
-        stuRtdbSvCircuit* pRtdbSvCircuit = *it;
-        if (!pRtdbSvCircuit || !pRtdbSvCircuit->m_pInIed || !pRtdbSvCircuit->m_pOutIed || !pRtdbSvCircuit->m_pSvCurcuitInfo)
-            continue;
+	const std::list<stuRtdbSvCircuit*>& svList = circuitModel->m_listSvCircuit;
+	for (std::list<stuRtdbSvCircuit*>::const_iterator it = svList.begin();
+		it != svList.end(); ++it)
+	{
+		stuRtdbSvCircuit* pRtdbSvCircuit = *it;
+		if (!pRtdbSvCircuit || !pRtdbSvCircuit->m_pInIed || !pRtdbSvCircuit->m_pOutIed || !pRtdbSvCircuit->m_pSvCurcuitInfo)
+			continue;
 
-        VirtualCircuit* pSv = new VirtualCircuit(SV);
-        const CRtdbEleModelIed* pRtdbSrcIed  = utils::asModelIed(pRtdbSvCircuit->m_pOutIed);
-        const CRtdbEleModelIed* pRtdbDestIed = utils::asModelIed(pRtdbSvCircuit->m_pInIed);
-        pSv->code = pRtdbSvCircuit->m_pSvCurcuitInfo->code;
+		VirtualCircuit* pSv = new VirtualCircuit(SV);
+		const CRtdbEleModelIed* pRtdbSrcIed  = utils::asModelIed(pRtdbSvCircuit->m_pOutIed);
+		const CRtdbEleModelIed* pRtdbDestIed = utils::asModelIed(pRtdbSvCircuit->m_pInIed);
+		pSv->code = pRtdbSvCircuit->m_pSvCurcuitInfo->code;
 		pSv->linkCode = pRtdbSvCircuit->m_pSvCurcuitInfo->linkCode;
-        // src
-        pSv->srcIedName = QString::fromLocal8Bit(pRtdbSrcIed->m_pIedHead->iedName);
-        pSv->srcIedDesc = QString::fromLocal8Bit(pRtdbSrcIed->m_pIedHead->iedDesc);
-        const CRtdbEleModelSmv* pRtdbOutSmv = utils::asModelSmv(pRtdbSvCircuit->m_pOutChl);
-        pSv->srcCbName = pRtdbOutSmv ? QString::fromLocal8Bit(pRtdbOutSmv->m_pSmvHead->name) : "";
-        pSv->srcRef = QString::fromLocal8Bit(pRtdbSvCircuit->m_pSvCurcuitInfo->outRef);
-        setChlDesc(pSv, pRtdbSvCircuit->m_pOutChl, true);
-        // dest
-        const stuRtdbStatus* pDestPlateStatus = utils::asPlateStatus(pRtdbSvCircuit->m_pInRyb);
-        pSv->destIedName = QString::fromLocal8Bit(pRtdbDestIed->m_pIedHead->iedName);
-        pSv->destIedDesc = QString::fromLocal8Bit(pRtdbDestIed->m_pIedHead->iedDesc);
-        pSv->destSoftPlateDesc = pDestPlateStatus ? QString::fromLocal8Bit(pDestPlateStatus->desc) : "";
-        pSv->destSoftPlateRef  = pDestPlateStatus ? QString::fromLocal8Bit(pDestPlateStatus->ref)  : "";
-        pSv->destRef = QString::fromLocal8Bit(pRtdbSvCircuit->m_pSvCurcuitInfo->inRef);
-        setChlDesc(pSv, pRtdbSvCircuit->m_pInChl, false);
+		// src
+		pSv->srcIedName = QString::fromLocal8Bit(pRtdbSrcIed->m_pIedHead->iedName);
+		pSv->srcIedDesc = QString::fromLocal8Bit(pRtdbSrcIed->m_pIedHead->iedDesc);
+		const CRtdbEleModelSmv* pRtdbOutSmv = utils::asModelSmv(pRtdbSvCircuit->m_pOutChl);
+		pSv->srcCbName = pRtdbOutSmv ? QString::fromLocal8Bit(pRtdbOutSmv->m_pSmvHead->name) : "";
+		pSv->srcRef = QString::fromLocal8Bit(pRtdbSvCircuit->m_pSvCurcuitInfo->outRef);
+		setChlDesc(pSv, pRtdbSvCircuit->m_pOutChl, true);
+		// dest
+		const stuRtdbStatus* pDestPlateStatus = utils::asPlateStatus(pRtdbSvCircuit->m_pInRyb);
+		pSv->destIedName = QString::fromLocal8Bit(pRtdbDestIed->m_pIedHead->iedName);
+		pSv->destIedDesc = QString::fromLocal8Bit(pRtdbDestIed->m_pIedHead->iedDesc);
+		pSv->destSoftPlateDesc = pDestPlateStatus ? QString::fromLocal8Bit(pDestPlateStatus->desc) : "";
+		pSv->destSoftPlateRef  = pDestPlateStatus ? QString::fromLocal8Bit(pDestPlateStatus->ref)  : "";
+		pSv->destRef = QString::fromLocal8Bit(pRtdbSvCircuit->m_pSvCurcuitInfo->inRef);
+		setChlDesc(pSv, pRtdbSvCircuit->m_pInChl, false);
 
-        buildCircuitRelations(pSv, logicHash);
-    }
-    return true;
+		buildCircuitRelations(pSv, logicHash);
+	}
+	return true;
 }
 
 bool CircuitConfig::LoadOpticalFromRtdb()
 {
-    if (!m_rtdb.isOpen())
-    {
-        qDebug() << "RTDB is not open";
-        return false;
-    }
-    const CRtdbEleModelCircuit* circuitModel = m_rtdb.circuitModel();
+	if (!m_rtdb.isOpen())
+	{
+		qDebug() << "RTDB is not open";
+		return false;
+	}
+	const CRtdbEleModelCircuit* circuitModel = m_rtdb.circuitModel();
 
-    const std::list<stuRtdbRealCircuit*>& realList = circuitModel->m_listRealCircuit;
-    for (std::list<stuRtdbRealCircuit*>::const_iterator it = realList.cbegin();
-         it != realList.cend(); ++it)
-    {
-        stuRtdbRealCircuit* pRtdbRealCircuit = *it;
-        if (!pRtdbRealCircuit || !pRtdbRealCircuit->m_pRcvIed || !pRtdbRealCircuit->m_pOffIed || !pRtdbRealCircuit->m_pRealCurcuitInfo)
-            continue;
+	const std::list<stuRtdbRealCircuit*>& realList = circuitModel->m_listRealCircuit;
+	for (std::list<stuRtdbRealCircuit*>::const_iterator it = realList.begin();
+		it != realList.end(); ++it)
+	{
+		stuRtdbRealCircuit* pRtdbRealCircuit = *it;
+		if (!pRtdbRealCircuit || !pRtdbRealCircuit->m_pRcvIed || !pRtdbRealCircuit->m_pOffIed || !pRtdbRealCircuit->m_pRealCurcuitInfo)
+			continue;
 
-        OpticalCircuit* pOptCircuit = new OpticalCircuit;
+		OpticalCircuit* pOptCircuit = new OpticalCircuit;
 		pOptCircuit->code = pRtdbRealCircuit->m_pRealCurcuitInfo->code;
-        pOptCircuit->loopName = QString::fromLocal8Bit(pRtdbRealCircuit->m_pRealCurcuitInfo->loopName);
-        pOptCircuit->loopCode = pOptCircuit->loopName.split('#').at(1).toUInt();
-        pOptCircuit->remoteId = pRtdbRealCircuit->m_pRealCurcuitInfo->linkCode;
-        CRtdbEleModelIed* pRtdbRcvIed = static_cast<CRtdbEleModelIed*>(pRtdbRealCircuit->m_pRcvIed);
-        CRtdbEleModelIed* pRtdbOffIed = static_cast<CRtdbEleModelIed*>(pRtdbRealCircuit->m_pOffIed);
-        IED* pSrcIed  = m_iedHash.value(QString::fromLocal8Bit(pRtdbOffIed->m_pIedHead->iedName), NULL);
-        IED* pDestIed = m_iedHash.value(QString::fromLocal8Bit(pRtdbRcvIed->m_pIedHead->iedName), NULL);
-        if (!pSrcIed || !pDestIed)
-        {
-            delete pOptCircuit;
-            continue;
-        }
-        pOptCircuit->srcIedName  = QString::fromLocal8Bit(pRtdbOffIed->m_pIedHead->iedName);
-        pOptCircuit->srcIedPort  = QString::fromLocal8Bit(pRtdbRealCircuit->m_pRealCurcuitInfo->offPort.port);
-        pOptCircuit->srcIedDesc  = QString::fromLocal8Bit(pRtdbOffIed->m_pIedHead->iedDesc);
-        pOptCircuit->destIedName = QString::fromLocal8Bit(pRtdbRcvIed->m_pIedHead->iedName);
-        pOptCircuit->destIedPort = QString::fromLocal8Bit(pRtdbRealCircuit->m_pRealCurcuitInfo->rcvPort.port);
-        pOptCircuit->destIedDesc = QString::fromLocal8Bit(pRtdbRcvIed->m_pIedHead->iedDesc);
-        pOptCircuit->pSrcIed = pSrcIed;
-        pOptCircuit->pDestIed = pDestIed;
+		pOptCircuit->loopName = QString::fromLocal8Bit(pRtdbRealCircuit->m_pRealCurcuitInfo->loopName);
+		pOptCircuit->loopCode = pOptCircuit->loopName.split('#').at(1).toUInt();
+		pOptCircuit->remoteId = pRtdbRealCircuit->m_pRealCurcuitInfo->linkCode;
+		CRtdbEleModelIed* pRtdbRcvIed = static_cast<CRtdbEleModelIed*>(pRtdbRealCircuit->m_pRcvIed);
+		CRtdbEleModelIed* pRtdbOffIed = static_cast<CRtdbEleModelIed*>(pRtdbRealCircuit->m_pOffIed);
+		IED* pSrcIed  = m_iedHash.value(QString::fromLocal8Bit(pRtdbOffIed->m_pIedHead->iedName), NULL);
+		IED* pDestIed = m_iedHash.value(QString::fromLocal8Bit(pRtdbRcvIed->m_pIedHead->iedName), NULL);
+		if (!pSrcIed || !pDestIed)
+		{
+			delete pOptCircuit;
+			continue;
+		}
+		pOptCircuit->srcIedName  = QString::fromLocal8Bit(pRtdbOffIed->m_pIedHead->iedName);
+		pOptCircuit->srcIedPort  = QString::fromLocal8Bit(pRtdbRealCircuit->m_pRealCurcuitInfo->offPort.port);
+		pOptCircuit->srcIedDesc  = QString::fromLocal8Bit(pRtdbOffIed->m_pIedHead->iedDesc);
+		pOptCircuit->destIedName = QString::fromLocal8Bit(pRtdbRcvIed->m_pIedHead->iedName);
+		pOptCircuit->destIedPort = QString::fromLocal8Bit(pRtdbRealCircuit->m_pRealCurcuitInfo->rcvPort.port);
+		pOptCircuit->destIedDesc = QString::fromLocal8Bit(pRtdbRcvIed->m_pIedHead->iedDesc);
+		pOptCircuit->pSrcIed = pSrcIed;
+		pOptCircuit->pDestIed = pDestIed;
 
-        pSrcIed->optical_list.append(pOptCircuit);
-        pDestIed->optical_list.append(pOptCircuit);
-        m_opticalCircuitList.append(pOptCircuit);
-        pSrcIed->connectedIedNameSet.insert(pOptCircuit->destIedName);
-        pDestIed->connectedIedNameSet.insert(pOptCircuit->srcIedName);
-        m_opticalCircuitHash.insert(qMakePair(pOptCircuit->srcIedName, pOptCircuit->destIedName), pOptCircuit);
-    }
-    return true;
+		pSrcIed->optical_list.append(pOptCircuit);
+		pDestIed->optical_list.append(pOptCircuit);
+		m_opticalCircuitList.append(pOptCircuit);
+		pSrcIed->connectedIedNameSet.insert(pOptCircuit->destIedName);
+		pDestIed->connectedIedNameSet.insert(pOptCircuit->srcIedName);
+		m_opticalCircuitHash.insert(qMakePair(pOptCircuit->srcIedName, pOptCircuit->destIedName), pOptCircuit);
+	}
+	return true;
 }
 
 bool CircuitConfig::LoadRTDB()
@@ -487,7 +487,8 @@ void CircuitConfig::Clear()
 OpticalCircuit* CircuitConfig::getOpticalByCode(quint64 code) const
 {
 	if (code == 0) return NULL;
-	for (int i = 0; i < m_opticalCircuitList.size(); ++i) {
+	for (int i = 0; i < m_opticalCircuitList.size(); ++i)
+	{
 		OpticalCircuit* p = m_opticalCircuitList[i];
 		if (p && p->code == code) return p;
 	}
@@ -496,39 +497,59 @@ OpticalCircuit* CircuitConfig::getOpticalByCode(quint64 code) const
 
 void CircuitConfig::buildOpticalRelation(VirtualCircuit* pVtCircuit, const IED* pSrcIed, const IED* pDestIed)
 {
-	if (!pVtCircuit || !pSrcIed || !pDestIed) return;
+	if (!pVtCircuit || !pSrcIed || !pDestIed)
+	{
+		return;
+	}
 	pVtCircuit->leftOpticalCode = 0;
 	pVtCircuit->rightOpticalCode = 0;
 	pVtCircuit->switchIedName.clear();
 	OpticalCircuit* left = NULL;
 	OpticalCircuit* right = NULL;
 	QString swName;
-	for (int i = 0; i < pSrcIed->optical_list.size(); ++i) {
+	for (int i = 0; i < pSrcIed->optical_list.size(); ++i)
+	{
 		OpticalCircuit* oc = pSrcIed->optical_list.at(i);
-		if (!oc) continue;
+		if (!oc)
+		{
+			continue;
+		}
 		QString other = (oc->srcIedName == pSrcIed->name) ? oc->destIedName : oc->srcIedName;
-		if (!other.contains("SW")) continue;
-		for (int j = 0; j < pDestIed->optical_list.size(); ++j) {
+		if (!other.contains("SW"))
+		{
+			continue;
+		}
+		for (int j = 0; j < pDestIed->optical_list.size(); ++j)
+		{
 			OpticalCircuit* oc2 = pDestIed->optical_list.at(j);
-			if (!oc2) continue;
+			if (!oc2)
+			{
+				continue;
+			}
 			QString other2 = (oc2->srcIedName == pDestIed->name) ? oc2->destIedName : oc2->srcIedName;
-			if (other2 == other) {
+			if (other2 == other)
+			{
 				left = oc;
 				right = oc2;
 				swName = other;
 				break;
 			}
 		}
-		if (left && right) break;
+		if (left && right)
+		{
+			break;
+		}
 	}
-	if (left && right) {
+	if (left && right)
+	{
 		pVtCircuit->leftOpticalCode = left->code;
 		pVtCircuit->rightOpticalCode = right->code;
 		pVtCircuit->switchIedName = swName;
 		return;
 	}
 	QList<OpticalCircuit*> direct = getOpticalByIeds(pSrcIed->name, pDestIed->name);
-	if (!direct.isEmpty()) {
+	if (!direct.isEmpty())
+	{
 		pVtCircuit->leftOpticalCode = direct.first()->code;
 	}
 }

@@ -25,13 +25,15 @@ static double dw_to_double(const char* val)
 static bool fill_optical_ports(const OpticalCircuit* oc, const QString& iedName, QString& iedPort, QString& swPort, QString& swName)
 {
 	if (!oc) return false;
-	if (oc->srcIedName == iedName) {
+	if (oc->srcIedName == iedName)
+	{
 		iedPort = oc->srcIedPort;
 		swPort = oc->destIedPort;
 		swName = oc->destIedName;
 		return true;
 	}
-	if (oc->destIedName == iedName) {
+	if (oc->destIedName == iedName)
+	{
 		iedPort = oc->destIedPort;
 		swPort = oc->srcIedPort;
 		swName = oc->srcIedName;
@@ -49,29 +51,42 @@ static QString build_plate_tooltip(const DirectPlateItem* item)
 	return line1 + sep + line2 + (line3.isEmpty() ? QString() : sep + line3);
 }
 
+static QString build_maint_plate_default_text()
+{
+	return QString::fromLocal8Bit("检修压板");
+}
+
 static QString build_virtual_tooltip(const VirtualCircuitLine* line)
 {
 	QString tip = QString::fromLocal8Bit("虚回路");
 	QString optLine;
-	if (line && line->pVirtualCircuit) {
+	if (line && line->pVirtualCircuit)
+	{
 		const VirtualCircuit* vc = line->pVirtualCircuit;
 		CircuitConfig* cfg = CircuitConfig::Instance();
 		OpticalCircuit* left = cfg ? cfg->getOpticalByCode(vc->leftOpticalCode) : NULL;
 		OpticalCircuit* right = cfg ? cfg->getOpticalByCode(vc->rightOpticalCode) : NULL;
-		if (left && right) {
+		if (left && right)
+		{
 			QString leftIedPort, leftSwPort, rightSwPort, rightIedPort;
 			QString swName1, swName2;
 			if (fill_optical_ports(left, vc->srcIedName, leftIedPort, leftSwPort, swName1) &&
-				fill_optical_ports(right, vc->destIedName, rightIedPort, rightSwPort, swName2)) {
+				fill_optical_ports(right, vc->destIedName, rightIedPort, rightSwPort, swName2))
+				{
 				QString swName = !vc->switchIedName.isEmpty() ? vc->switchIedName : (!swName1.isEmpty() ? swName1 : swName2);
 				optLine = leftIedPort + " <-> " + leftSwPort + QString::fromLocal8Bit(" ：") + swName + QString::fromLocal8Bit("：") + rightSwPort + " <-> " + rightIedPort;
 			}
-		} else if (left) {
+		}
+		else if (left)
+		{
 			QString iedPort1, iedPort2;
-			if (left->srcIedName == vc->srcIedName) {
+			if (left->srcIedName == vc->srcIedName)
+			{
 				iedPort1 = left->srcIedPort;
 				iedPort2 = left->destIedPort;
-			} else {
+			}
+			else
+			{
 				iedPort1 = left->destIedPort;
 				iedPort2 = left->srcIedPort;
 			}
@@ -127,6 +142,22 @@ static QRectF build_logic_external_rect(const QList<IedRect*>& rectList, const Q
 	int width = firstIed->width + firstIed->horizontal_margin * 2 + titleWidth;
 	int height = (lastIed->y - y + lastIed->height) + lastIed->vertical_margin;
 	return QRectF(x, y, width, height);
+}
+
+static QRectF build_virtual_ied_outer_rect(const IedRect* rect)
+{
+	if (!rect)
+	{
+		return QRectF();
+	}
+	if (rect->extend_height > 0)
+	{
+		return QRectF(rect->x - rect->inner_gap,
+			rect->y - rect->inner_gap,
+			rect->width + rect->inner_gap * 2,
+			rect->height + rect->extend_height + rect->inner_gap * 2);
+	}
+	return QRectF(rect->x, rect->y, rect->width, rect->height);
 }
 
 class DirectRelationWindow : public QWidget
@@ -461,7 +492,8 @@ void DirectView::wheelEvent(QWheelEvent* event)
 	double targetX = sX * factor;
 	double targetY = sY * factor;
 	if ((event->delta() > 0 && (targetX > maxTarget || targetY > maxTarget)) ||
-		(event->delta() <= 0 && (targetX < minTarget || targetY < minTarget))) {
+		(event->delta() <= 0 && (targetX < minTarget || targetY < minTarget)))
+	{
 		event->accept();
 		return;
 	}
@@ -475,17 +507,35 @@ void DirectView::contextMenuEvent(QContextMenuEvent* event)
 {
 	QGraphicsItem* item = itemAt(event->pos());
 	QMenu menu;
+	DirectMaintainPlateItem* maintainPlate = dynamic_cast<DirectMaintainPlateItem*>(item);
+	if (maintainPlate)
+	{
+		QAction* act = maintainPlate->isClosed()
+			? menu.addAction(QString::fromLatin1("Open"))
+			: menu.addAction(QString::fromLatin1("Close"));
+		QAction* chosen = menu.exec(event->globalPos());
+		if (chosen == act)
+		{
+			bool nextClosed = !maintainPlate->isClosed();
+			maintainPlate->setClosed(nextClosed);
+			emit maintainPlateToggled(maintainPlate->iedName(), nextClosed ? 1 : 0);
+		}
+		return;
+	}
 	DirectPlateItem* plate = dynamic_cast<DirectPlateItem*>(item);
-	if (plate) {
+	if (plate)
+	{
 		QAction* act = plate->isClosed()
 			? menu.addAction(QString::fromLocal8Bit("断开"))
 			: menu.addAction(QString::fromLocal8Bit("合上"));
 		QAction* chosen = menu.exec(event->globalPos());
-		if (chosen == act) {
+		if (chosen == act)
+		{
 			plate->setClosed(!plate->isClosed());
 			RtdbClient& rtdb = RtdbClient::Instance();
 			stuRtdbStatus* plateEle = rtdb.getRyb(plate->code());
-			if (plateEle) {
+			if (plateEle)
+			{
 				const char* newVal = plate->isClosed() ? "1" : "0";
 				strcpy(plateEle->val, newVal);
 			}
@@ -495,10 +545,12 @@ void DirectView::contextMenuEvent(QContextMenuEvent* event)
 	QAction* actAllClose = menu.addAction(QString::fromLocal8Bit("全部合上"));
 	QAction* actAllOpen  = menu.addAction(QString::fromLocal8Bit("全部断开"));
 	QAction* chosen = menu.exec(event->globalPos());
-	if (chosen == actAllClose || chosen == actAllOpen) {
+	if (chosen == actAllClose || chosen == actAllOpen)
+	{
 		bool toClosed = (chosen == actAllClose);
 		QList<QGraphicsItem*> items = scene()->items();
-		for (int i = 0; i < items.size(); ++i) {
+		for (int i = 0; i < items.size(); ++i)
+		{
 			DirectPlateItem* p = dynamic_cast<DirectPlateItem*>(items[i]);
 			if (p) p->setClosed(toClosed);
 		}
@@ -509,7 +561,8 @@ void DirectView::mouseDoubleClickEvent(QMouseEvent* event)
 {
 	QGraphicsItem* item = itemAt(event->pos());
 	DirectVirtualLineItem* line = dynamic_cast<DirectVirtualLineItem*>(item);
-	if (line) {
+	if (line)
+	{
 		line->setBlinking(!line->isBlinking());
 	}
 	QGraphicsView::mouseDoubleClickEvent(event);
@@ -527,6 +580,7 @@ DirectWidget::DirectWidget(QWidget *parent)
 	initView();
 	connect(m_view, SIGNAL(opticalLineClicked(quint64, const QString&, const QString&)), this, SLOT(OnOpticalLineClicked(quint64, const QString&, const QString&)));
 	connect(m_view, SIGNAL(logicLineClicked(LineItem*)), this, SLOT(OnLogicLineClicked(LineItem*)));
+	connect(m_view, SIGNAL(maintainPlateToggled(const QString&, int)), this, SLOT(OnMaintainPlateToggled(const QString&, int)));
 	m_statusTimer = new QTimer(this);
 	connect(m_statusTimer, SIGNAL(timeout()), this, SLOT(OnStatusTimeout()));
 	m_statusTimer->start(1000);
@@ -540,54 +594,66 @@ DirectWidget::~DirectWidget()
 
 void DirectWidget::ParseFromLogicSvg(const LogicSvg& svg)
 {
-	if (!m_scene) return;
+	if (!m_scene)
+	{
+		return;
+	}
 	ClearScene();
 	m_currentIedName = svg.mainIedRect ? svg.mainIedRect->iedName : (svg.centerIedRectList.isEmpty() ? QString() : svg.centerIedRectList.first()->iedName);
 	m_scene->setSceneRect(0, 0, svg.viewBoxWidth, svg.viewBoxHeight);
 	QString reviewTitle = build_logic_review_title();
 	QString effectTitle = build_logic_effect_title();
-	if (!svg.centerIedRectList.isEmpty()) {
+	if (!svg.centerIedRectList.isEmpty())
+	{
 		LogicFrameItem* frameItem = new LogicFrameItem();
 		frameItem->setFrame(build_logic_external_rect(svg.centerIedRectList, reviewTitle), reviewTitle, utils::ColorHelper::Color(utils::ColorHelper::pure_red), false);
 		frameItem->setZValue(-2.0);
 		m_scene->addItem(frameItem);
-	} else if (svg.mainIedRect) {
+	}
+	else if (svg.mainIedRect)
+	{
 		LogicFrameItem* frameItem = new LogicFrameItem();
 		frameItem->setFrame(build_logic_external_rect(svg.mainIedRect, reviewTitle), reviewTitle, utils::ColorHelper::Color(svg.mainIedRect->border_color), false);
 		frameItem->setZValue(-2.0);
 		m_scene->addItem(frameItem);
 	}
-	if (!svg.leftIedRectList.isEmpty()) {
+	if (!svg.leftIedRectList.isEmpty())
+	{
 		LogicFrameItem* frameItem = new LogicFrameItem();
 		frameItem->setFrame(build_logic_external_rect(svg.leftIedRectList, effectTitle), effectTitle, utils::ColorHelper::Color(svg.leftIedRectList.first()->border_color), true);
 		frameItem->setZValue(-2.0);
 		m_scene->addItem(frameItem);
 	}
-	if (!svg.rightIedRectList.isEmpty()) {
+	if (!svg.rightIedRectList.isEmpty())
+	{
 		LogicFrameItem* frameItem = new LogicFrameItem();
 		frameItem->setFrame(build_logic_external_rect(svg.rightIedRectList, effectTitle), effectTitle, utils::ColorHelper::Color(svg.rightIedRectList.first()->border_color), false);
 		frameItem->setZValue(-2.0);
 		m_scene->addItem(frameItem);
 	}
-	if (svg.mainIedRect) {
+	if (svg.mainIedRect)
+	{
 		IedItem* item = new IedItem();
 		item->setFromIedRect(*svg.mainIedRect, false);
 		item->setZValue(-1.0);
 		m_scene->addItem(item);
 	}
-	for (int i = 0; i < svg.centerIedRectList.size(); ++i) {
+	for (int i = 0; i < svg.centerIedRectList.size(); ++i)
+	{
 		IedItem* item = new IedItem();
 		item->setFromIedRect(*svg.centerIedRectList[i], false);
 		item->setZValue(-1.0);
 		m_scene->addItem(item);
 	}
-	for (int i = 0; i < svg.leftIedRectList.size(); ++i) {
+	for (int i = 0; i < svg.leftIedRectList.size(); ++i)
+	{
 		IedItem* item = new IedItem();
 		item->setFromIedRect(*svg.leftIedRectList[i], false);
 		item->setZValue(-1.0);
 		m_scene->addItem(item);
 	}
-	for (int i = 0; i < svg.rightIedRectList.size(); ++i) {
+	for (int i = 0; i < svg.rightIedRectList.size(); ++i)
+	{
 		IedItem* item = new IedItem();
 		item->setFromIedRect(*svg.rightIedRectList[i], false);
 		item->setZValue(-1.0);
@@ -611,45 +677,59 @@ void DirectWidget::ParseFromLogicSvg(const LogicSvg& svg)
 	all += svg.centerIedRectList;
 	all += svg.leftIedRectList;
 	all += svg.rightIedRectList;
-	for (int i = 0; i < all.size(); ++i) {
+	for (int i = 0; i < all.size(); ++i)
+	{
 		IedRect* rect = all[i];
-		for (int j = 0; j < rect->logic_line_list.size(); ++j) {
+		for (int j = 0; j < rect->logic_line_list.size(); ++j)
+		{
 			LogicCircuitLine* line = rect->logic_line_list[j];
-			if (!line) {
+			if (!line)
+			{
 				continue;
 			}
 			QVector<QPointF> pts;
 			pts.append(line->startPoint);
-			if (!line->turnPointList.isEmpty()) {
-				for (int ptIndex = 0; ptIndex < line->turnPointList.size(); ++ptIndex) {
+			if (!line->turnPointList.isEmpty())
+			{
+				for (int ptIndex = 0; ptIndex < line->turnPointList.size(); ++ptIndex)
+				{
 					pts.append(line->turnPointList.at(ptIndex));
 				}
-			} else {
+			}
+			else
+			{
 				pts.append(line->midPoint);
 			}
 			pts.append(line->endPoint);
 			QSet<quint64> circuitCodeSet;
 			QString srcIedName;
 			QString destIedName;
-			if (line->pLogicCircuit) {
-				if (line->pLogicCircuit->pSrcIed) {
+			if (line->pLogicCircuit)
+			{
+				if (line->pLogicCircuit->pSrcIed)
+				{
 					srcIedName = line->pLogicCircuit->pSrcIed->name;
 				}
-				if (line->pLogicCircuit->pDestIed) {
+				if (line->pLogicCircuit->pDestIed)
+				{
 					destIedName = line->pLogicCircuit->pDestIed->name;
 				}
-				for (int circuitIndex = 0; circuitIndex < line->pLogicCircuit->circuitList.size(); ++circuitIndex) {
+				for (int circuitIndex = 0; circuitIndex < line->pLogicCircuit->circuitList.size(); ++circuitIndex)
+				{
 					VirtualCircuit* virtualCircuit = line->pLogicCircuit->circuitList.at(circuitIndex);
-					if (!virtualCircuit) {
+					if (!virtualCircuit)
+					{
 						continue;
 					}
 					circuitCodeSet.insert(virtualCircuit->code);
 				}
 			}
-			if (srcIedName.isEmpty() && line->pSrcIedRect) {
+			if (srcIedName.isEmpty() && line->pSrcIedRect)
+			{
 				srcIedName = line->pSrcIedRect->iedName;
 			}
-			if (destIedName.isEmpty() && line->pDestIedRect) {
+			if (destIedName.isEmpty() && line->pDestIedRect)
+			{
 				destIedName = line->pDestIedRect->iedName;
 			}
 			QString preferredMainIedName;
@@ -723,6 +803,7 @@ void DirectWidget::ClearScene()
 {
 	if (m_scene) m_scene->clear();
 	m_plateItems.clear();
+	m_maintPlateItems.clear();
 	m_virtualLines.clear();
 }
 
@@ -731,9 +812,49 @@ void DirectWidget::ParseFromVirtualSvg(const VirtualSvg& svg)
 	ParseFromVirtualSvg(svg, QSet<quint64>());
 }
 
+void DirectWidget::SetMaintainPlateText(const QString& iedName, const QString& text)
+{
+	if (iedName.isEmpty())
+	{
+		return;
+	}
+	QString displayText = text;
+	if (displayText.isEmpty())
+	{
+		displayText = build_maint_plate_default_text();
+	}
+	m_maintPlateTextByIed.insert(iedName, displayText);
+	DirectMaintainPlateItem* item = m_maintPlateItems.value(iedName, NULL);
+	if (!item)
+	{
+		return;
+	}
+	item->setDisplayText(displayText);
+	item->setToolTip(displayText);
+}
+
+void DirectWidget::SetMaintainPlateState(const QString& iedName, int value)
+{
+	if (iedName.isEmpty())
+	{
+		return;
+	}
+	int stateValue = value == 0 ? 0 : 1;
+	m_maintPlateStateByIed.insert(iedName, stateValue);
+	DirectMaintainPlateItem* item = m_maintPlateItems.value(iedName, NULL);
+	if (!item)
+	{
+		return;
+	}
+	item->setStateByValue(stateValue);
+}
+
 void DirectWidget::ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64>& circuitCodeSet)
 {
-	if (!m_scene) return;
+	if (!m_scene)
+	{
+		return;
+	}
 	ClearScene();
 	m_currentIedName = svg.mainIedRect ? svg.mainIedRect->iedName : QString();
 	m_scene->setSceneRect(0, 0, svg.viewBoxWidth, svg.viewBoxHeight);
@@ -741,6 +862,7 @@ void DirectWidget::ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64
 	QSet<QString> visibleIedNameSet;
 	QSet<QString> visiblePlateRefSet;
 	QSet<quint64> visiblePlateCodeSet;
+	QMap<QString, QRectF> maintainPlateRectHash;
 	QList<IedRect*> allRectList;
 	allRectList += svg.leftIedRectList;
 	allRectList += svg.rightIedRectList;
@@ -806,6 +928,7 @@ void DirectWidget::ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64
 		IedItem* item = new IedItem();
 		item->setFromIedRect(*svg.mainIedRect, false);
 		m_scene->addItem(item);
+		maintainPlateRectHash.insert(svg.mainIedRect->iedName, build_virtual_ied_outer_rect(svg.mainIedRect));
 	}
 	for (int i = 0; i < svg.leftIedRectList.size(); ++i)
 	{
@@ -817,6 +940,7 @@ void DirectWidget::ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64
 		IedItem* item = new IedItem();
 		item->setFromIedRect(*rect, false);
 		m_scene->addItem(item);
+		maintainPlateRectHash.insert(rect->iedName, build_virtual_ied_outer_rect(rect));
 	}
 	for (int i = 0; i < svg.rightIedRectList.size(); ++i)
 	{
@@ -828,6 +952,26 @@ void DirectWidget::ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64
 		IedItem* item = new IedItem();
 		item->setFromIedRect(*rect, false);
 		m_scene->addItem(item);
+		maintainPlateRectHash.insert(rect->iedName, build_virtual_ied_outer_rect(rect));
+	}
+	QMap<QString, QRectF>::const_iterator maintainIt = maintainPlateRectHash.constBegin();
+	for (; maintainIt != maintainPlateRectHash.constEnd(); ++maintainIt)
+	{
+		DirectMaintainPlateItem* maintainItem = new DirectMaintainPlateItem();
+		maintainItem->setIedName(maintainIt.key());
+		QString displayText = m_maintPlateTextByIed.contains(maintainIt.key()) ?
+			m_maintPlateTextByIed.value(maintainIt.key()) :
+			build_maint_plate_default_text();
+		int stateValue = m_maintPlateStateByIed.contains(maintainIt.key()) ?
+			m_maintPlateStateByIed.value(maintainIt.key()) :
+			1;
+		maintainItem->setDisplayText(displayText);
+		maintainItem->setStateByValue(stateValue);
+		maintainItem->setAnchorRect(maintainIt.value());
+		maintainItem->setToolTip(displayText);
+		maintainItem->setZValue(1.0);
+		m_scene->addItem(maintainItem);
+		m_maintPlateItems.insert(maintainIt.key(), maintainItem);
 	}
 	for (int i = 0; i < allRectList.size(); ++i)
 	{
@@ -919,26 +1063,33 @@ void DirectWidget::ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64
 
 void DirectWidget::ParseFromOpticalSvg(const OpticalSvg& svg)
 {
-	if (!m_scene) return;
+	if (!m_scene)
+	{
+		return;
+	}
 	ClearScene();
 	m_currentIedName = svg.mainIedRect ? svg.mainIedRect->iedName : QString();
 	m_scene->setSceneRect(0, 0, svg.viewBoxWidth, svg.viewBoxHeight);
-	if (svg.mainIedRect) {
+	if (svg.mainIedRect)
+	{
 		IedItem* item = new IedItem();
 		item->setFromIedRect(*svg.mainIedRect, false);
 		m_scene->addItem(item);
 	}
-	for (int i = 0; i < svg.iedRectList.size(); ++i) {
+	for (int i = 0; i < svg.iedRectList.size(); ++i)
+	{
 		IedItem* item = new IedItem();
 		item->setFromIedRect(*svg.iedRectList[i], false);
 		m_scene->addItem(item);
 	}
-	for (int i = 0; i < svg.switcherRectList.size(); ++i) {
+	for (int i = 0; i < svg.switcherRectList.size(); ++i)
+	{
 		IedItem* item = new IedItem();
 		item->setFromIedRect(*svg.switcherRectList[i], true);
 		m_scene->addItem(item);
 	}
-	for (int i = 0; i < svg.opticalCircuitLineList.size(); ++i) {
+	for (int i = 0; i < svg.opticalCircuitLineList.size(); ++i)
+	{
 		OpticalCircuitLine* line = svg.opticalCircuitLineList[i];
 		DirectOpticalLineItem* lineItem = new DirectOpticalLineItem();
 		lineItem->setFromOpticalLine(*line);
@@ -1003,19 +1154,32 @@ void DirectWidget::OnLogicLineClicked(LineItem* lineItem)
 	relationWindow->raise();
 	relationWindow->activateWindow();
 }
+void DirectWidget::OnMaintainPlateToggled(const QString& iedName, int value)
+{
+	SetMaintainPlateState(iedName, value);
+}
+
 
 void DirectWidget::UpdatePlateStatuses()
 {
 	if (!m_rtdb.isOpen())
 		m_rtdb.refresh();
 	QMap<QString, DirectPlateItem*>::iterator it = m_plateItems.begin();
-	for (; it != m_plateItems.end(); ++it) {
+	for (; it != m_plateItems.end(); ++it)
+	{
 		DirectPlateItem* item = it.value();
-		if (!item) continue;
+		if (!item)
+		{
+			continue;
+		}
 		quint64 code = item->code();
-		if (code == 0) continue;
+		if (code == 0)
+		{
+			continue;
+		}
 		stuRtdbStatus* plateEle = m_rtdb.getRyb(code);
-		if (plateEle) {
+		if (plateEle)
+		{
 			int value = plateEle->val[0] != '\0' ? atoi(plateEle->val) : 0;
 			item->setClosed(value != 0);
 		}
@@ -1025,23 +1189,35 @@ void DirectWidget::UpdateLineStatuses()
 {
 	if (!m_rtdb.isOpen())
 		m_rtdb.refresh();
-	for (int i = 0; i < m_virtualLines.size(); ++i) {
+	for (int i = 0; i < m_virtualLines.size(); ++i)
+	{
 		DirectVirtualLineItem* line = m_virtualLines[i];
-		if (!line) continue;
+		if (!line)
+		{
+			continue;
+		}
 		quint64 code = line->circuitCode();
-		if (code == 0) continue;
-		if (line->virtualType() == GOOSE) {
+		if (code == 0)
+		{
+			continue;
+		}
+		if (line->virtualType() == GOOSE)
+		{
 			stuRtdbGseCircuit* gseCircuit = m_rtdb.getGseCircuit(code);
-			if (gseCircuit) {
+			if (gseCircuit)
+			{
 				stuRtdbStatus* inChl = static_cast<stuRtdbStatus*>(gseCircuit->m_pInChl);
 				stuRtdbStatus* outChl = static_cast<stuRtdbStatus*>(gseCircuit->m_pOutChl);
 				QString outVal = outChl ? QString::number(dw_to_double(outChl->val), 'f', 0) : QString();
 				QString inVal  = inChl ? QString::number(dw_to_double(inChl->val), 'f', 0) : QString();
 				line->setValues(outVal, inVal);
 			}
-		} else {
+		}
+		else
+		{
 			stuRtdbSvCircuit* svCircuit = m_rtdb.getSvCircuit(code);
-			if (svCircuit) {
+			if (svCircuit)
+			{
 				stuRtdbAnalog* inChl = static_cast<stuRtdbAnalog*>(svCircuit->m_pInChl);
 				stuRtdbAnalog* outChl = static_cast<stuRtdbAnalog*>(svCircuit->m_pOutChl);
 				QString outVal = outChl ? QString::number(dw_to_double(outChl->val), 'f', 0) : QString();
@@ -1061,7 +1237,8 @@ void DirectWidget::OnStatusTimeout()
 void DirectWidget::OnBlinkTimeout()
 {
 	m_blinkOn = !m_blinkOn;
-	for (int i = 0; i < m_virtualLines.size(); ++i) {
+	for (int i = 0; i < m_virtualLines.size(); ++i)
+	{
 		DirectVirtualLineItem* line = m_virtualLines[i];
 		if (line) line->setBlinkOn(m_blinkOn);
 	}

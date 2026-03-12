@@ -90,6 +90,7 @@ protected:
 signals:
 	void opticalLineClicked(quint64 opticalCode, const QString& srcIedName, const QString& destIedName);
 	void logicLineClicked(LineItem* lineItem);
+	void maintainPlateToggled(const QString& iedName, int value);
 
 private:
 	bool m_dragging;
@@ -115,6 +116,8 @@ public:
 	void ParseFromVirtualSvg();
 	void ParseFromVirtualSvg(const VirtualSvg& svg);
 	void ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64>& circuitCodeSet);
+	void SetMaintainPlateText(const QString& iedName, const QString& text);
+	void SetMaintainPlateState(const QString& iedName, int value);
 
 protected:
 	void resizeEvent(QResizeEvent* event);
@@ -152,6 +155,7 @@ private:
 private slots:
 	void OnOpticalLineClicked(quint64 opticalCode, const QString& srcIedName, const QString& destIedName);
 	void OnLogicLineClicked(LineItem* lineItem);
+	void OnMaintainPlateToggled(const QString& iedName, int value);
 	//************************************
 	// 函数名称:	OnStatusTimeout
 	// 函数全名:	DirectWidget::OnStatusTimeout
@@ -175,6 +179,9 @@ private:
 	QGraphicsScene* m_scene;
 	DirectView* m_view;
 	QMap<QString, DirectPlateItem*> m_plateItems;
+	QMap<QString, DirectMaintainPlateItem*> m_maintPlateItems;
+	QMap<QString, QString> m_maintPlateTextByIed;
+	QMap<QString, int> m_maintPlateStateByIed;
 	QVector<DirectVirtualLineItem*> m_virtualLines;
 	RtdbClient& m_rtdb;
 	QTimer* m_statusTimer;

@@ -571,9 +571,9 @@ void SvgTransformer::drawArrowHeader(const QPoint& endPoint, double arrowAngle, 
 		-arrowLen * sin(AngleToRadians(arrowAngle - arrowHeadLineAngle)));
 	int offset = 8;
 	// 考虑当箭头方向不是垂直时的偏移量，offset偏移仅为箭头方向的偏移量
-	// 箭头方向减少偏移，假设箭头点位置为endPoint，则偏移点位置为 
+	// 箭头方向减少偏移，假设箭头点位置为endPoint，则偏移点位置为
 	QPointF offsetPoint = QPointF(
-		endPoint.x() + offset * cos(AngleToRadians(arrowAngle)), 
+		endPoint.x() + offset * cos(AngleToRadians(arrowAngle)),
 		endPoint.y() - offset * sin(AngleToRadians(arrowAngle)));
 	QBrush brush(color, Qt::SolidPattern);
 	QPen pen(Qt::NoPen);
@@ -594,33 +594,37 @@ double SvgTransformer::GetAngleByVec(const QPointF& vec) const
 
 QPoint SvgTransformer::GetArrowPt(const QPoint& pt, int arrowLen, int conn_r, double angle, bool isUnderConnpt, int offset /* 箭头偏移量，向前兼容 */)
 {
-	//int offset = 10;	
-    // 保留原有垂直方向的特殊处理逻辑，确保向前兼容
-    if (abs(angle - 90) < 0.001 || abs(angle + 90) < 0.001) {
-        // 原有垂直方向的处理，保持不变
-        if (isUnderConnpt) {
-            return QPoint(
-                pt.x(),
-                pt.y() + 2 * conn_r + (angle > 0 ? 1 : (2 * arrowLen + 5)) + offset
-            );
-        } else {
-            return QPoint(
-                pt.x(),
-                pt.y() - 2 * conn_r - (angle > 0 ? (2 * arrowLen + 5) : 1) - offset
-            );
-        }
-    }
-    // 任意方向的箭头偏移计算
-    double angleRad = AngleToRadians(angle);
-    // 根据参数计算箭头点在连接点的哪一侧
-    int direction = isUnderConnpt ? 1 : -1;
-    // 计算总偏移距离
-    int totalOffset = 2 * conn_r + arrowLen + offset;
-    // 使用三角函数计算任意方向上的偏移点
-    return QPoint(
-        pt.x() + direction * totalOffset * cos(angleRad),
-        pt.y() - direction * totalOffset * sin(angleRad)
-    );
+	//int offset = 10;
+	// 保留原有垂直方向的特殊处理逻辑，确保向前兼容
+	if (abs(angle - 90) < 0.001 || abs(angle + 90) < 0.001)
+	{
+		// 原有垂直方向的处理，保持不变
+		if (isUnderConnpt)
+		{
+			return QPoint(
+				pt.x(),
+				pt.y() + 2 * conn_r + (angle > 0 ? 1 : (2 * arrowLen + 5)) + offset
+			);
+		}
+		else
+		{
+			return QPoint(
+				pt.x(),
+				pt.y() - 2 * conn_r - (angle > 0 ? (2 * arrowLen + 5) : 1) - offset
+			);
+		}
+	}
+	// 任意方向的箭头偏移计算
+	double angleRad = AngleToRadians(angle);
+	// 根据参数计算箭头点在连接点的哪一侧
+	int direction = isUnderConnpt ? 1 : -1;
+	// 计算总偏移距离
+	int totalOffset = 2 * conn_r + arrowLen + offset;
+	// 使用三角函数计算任意方向上的偏移点
+	return QPoint(
+		pt.x() + direction * totalOffset * cos(angleRad),
+		pt.y() - direction * totalOffset * sin(angleRad)
+	);
 }
 
 void SvgTransformer::DrawDescRect(const IedRect& leftTopRect)
@@ -697,7 +701,10 @@ void SvgTransformer::DrawIedRect(QList<IedRect*>& rectList)
 
 void SvgTransformer::DrawIedRect(QList<IedRect*>& rectList, QPainter* _painter)
 {
-	if (rectList.isEmpty()) return;
+	if (rectList.isEmpty())
+	{
+		return;
+	}
 	foreach(IedRect * rect, rectList)
 	{
 		DrawIedRect(rect, _painter);
@@ -779,7 +786,10 @@ void SvgTransformer::DrawTextInRect(QPainter* _painter, SvgRect* rect, QString n
 void SvgTransformer::DrawExternalRect(QList<IedRect*>& rectList, QString title, bool hasDescIedRect)
 {
 	// 绘制外部虚线框
-	if (rectList.isEmpty()) return;
+	if (rectList.isEmpty())
+	{
+		return;
+	}
 	IedRect* firstIed = rectList.first();
 	IedRect* lastIed = rectList.last();
 	QFont font;
@@ -1023,11 +1033,11 @@ static QPoint ResolveArrowAdjacentPoint(const QVector<QPoint>& pointList, int en
 
 void SvgTransformer::DrawOpticalLine(OpticalCircuitLine* optLine)
 {
-    QPen pen;
-    pen.setColor(ColorHelper::Color(ColorHelper::pure_green));
-    //m_painter->save();
+	QPen pen;
+	pen.setColor(ColorHelper::Color(ColorHelper::pure_green));
+	//m_painter->save();
 	PAINTER_STATE_GUARD(m_painter);
-    m_painter->setPen(pen);
+	m_painter->setPen(pen);
 	// 记录链路信息到SVG文件
 	QFont font;
 	QString connStatus = optLine->pOpticalCircuit->connStatus ? "true" : "false";	// true/false
@@ -1043,23 +1053,23 @@ void SvgTransformer::DrawOpticalLine(OpticalCircuitLine* optLine)
 	font.setPointSize(TYPE_OpticalCircuit);
 	//font.setWeight(m_circuit_id++);	// 标识链路id
 	m_painter->setFont(font);
-    // 绘制光纤链路折线
-    QVector<QPoint> points;
-    points << optLine->startPoint;
-    foreach(const QPoint& pt, optLine->midPoints)
-    {
-        points << pt;
-    }
-    points << optLine->endPoint;
-    m_painter->drawPolyline(points.data(), points.size());
-    // 绘制连接点圆
+	// 绘制光纤链路折线
+	QVector<QPoint> points;
+	points << optLine->startPoint;
+	foreach(const QPoint& pt, optLine->midPoints)
+	{
+		points << pt;
+	}
+	points << optLine->endPoint;
+	m_painter->drawPolyline(points.data(), points.size());
+	// 绘制连接点圆
 	font.setPointSize(TYPE_Optical_ConnCircle);
 	//font.setFamily(DEFAULT_FONT_FAMILY);
 	m_painter->setFont(font);
 	QPoint& upPoint = optLine->startPoint.y() < optLine->endPoint.y() ? optLine->startPoint : optLine->endPoint;
 	QPoint& downPoint = optLine->startPoint.y() < optLine->endPoint.y() ? optLine->endPoint : optLine->startPoint;
-    DrawConnCircle(upPoint, CONN_R);
-    DrawConnCircle(downPoint, CONN_R, false);
+	DrawConnCircle(upPoint, CONN_R);
+	DrawConnCircle(downPoint, CONN_R, false);
 	font.setPointSize(TYPE_Circuit_Arrow);
 	m_painter->setFont(font);
 	if (points.size() < 2 || !optLine->pSrcRect || !optLine->pDestRect)
@@ -1178,7 +1188,8 @@ void SvgTransformer::DrawVirtualText(const QRect& rect, QString val, QString typ
 {
 	//m_painter->save();
 	PAINTER_STATE_GUARD(m_painter);
-	if (rect.height() == 0) {
+	if (rect.height() == 0)
+	{
 		// 使用 font-family 携带占位信息：id 以及矩形位置尺寸
 		// group0: id，仅用流水 m_element_id
 		// group1: x y w h（这里 h==0 只是标记用途，仍按数值写入）
@@ -1314,15 +1325,15 @@ void SvgTransformer::DrawSvIcon(const QPoint& pt, const quint32 color)
 void SvgTransformer::DrawPlateIcon(const QPoint& centerPt, bool status, const QString& info)
 {
 	PAINTER_STATE_GUARD(m_painter);
-    quint32 color = status ? ColorHelper::pure_green : ColorHelper::pure_red; // 根据闭合状态使用默认颜色
-    QPen pen;
-    QFont font;
-    pen.setWidth(2);
-    pen.setColor(ColorHelper::Color(color));
-    font.setPointSize(TYPE_Plate_ICON);
-    font.setFamily(info);
-    m_painter->setFont(font);
-    m_painter->setPen(pen);
+	quint32 color = status ? ColorHelper::pure_green : ColorHelper::pure_red; // 根据闭合状态使用默认颜色
+	QPen pen;
+	QFont font;
+	pen.setWidth(2);
+	pen.setColor(ColorHelper::Color(color));
+	font.setPointSize(TYPE_Plate_ICON);
+	font.setFamily(info);
+	m_painter->setFont(font);
+	m_painter->setPen(pen);
 	int distance = PLATE_WIDTH - PLATE_CIRCLE_RADIUS * 4;	// 两个圆之间的距离 = 压板图形总宽度 - 两个圆的直径
 	// 直径20的圆
 	m_painter->drawEllipse(centerPt, PLATE_CIRCLE_RADIUS, PLATE_CIRCLE_RADIUS);
@@ -1553,19 +1564,19 @@ void SvgTransformer::ReSignPlate(pugi::xml_document& doc)
 		plateNode.attribute("font-family").set_value("SimSun");
 		plateNode.attribute("font-size").set_value("15");
 	}
-    pugi::xpath_node_set plateRectNodeSet = doc.select_nodes(QString("//g[@font-size='%1' or @font-size='%2']").arg(TYPE_Plate_RECT).arg(TYPE_Plate_ICON).toLocal8Bit());
-    for (nodeSetConstIterator it = plateRectNodeSet.begin(); it != plateRectNodeSet.end(); ++it)
-    {
-            pugi::xml_node plateRectNode = it->node();
+	pugi::xpath_node_set plateRectNodeSet = doc.select_nodes(QString("//g[@font-size='%1' or @font-size='%2']").arg(TYPE_Plate_RECT).arg(TYPE_Plate_ICON).toLocal8Bit());
+	for (nodeSetConstIterator it = plateRectNodeSet.begin(); it != plateRectNodeSet.end(); ++it)
+	{
+			pugi::xml_node plateRectNode = it->node();
 			plateRectNode.append_attribute("type");
 			plateRectNode.append_attribute("id");
 			QString plateDesc = plateRectNode.attribute("font-family").value();
 			QList<QStringList> plateDescGrp = splitGroupAndFields(plateDesc);
 			QString id = getField(plateDescGrp, 0, 0);	// id
-            plateRectNode.attribute("type").set_value("plate-component");
+			plateRectNode.attribute("type").set_value("plate-component");
 			plateRectNode.attribute("id").set_value(id.toUtf8().constData());
-            plateRectNode.attribute("font-family").set_value("SimSun");
-            plateRectNode.attribute("font-size").set_value("15");
+			plateRectNode.attribute("font-family").set_value("SimSun");
+			plateRectNode.attribute("font-size").set_value("15");
 	}
 }
 

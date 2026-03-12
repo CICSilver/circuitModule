@@ -194,7 +194,6 @@
     <ClCompile Include="circuitconfig.cpp" />
     <ClCompile Include="RtdbClient.cpp" />
     <ClCompile Include="RtdbUtils.cpp" />
-    <ClCompile Include="secwidget.cpp" />
     <ClCompile Include="SvgTransformer.cpp" />
     <ClCompile Include="SvgUtils.cpp" />
   </ItemGroup>
@@ -274,20 +273,6 @@
     <ClInclude Include="RtdbClient.h" />
     <ClInclude Include="RtdbUtils.h" />
     <ClInclude Include="Common\SvgTransformerCommon.h" />
-    <CustomBuild Include="secwidget.h">
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug_exe|Win32'">$(QTDIR)\bin\moc.exe;%(FullPath)</AdditionalInputs>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug_exe|Win32'">Moc%27ing secwidget.h...</Message>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug_exe|Win32'">.\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug_exe|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"  -DUNICODE -DWIN32 -DCIRCUITMODULE_LIBRARY -DQT_DLL -DQT_CORE_LIB -DQT_GUI_LIB -DQT_SVG_LIB -DQT_XML_LIB -D_BUILD_IN_EXE -D_MBCS "-I.\GeneratedFiles" "-I." "-I$(QTDIR)\include" "-I.\GeneratedFiles\$(ConfigurationName)\." "-I$(QTDIR)\include\QtCore" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtSvg" "-I$(QTDIR)\include\QtXml" "-I.\include" "-I.\include\cime" "-I.\include\pugixml" "-I.\..\..\rtdb_dll"</Command>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(QTDIR)\bin\moc.exe;%(FullPath)</AdditionalInputs>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Moc%27ing secwidget.h...</Message>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">.\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"  -DUNICODE -DWIN32 -DCIRCUITMODULE_LIBRARY -DQT_DLL -DQT_CORE_LIB -DQT_GUI_LIB -DQT_SVG_LIB -DQT_XML_LIB -D_WINDLL -D_MBCS "-I.\GeneratedFiles" "-I." "-I$(QTDIR)\include" "-I.\GeneratedFiles\$(ConfigurationName)\." "-I$(QTDIR)\include\QtCore" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtSvg" "-I$(QTDIR)\include\QtXml" "-I.\include" "-I.\include\cime" "-I.\include\pugixml" "-I.\..\..\rtdb_dll"</Command>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(QTDIR)\bin\moc.exe;%(FullPath)</AdditionalInputs>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Moc%27ing secwidget.h...</Message>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">.\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"  -DUNICODE -DWIN32 -DCIRCUITMODULE_LIBRARY -DQT_DLL -DQT_NO_DEBUG -DNDEBUG -DQT_CORE_LIB -DQT_GUI_LIB -DQT_SVG_LIB -DQT_XML_LIB -D_WINDLL "-I.\GeneratedFiles" "-I." "-I$(QTDIR)\include" "-I.\GeneratedFiles\$(ConfigurationName)\." "-I$(QTDIR)\include\QtCore" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtSvg" "-I$(QTDIR)\include\QtXml" "-I.\include" "-I.\include\cime" "-I.\include\pugixml" "-I.\include\rtdb"</Command>
-    </CustomBuild>
     <ClInclude Include="svgmodel.h" />
     <ClInclude Include="SvgTransformer.h" />
     <ClInclude Include="SvgUtils.h" />

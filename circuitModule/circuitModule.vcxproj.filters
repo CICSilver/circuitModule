@@ -4,9 +4,6 @@
     <ClCompile Include="include\pugixml\pugixml.cpp">
       <Filter>thirdparty\pugixml</Filter>
     </ClCompile>
-    <ClCompile Include="secwidget.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="GeneratedFiles\Debug_exe\moc_secwidget.cpp">
       <Filter>Generated Files\Debug_exe</Filter>
     </ClCompile>
@@ -166,9 +163,6 @@
     </CustomBuild>
     <CustomBuild Include="mainwindow.qrc">
       <Filter>resources</Filter>
-    </CustomBuild>
-    <CustomBuild Include="secwidget.h">
-      <Filter>Header Files</Filter>
     </CustomBuild>
     <CustomBuild Include="InteractiveSvgItem.h">
       <Filter>Header Files</Filter>

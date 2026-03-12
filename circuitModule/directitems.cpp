@@ -20,6 +20,9 @@
 #define DIRECT_LOGIC_FRAME_TITLE_FONT_SIZE 8
 // 虚实回路相关常量
 #define DIRECT_WHOLE_LABEL_FONT_SIZE 8	// 虚实回路中虚回路名称字体大小
+#define DIRECT_WHOLE_SIDE_LABEL_TEXT_WIDTH 180	// 虚实回路侧边标签文本宽度
+#define DIRECT_WHOLE_SIDE_LABEL_SAFE_DISTANCE 120	// 虚实回路IED内部安全距离
+#define DIRECT_WHOLE_CENTER_ARROW_MIN_LENGTH 120	// 虚实回路中间实线箭头最小长度
 #define DIRECT_WHOLE_SIDE_LABEL_VERTICAL_PADDING 3	// 虚实回路侧边标签上下间距
 #define DIRECT_WHOLE_SIDE_LABEL_LINE_GAP 2	// 虚实回路侧边标签与线条间距
 #define DIRECT_WHOLE_SIDE_LABEL_BRACE_GAP 6	// 虚实回路侧边标签与括号间距
@@ -440,8 +443,8 @@ QRectF LogicFrameItem::buildLegendRect() const
 	QFont font = QApplication::font();
 	font.setPointSize(LogicFrameItem::TitleFontPointSize());
 	QFontMetrics metrics(font);
-	qreal descWidth = 180.0;
-	qreal descHeight = metrics.height() * 2 + 10;
+	qreal descWidth = 150.0;
+	qreal descHeight = metrics.height() * 2 + 30;
 	return QRectF(m_rect.x(), m_rect.y() - descHeight - 20, descWidth, descHeight);
 }
 
@@ -1027,6 +1030,26 @@ int DirectVirtualLineItem::LabelFontPointSize()
 	return DIRECT_WHOLE_LABEL_FONT_SIZE;
 }
 
+qreal DirectVirtualLineItem::SideLabelTextWidth()
+{
+	return DIRECT_WHOLE_SIDE_LABEL_TEXT_WIDTH;
+}
+
+qreal DirectVirtualLineItem::SideLabelMaxWidth()
+{
+	return SideLabelTextWidth();
+}
+
+qreal DirectVirtualLineItem::SideLabelSafeDistance()
+{
+	return DIRECT_WHOLE_SIDE_LABEL_SAFE_DISTANCE;
+}
+
+qreal DirectVirtualLineItem::CenterArrowMinLength()
+{
+	return DIRECT_WHOLE_CENTER_ARROW_MIN_LENGTH;
+}
+
 qreal DirectVirtualLineItem::SideLabelVerticalPadding()
 {
 	return DIRECT_WHOLE_SIDE_LABEL_VERTICAL_PADDING;
@@ -1113,24 +1136,29 @@ void DirectVirtualLineItem::paint(QPainter* painter, const QStyleOptionGraphicsI
 	painter->setPen(Qt::white);
 	if (m_valueVisible)
 	{
+		int valueVerticalAlign = Qt::AlignVCenter;
 		if (!m_startValRect.isNull())
 		{
-			painter->drawText(m_startValRect, Qt::AlignCenter, m_outValStr);
+			bool startValueOnLeft = m_startValRect.center().x() <= m_startIconPt.x();
+			int startValueAlign = startValueOnLeft ? (valueVerticalAlign | Qt::AlignRight) : (valueVerticalAlign | Qt::AlignLeft);
+			painter->drawText(m_startValRect, startValueAlign, m_outValStr);
 		}
 		if (!m_endValRect.isNull())
 		{
-			painter->drawText(m_endValRect, Qt::AlignCenter, m_inValStr);
+			bool endValueOnLeft = m_endValRect.center().x() <= m_endIconPt.x();
+			int endValueAlign = endValueOnLeft ? (valueVerticalAlign | Qt::AlignRight) : (valueVerticalAlign | Qt::AlignLeft);
+			painter->drawText(m_endValRect, endValueAlign, m_inValStr);
 		}
 	}
 	if (!m_leftLabelRect.isNull() && !m_leftLabelStr.isEmpty())
 	{
 		QRectF leftDrawRect = m_leftLabelRect.adjusted(0.0, 0.0, 0.0, -SideLabelBottomPadding());
-		painter->drawText(leftDrawRect, Qt::AlignBottom | Qt::AlignHCenter, m_leftLabelStr);
+		painter->drawText(leftDrawRect, Qt::AlignBottom | Qt::AlignLeft, m_leftLabelStr);
 	}
 	if (!m_rightLabelRect.isNull() && !m_rightLabelStr.isEmpty())
 	{
 		QRectF rightDrawRect = m_rightLabelRect.adjusted(0.0, 0.0, 0.0, -SideLabelBottomPadding());
-		painter->drawText(rightDrawRect, Qt::AlignBottom | Qt::AlignHCenter, m_rightLabelStr);
+		painter->drawText(rightDrawRect, Qt::AlignBottom | Qt::AlignLeft, m_rightLabelStr);
 	}
 	if (m_leftLabelStr.isEmpty() && m_rightLabelStr.isEmpty() && !m_descRect.isNull())
 	{

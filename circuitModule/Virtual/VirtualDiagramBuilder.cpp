@@ -3,6 +3,7 @@
 #include <QFontMetrics>
 
 #define VIRTUAL_MAINT_PLATE_OUTER_GAP 30	// 虚回路区与检修压板整体的间距
+#define VIRTUAL_VALUE_ICON_SAFE_GAP 10	// 值和图标之间的安全距离
 
 using utils::ColorHelper;
 
@@ -198,10 +199,12 @@ void VirtualDiagramBuilder::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QL
 				QFont font;
 				font.setPointSize(18);
 				QFontMetrics fm(font);
-				int valWidth = fm.width("000.00");
+				QString valueWidthSampleText = "000.00";
+				int valWidth = fm.width(valueWidthSampleText);
 				int startOffset = ICON_LENGTH * 4 + rect->inner_gap;
 				int iconOffset = ICON_LENGTH + rect->inner_gap;
-				int valGap = rect->inner_gap * 2 + valWidth;
+				int valueLeftOffset = valWidth + VIRTUAL_VALUE_ICON_SAFE_GAP;
+				int valueRightOffset = ICON_LENGTH + VIRTUAL_VALUE_ICON_SAFE_GAP;
 				int iedDistance = IED_HORIZONTAL_DISTANCE - rect->inner_gap * 4;
 				if (isSideSource)
 				{
@@ -220,11 +223,11 @@ void VirtualDiagramBuilder::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QL
 						endPt_X + rect->inner_gap :
 						endPt_X - iconOffset;
 					startVal_X = isLeft ?
-						startIconPt_X - valGap :
-						startIconPt_X + iconOffset;
+						startIconPt_X - valueLeftOffset :
+						startIconPt_X + valueRightOffset;
 					endVal_X = isLeft ?
-						endIconPt_X + iconOffset :
-						endIconPt_X - valGap;
+						endIconPt_X + valueRightOffset :
+						endIconPt_X - valueLeftOffset;
 					// 目标 <- 源 -> 目标
 					pVtLine->circuitDesc = isLeft ?
 						QString("%1 -> %2").arg(pCircuit->srcDesc, pCircuit->destDesc) :
@@ -247,11 +250,11 @@ void VirtualDiagramBuilder::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QL
 						endPt_X - iconOffset :
 						endPt_X + rect->inner_gap;
 					startVal_X = isLeft ?
-						startIconPt_X + iconOffset :
-						startIconPt_X - valGap;
+						startIconPt_X + valueRightOffset :
+						startIconPt_X - valueLeftOffset;
 					endVal_X = isLeft ?
-						endIconPt_X - valGap :
-						endIconPt_X + iconOffset;
+						endIconPt_X - valueLeftOffset :
+						endIconPt_X + valueRightOffset;
 					// 源 -> 目标 <- 源
 					pVtLine->circuitDesc = isLeft ?
 						QString("%1 <- %2").arg(pCircuit->destDesc, pCircuit->srcDesc) :
@@ -277,8 +280,8 @@ void VirtualDiagramBuilder::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QL
 				pVtLine->endPoint = QPoint(endPt_X, pt_Y);
 				pVtLine->startIconPt = QPoint(startIconPt_X, icon_Y);
 				pVtLine->endIconPt = QPoint(endIconPt_X, icon_Y);
-				pVtLine->startValRect = QRect(QPoint(startVal_X, icon_Y), QPoint(startVal_X + valWidth, icon_Y));
-				pVtLine->endValRect = QRect(QPoint(endVal_X, icon_Y), QPoint(endVal_X + valWidth, icon_Y));
+				pVtLine->startValRect = QRect(QPoint(startVal_X, icon_Y), QSize(valWidth, fm.height()));
+				pVtLine->endValRect = QRect(QPoint(endVal_X, icon_Y), QSize(valWidth, fm.height()));
 				pVtLine->circuitDescRect = QRect(QPoint(descRect_X, pt_Y - fm.height() * 1.2), QSize(iedDistance, fm.height()));
 				pLogicLine->virtual_line_list.append(pVtLine);
 				// 生成并调整当前通道的压板矩形位置

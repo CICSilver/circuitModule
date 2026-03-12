@@ -148,6 +148,10 @@ public:
 	DirectVirtualLineItem(QGraphicsItem* parent = NULL);
 	~DirectVirtualLineItem();
 	static int LabelFontPointSize();
+	static qreal SideLabelTextWidth();
+	static qreal SideLabelMaxWidth();
+	static qreal SideLabelSafeDistance();
+	static qreal CenterArrowMinLength();
 	static qreal SideLabelVerticalPadding();
 	static qreal SideLabelLineGap();
 	static qreal SideLabelBraceGap();

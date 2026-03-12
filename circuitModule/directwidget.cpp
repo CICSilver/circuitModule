@@ -160,13 +160,73 @@ static QRectF build_virtual_ied_outer_rect(const IedRect* rect)
 	return QRectF(rect->x, rect->y, rect->width, rect->height);
 }
 
+static void logic_add_frame_item(QGraphicsScene* scene, const QRectF& rect, const QString& title, const QColor& borderColor, bool showLegend)
+{
+	if (!scene || rect.isNull())
+	{
+		return;
+	}
+	LogicFrameItem* frameItem = new LogicFrameItem();
+	frameItem->setFrame(rect, title, borderColor, showLegend);
+	frameItem->setZValue(-2.0);
+	scene->addItem(frameItem);
+}
+
+static void logic_add_ied_item(QGraphicsScene* scene, const IedRect* rect)
+{
+	if (!scene || !rect)
+	{
+		return;
+	}
+	IedItem* item = new IedItem();
+	item->setFromIedRect(*rect, false);
+	item->setZValue(-1.0);
+	scene->addItem(item);
+}
+
+static void logic_add_ied_item_list(QGraphicsScene* scene, const QList<IedRect*>& rectList)
+{
+	for (int i = 0; i < rectList.size(); ++i)
+	{
+		logic_add_ied_item(scene, rectList.at(i));
+	}
+}
+
+static QString whole_build_elided_label_text(const QString& text, const QFontMetrics& metrics, int width)
+{
+	if (text.isEmpty() || width <= 0)
+	{
+		return QString();
+	}
+	QString suffix = QString::fromLatin1("..");
+	int suffixWidth = metrics.width(suffix);
+	if (width < suffixWidth)
+	{
+		return QString();
+	}
+	if (metrics.width(text) <= width)
+	{
+		return text;
+	}
+	QString result = text;
+	while (!result.isEmpty() && metrics.width(result + suffix) > width)
+	{
+		result.chop(1);
+	}
+	if (result.isEmpty())
+	{
+		return suffix;
+	}
+	return result + suffix;
+}
+
 static void whole_build_side_label_layout(const VirtualCircuitLine* virtualLine, const WholeGroupDecor* groupDecor, QString& leftText, QRectF& leftRect, QString& rightText, QRectF& rightRect)
 {
 	leftText.clear();
 	rightText.clear();
 	leftRect = QRectF();
 	rightRect = QRectF();
-	if (!virtualLine || !virtualLine->pVirtualCircuit || !groupDecor)
+	if (!virtualLine || !virtualLine->pVirtualCircuit || !groupDecor || !virtualLine->pSrcIedRect || !virtualLine->pDestIedRect)
 	{
 		return;
 	}
@@ -174,27 +234,38 @@ static void whole_build_side_label_layout(const VirtualCircuitLine* virtualLine,
 	QFont font = QApplication::font();
 	font.setPointSize(DirectVirtualLineItem::LabelFontPointSize());
 	QFontMetrics metrics(font);
-	bool startOnLeft = virtualLine->startPoint.x() <= virtualLine->endPoint.x();
-	QString leftName = startOnLeft ? virtualCircuit->srcDesc : virtualCircuit->destDesc;
-	QString rightName = startOnLeft ? virtualCircuit->destDesc : virtualCircuit->srcDesc;
+	bool srcOnLeft = virtualLine->pSrcIedRect->x <= virtualLine->pDestIedRect->x;
+	const IedRect* leftIedRect = srcOnLeft ? virtualLine->pSrcIedRect : virtualLine->pDestIedRect;
+	const IedRect* rightIedRect = srcOnLeft ? virtualLine->pDestIedRect : virtualLine->pSrcIedRect;
+	QString leftName = srcOnLeft ? virtualCircuit->srcDesc : virtualCircuit->destDesc;
+	QString rightName = srcOnLeft ? virtualCircuit->destDesc : virtualCircuit->srcDesc;
 	qreal verticalPadding = DirectVirtualLineItem::SideLabelVerticalPadding();
 	qreal labelHeight = metrics.lineSpacing() + verticalPadding + verticalPadding;
 	qreal labelTop = virtualLine->startPoint.y() - labelHeight - DirectVirtualLineItem::SideLabelLineGap();
-	qreal leftLineStartX = qMin((qreal)virtualLine->startPoint.x(), (qreal)virtualLine->endPoint.x());
-	qreal leftLineEndX = groupDecor->leftBraceRect.left() - DirectVirtualLineItem::SideLabelBraceGap();
-	qreal rightLineStartX = groupDecor->rightBraceRect.right() + DirectVirtualLineItem::SideLabelBraceGap();
-	qreal rightLineEndX = qMax((qreal)virtualLine->startPoint.x(), (qreal)virtualLine->endPoint.x());
-	if (leftLineEndX > leftLineStartX && !leftName.isEmpty())
+	qreal textWidth = DirectVirtualLineItem::SideLabelTextWidth();
+	qreal leftLabelStartX = leftIedRect->x + leftIedRect->width;
+	qreal leftLabelEndLimit = groupDecor->leftBraceRect.left();
+	qreal rightLabelStartX = groupDecor->rightBraceRect.right();
+	qreal rightLabelEndLimit = rightIedRect->x;
+	qreal leftAvailableWidth = leftLabelEndLimit - leftLabelStartX;
+	qreal rightAvailableWidth = rightLabelEndLimit - rightLabelStartX;
+	if (leftAvailableWidth > 0 && !leftName.isEmpty())
 	{
-		int leftWidth = (int)(leftLineEndX - leftLineStartX);
-		leftText = metrics.elidedText(leftName, Qt::ElideRight, leftWidth);
-		leftRect = QRectF(leftLineStartX, labelTop, leftWidth, labelHeight);
+		qreal leftWidth = qMin(textWidth, leftAvailableWidth);
+		leftText = whole_build_elided_label_text(leftName, metrics, (int)leftWidth);
+		if (!leftText.isEmpty())
+		{
+			leftRect = QRectF(leftLabelStartX, labelTop, leftWidth, labelHeight);
+		}
 	}
-	if (rightLineEndX > rightLineStartX && !rightName.isEmpty())
+	if (rightAvailableWidth > 0 && !rightName.isEmpty())
 	{
-		int rightWidth = (int)(rightLineEndX - rightLineStartX);
-		rightText = metrics.elidedText(rightName, Qt::ElideRight, rightWidth);
-		rightRect = QRectF(rightLineStartX, labelTop, rightWidth, labelHeight);
+		qreal rightWidth = qMin(textWidth, rightAvailableWidth);
+		rightText = whole_build_elided_label_text(rightName, metrics, (int)rightWidth);
+		if (!rightText.isEmpty())
+		{
+			rightRect = QRectF(rightLabelStartX, labelTop, rightWidth, labelHeight);
+		}
 	}
 }
 
@@ -641,62 +712,34 @@ void DirectWidget::ParseFromLogicSvg(const LogicSvg& svg)
 	m_scene->setSceneRect(0, 0, svg.viewBoxWidth, svg.viewBoxHeight);
 	QString reviewTitle = build_logic_review_title();
 	QString effectTitle = build_logic_effect_title();
+	bool hasLeftFrame = !svg.leftIedRectList.isEmpty();
+	bool hasCenterFrame = false;
+	QRectF centerFrameRect;
+	QColor centerFrameColor;
 	if (!svg.centerIedRectList.isEmpty())
 	{
-		LogicFrameItem* frameItem = new LogicFrameItem();
-		frameItem->setFrame(build_logic_external_rect(svg.centerIedRectList, reviewTitle), reviewTitle, utils::ColorHelper::Color(utils::ColorHelper::pure_red), false);
-		frameItem->setZValue(-2.0);
-		m_scene->addItem(frameItem);
+		centerFrameRect = build_logic_external_rect(svg.centerIedRectList, reviewTitle);
+		centerFrameColor = utils::ColorHelper::Color(utils::ColorHelper::pure_red);
+		hasCenterFrame = true;
 	}
 	else if (svg.mainIedRect)
 	{
-		LogicFrameItem* frameItem = new LogicFrameItem();
-		frameItem->setFrame(build_logic_external_rect(svg.mainIedRect, reviewTitle), reviewTitle, utils::ColorHelper::Color(svg.mainIedRect->border_color), false);
-		frameItem->setZValue(-2.0);
-		m_scene->addItem(frameItem);
+		centerFrameRect = build_logic_external_rect(svg.mainIedRect, reviewTitle);
+		centerFrameColor = utils::ColorHelper::Color(svg.mainIedRect->border_color);
+		hasCenterFrame = true;
 	}
-	if (!svg.leftIedRectList.isEmpty())
+	if (hasCenterFrame)
 	{
-		LogicFrameItem* frameItem = new LogicFrameItem();
-		frameItem->setFrame(build_logic_external_rect(svg.leftIedRectList, effectTitle), effectTitle, utils::ColorHelper::Color(svg.leftIedRectList.first()->border_color), true);
-		frameItem->setZValue(-2.0);
-		m_scene->addItem(frameItem);
+		logic_add_frame_item(m_scene, centerFrameRect, reviewTitle, centerFrameColor, !hasLeftFrame);
 	}
-	if (!svg.rightIedRectList.isEmpty())
+	if (hasLeftFrame)
 	{
-		LogicFrameItem* frameItem = new LogicFrameItem();
-		frameItem->setFrame(build_logic_external_rect(svg.rightIedRectList, effectTitle), effectTitle, utils::ColorHelper::Color(svg.rightIedRectList.first()->border_color), false);
-		frameItem->setZValue(-2.0);
-		m_scene->addItem(frameItem);
+		logic_add_frame_item(m_scene, build_logic_external_rect(svg.leftIedRectList, effectTitle), effectTitle, utils::ColorHelper::Color(svg.leftIedRectList.first()->border_color), true);
 	}
-	if (svg.mainIedRect)
-	{
-		IedItem* item = new IedItem();
-		item->setFromIedRect(*svg.mainIedRect, false);
-		item->setZValue(-1.0);
-		m_scene->addItem(item);
-	}
-	for (int i = 0; i < svg.centerIedRectList.size(); ++i)
-	{
-		IedItem* item = new IedItem();
-		item->setFromIedRect(*svg.centerIedRectList[i], false);
-		item->setZValue(-1.0);
-		m_scene->addItem(item);
-	}
-	for (int i = 0; i < svg.leftIedRectList.size(); ++i)
-	{
-		IedItem* item = new IedItem();
-		item->setFromIedRect(*svg.leftIedRectList[i], false);
-		item->setZValue(-1.0);
-		m_scene->addItem(item);
-	}
-	for (int i = 0; i < svg.rightIedRectList.size(); ++i)
-	{
-		IedItem* item = new IedItem();
-		item->setFromIedRect(*svg.rightIedRectList[i], false);
-		item->setZValue(-1.0);
-		m_scene->addItem(item);
-	}
+	logic_add_ied_item(m_scene, svg.mainIedRect);
+	logic_add_ied_item_list(m_scene, svg.centerIedRectList);
+	logic_add_ied_item_list(m_scene, svg.leftIedRectList);
+	logic_add_ied_item_list(m_scene, svg.rightIedRectList);
 	QSet<QString> centerIedNameSet;
 	for (int centerIndex = 0; centerIndex < svg.centerIedRectList.size(); ++centerIndex)
 	{
@@ -1087,6 +1130,7 @@ void DirectWidget::ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64
 		item->setFromPlateRect(plateIt.value(), plateIt.key());
 		item->setClosed(true);
 		item->setToolTip(build_plate_tooltip(item));
+		item->setZValue(2.0);
 		m_scene->addItem(item);
 		m_plateItems.insert(plateIt.key(), item);
 	}
@@ -1251,6 +1295,7 @@ void DirectWidget::ParseFromWholeSvg(const WholeCircuitSvg& svg)
 		item->setFromPlateRect(plateIt.value(), plateIt.key());
 		item->setClosed(true);
 		item->setToolTip(build_plate_tooltip(item));
+		item->setZValue(2.0);
 		m_scene->addItem(item);
 		m_plateItems.insert(plateIt.key(), item);
 	}

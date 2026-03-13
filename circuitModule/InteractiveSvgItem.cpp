@@ -20,13 +20,15 @@
 #include <sstream>
 #include <QToolTip>
 #include <QTimer>
-// 闪烁间隔
-#define BLINK_CYCLE_MS 1000
+enum InteractiveSvgConfig
+{
+	BLINK_CYCLE_MS = 1000	// 闪烁周期
+};
 #ifndef SVG_PIXMAP_REGEN_SCALE_THRESHOLD
-#define SVG_PIXMAP_REGEN_SCALE_THRESHOLD 1.5
+#define SVG_PIXMAP_REGEN_SCALE_THRESHOLD 1.5	// SVG 位图重建的缩放阈值，保留预编译覆写能力
 #endif
 #ifndef SVG_PIXMAP_REGEN_MAX_DIM
-#define SVG_PIXMAP_REGEN_MAX_DIM 8192
+#define SVG_PIXMAP_REGEN_MAX_DIM 8192	// SVG 位图重建的最大边长，保留预编译覆写能力
 #endif
 namespace utils
 {

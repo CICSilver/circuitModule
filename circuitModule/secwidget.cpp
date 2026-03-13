@@ -7,8 +7,11 @@
 #include <QFont>
 #include "svgmodel.h"
 #include "SvgUtils.h"
-#define SECWIDGET_WIDTH		800
-#define SECWIDGET_HEIGHT	600
+enum SecWidgetConfig
+{
+	SECWIDGET_WIDTH = 800,	// 二次回路窗口默认宽度
+	SECWIDGET_HEIGHT = 600	// 二次回路窗口默认高度
+};
 SecWidget::SecWidget(QWidget *parent)
 	: QWidget(parent)
 	, m_view(new QGraphicsView(this))

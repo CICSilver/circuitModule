@@ -11,30 +11,42 @@
 #include <QPixmap>
 #include <qmath.h>
 
-// 光纤回路相关常量
-#define DIRECT_PORT_TEXT_OFFSET 12	// 端口文字距连接点偏移
-#define DIRECT_ARROW_OFFSET 10	// 箭头距连接点偏移
-#define DIRECT_BOUND_MARGIN 12	// 交互区域额外边距
 #define DIRECT_DOUBLE_ARROW_GAP_RATIO 1.5	// 双向箭头前后错开比例
-// 逻辑回路相关常量
-#define DIRECT_LOGIC_FRAME_TITLE_FONT_SIZE 8
-// 虚实回路相关常量
-#define DIRECT_WHOLE_LABEL_FONT_SIZE 8	// 虚实回路中虚回路名称字体大小
-#define DIRECT_WHOLE_SIDE_LABEL_TEXT_WIDTH 180	// 虚实回路侧边标签文本宽度
-#define DIRECT_WHOLE_SIDE_LABEL_SAFE_DISTANCE 120	// 虚实回路IED内部安全距离
-#define DIRECT_WHOLE_SIDE_LABEL_VERTICAL_PADDING 3	// 虚实回路侧边标签上下间距
-#define DIRECT_WHOLE_SIDE_LABEL_LINE_GAP 2	// 虚实回路侧边标签与线条间距
-#define DIRECT_WHOLE_SIDE_LABEL_BRACE_GAP 6	// 虚实回路侧边标签与括号间距
-#define DIRECT_WHOLE_SIDE_LABEL_BOTTOM_PADDING 1	// 虚实回路侧边标签底边补偿
-// 检修压板相关常量
-#define DIRECT_MAINT_PLATE_CIRCLE_RADIUS 5
-#define DIRECT_MAINT_PLATE_ICON_SPAN 36
-#define DIRECT_MAINT_PLATE_BODY_WIDTH 26
-#define DIRECT_MAINT_PLATE_BODY_HEIGHT 10
-#define DIRECT_MAINT_PLATE_TEXT_HEIGHT 18
-#define DIRECT_MAINT_PLATE_TEXT_FONT_SIZE 8
-#define DIRECT_MAINT_PLATE_TEXT_ICON_GAP 30	// 检修压板文本与图标之间的间距
-#define DIRECT_MAINT_PLATE_BOTTOM_MARGIN 6
+enum DirectLineConfig
+{
+	DIRECT_PORT_TEXT_OFFSET = 12,	// 端口文字距连接点偏移
+	DIRECT_ARROW_OFFSET = 10,		// 箭头距连接点偏移
+	DIRECT_BOUND_MARGIN = 12		// 交互区域额外边距
+};
+
+
+enum LogicFrameConfig
+{
+	DIRECT_LOGIC_FRAME_TITLE_FONT_SIZE = 8	// 逻辑回路标题字体大小
+};
+
+enum WholeLabelConfig
+{
+	DIRECT_WHOLE_LABEL_FONT_SIZE = 8,			// 虚实回路中虚回路名称字体大小
+	DIRECT_WHOLE_SIDE_LABEL_TEXT_WIDTH = 180,	// 虚实回路侧边标签文本宽度
+	DIRECT_WHOLE_SIDE_LABEL_SAFE_DISTANCE = 120,	// 虚实回路IED内部安全距离
+	DIRECT_WHOLE_SIDE_LABEL_VERTICAL_PADDING = 3,	// 虚实回路侧边标签上下间距
+	DIRECT_WHOLE_SIDE_LABEL_LINE_GAP = 2,		// 虚实回路侧边标签与线条间距
+	DIRECT_WHOLE_SIDE_LABEL_BRACE_GAP = 6,		// 虚实回路侧边标签与括号间距
+	DIRECT_WHOLE_SIDE_LABEL_BOTTOM_PADDING = 1	// 虚实回路侧边标签底边补偿
+};
+
+enum DirectMaintainPlateConfig
+{
+	DIRECT_MAINT_PLATE_CIRCLE_RADIUS = 5,	// 检修压板圆点半径
+	DIRECT_MAINT_PLATE_ICON_SPAN = 36,		// 检修压板图标横向跨度
+	DIRECT_MAINT_PLATE_BODY_WIDTH = 26,		// 检修压板主体宽度
+	DIRECT_MAINT_PLATE_BODY_HEIGHT = 10,	// 检修压板主体高度
+	DIRECT_MAINT_PLATE_TEXT_HEIGHT = 18,	// 检修压板文本区域高度
+	DIRECT_MAINT_PLATE_TEXT_FONT_SIZE = 8,	// 检修压板文本字体大小
+	DIRECT_MAINT_PLATE_TEXT_ICON_GAP = 30,	// 检修压板文本与图标之间的间距
+	DIRECT_MAINT_PLATE_BOTTOM_MARGIN = 6	// 检修压板整体距底边的间距
+};
 
 directItemBase::~directItemBase()
 {}

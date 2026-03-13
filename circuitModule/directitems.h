@@ -19,11 +19,11 @@ struct OpticalCircuitLine;
 struct WholeGroupDecor;
 enum WholePortConfig
 {
-	WHOLE_PORT_TEXT_FONT_SIZE = 8,
-	WHOLE_PORT_TEXT_LINE_GAP = 2,
-	WHOLE_PORT_TEXT_SIDE_GAP = 8,
-	WHOLE_PORT_TEXT_VERTICAL_PADDING = 2,
-	WHOLE_CENTER_ARROW_MIN_LENGTH = 120
+	WHOLE_PORT_TEXT_FONT_SIZE = 8,		// 实回路端口文本字体大小
+	WHOLE_PORT_TEXT_LINE_GAP = 2,		// 实回路端口文本与实线的垂直间距
+	WHOLE_PORT_TEXT_SIDE_GAP = 8,		// 实回路端口文本在左右分区时的水平留白
+	WHOLE_PORT_TEXT_VERTICAL_PADDING = 2,	// 实回路端口文本矩形的上下补偿
+	WHOLE_CENTER_ARROW_MIN_LENGTH = 120	// 虚实回路中间实线的最小长度
 };
 class directItemBase  : public QGraphicsItem
 {

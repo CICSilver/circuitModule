@@ -5,27 +5,23 @@
 #include <QLineF>
 #ifndef SVG_DEFAULT_VALUE
 #define SVG_DEFAULT_VALUE
-// 默认IED矩形宽高
-#define RECT_DEFAULT_WIDTH 280
-#define RECT_DEFAULT_HEIGHT 100
-
-// IED矩形 水平间距
-#define IED_HORIZONTAL_DISTANCE 400
-// 垂直间距
-#define IED_VERTICAL_DISTANCE 15
-// 虚链路垂直间距
-#define CIRCUIT_VERTICAL_DISTANCE 15
-// 图标高/宽度
-#define ICON_LENGTH 20
-
-#define SVG_VIEWBOX_WIDTH	2200
-#define SVG_VIEWBOX_HEIGHT	1500
-#define ARROW_LEN			10	// 箭头长度
-#define CONN_R				3	// 连接点半径
-#define PLATE_GAP			5	// 压板矩形内部间距
-#define PLATE_WIDTH			70	// 压板图形宽度，圆间距40，圆半径均为5
-#define PLATE_HEIGHT		15	// 压板图形高度
-#define PLATE_CIRCLE_RADIUS	5	// 压板图形圆半径
+enum SvgModelConfig
+{
+	RECT_DEFAULT_WIDTH = 280,		// 默认IED矩形宽度
+	RECT_DEFAULT_HEIGHT = 100,	// 默认IED矩形高度
+	IED_HORIZONTAL_DISTANCE = 400,	// IED矩形水平间距
+	IED_VERTICAL_DISTANCE = 15,	// IED矩形垂直间距
+	CIRCUIT_VERTICAL_DISTANCE = 15,	// 虚链路垂直间距
+	ICON_LENGTH = 20,			// 图标宽高
+	SVG_VIEWBOX_WIDTH = 2200,	// 默认视口宽度
+	SVG_VIEWBOX_HEIGHT = 1500,	// 默认视口高度
+	ARROW_LEN = 10,			// 箭头长度
+	CONN_R = 3,				// 连接点半径
+	PLATE_GAP = 5,			// 压板矩形内部间距
+	PLATE_WIDTH = 70,			// 压板图形宽度，圆间距40，圆半径均为5
+	PLATE_HEIGHT = 15,		// 压板图形高度
+	PLATE_CIRCLE_RADIUS = 5	// 压板图形圆半径
+};
 #endif
 
 struct CircuitLine;

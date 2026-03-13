@@ -2,8 +2,11 @@
 #include <QFont>
 #include <QFontMetrics>
 
-#define VIRTUAL_MAINT_PLATE_OUTER_GAP 30	// 虚回路区与检修压板整体的间距
-#define VIRTUAL_VALUE_ICON_SAFE_GAP 10	// 值和图标之间的安全距离
+enum VirtualDiagramConfig
+{
+	VIRTUAL_MAINT_PLATE_OUTER_GAP = 30,	// 虚回路区与检修压板整体的间距
+	VIRTUAL_VALUE_ICON_SAFE_GAP = 10		// 值和图标之间的安全距离
+};
 
 using utils::ColorHelper;
 

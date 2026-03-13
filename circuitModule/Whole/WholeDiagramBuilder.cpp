@@ -3,15 +3,15 @@
 #include "directitems.h"
 #include <QFont>
 #include <QFontMetrics>
-enum wholeDiagramConfig
+enum WholeDiagramConfig
 {
-	WHOLE_GROUP_BRACE_WIDTH = 18,
-	WHOLE_GROUP_ARROW_MARGIN = 16,
-	WHOLE_GROUP_SWITCH_ICON_WIDTH = 86,
-	WHOLE_GROUP_SWITCH_ICON_HEIGHT = 60,
-	WHOLE_GROUP_SWITCH_ICON_SIDE_GAP = 4,
-	WHOLE_GROUP_TOP_BOTTOM_MARGIN = 4,
-	WHOLE_VALUE_ICON_SAFE_GAP = 4
+	WHOLE_GROUP_BRACE_WIDTH = 18,		// 虚实回路分组大括号宽度
+	WHOLE_GROUP_ARROW_MARGIN = 16,		// 大括号与中间实线之间的留白
+	WHOLE_GROUP_SWITCH_ICON_WIDTH = 86,	// 虚实回路交换机图标宽度
+	WHOLE_GROUP_SWITCH_ICON_HEIGHT = 60,	// 虚实回路交换机图标高度
+	WHOLE_GROUP_SWITCH_ICON_SIDE_GAP = 4,	// 交换机图标与实线之间的留白
+	WHOLE_GROUP_TOP_BOTTOM_MARGIN = 4,	// 分组区域上下额外边距
+	WHOLE_VALUE_ICON_SAFE_GAP = 4		// 值文本与图标之间的安全间距
 };
 
 static bool whole_fill_optical_side_ports(const OpticalCircuit* opticalCircuit, const QString& iedName, QString& iedPort, QString& switchPort)

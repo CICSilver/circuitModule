@@ -17,6 +17,14 @@ struct IedRect;
 struct VirtualCircuitLine;
 struct OpticalCircuitLine;
 struct WholeGroupDecor;
+enum WholePortConfig
+{
+	WHOLE_PORT_TEXT_FONT_SIZE = 8,
+	WHOLE_PORT_TEXT_LINE_GAP = 2,
+	WHOLE_PORT_TEXT_SIDE_GAP = 8,
+	WHOLE_PORT_TEXT_VERTICAL_PADDING = 2,
+	WHOLE_CENTER_ARROW_MIN_LENGTH = 120
+};
 class directItemBase  : public QGraphicsItem
 {
 public:
@@ -364,6 +372,8 @@ private:
 	QRectF m_rightBraceRect;
 	QLineF m_centerArrowLine;
 	QRectF m_switchIconRect;
+	QRectF m_leftPortRect;
+	QRectF m_rightPortRect;
 	QColor m_braceColor;
 	QColor m_centerLineColor;
 	bool m_braceBlinking;
@@ -372,6 +382,8 @@ private:
 	bool m_centerLineBlinkOn;
 	bool m_hasSwitchIcon;
 	QString m_switchIedName;
+	QString m_leftPortText;
+	QString m_rightPortText;
 };
 
 class DirectOpticalLineItem : public directItemBase

@@ -22,7 +22,6 @@
 #define DIRECT_WHOLE_LABEL_FONT_SIZE 8	// 虚实回路中虚回路名称字体大小
 #define DIRECT_WHOLE_SIDE_LABEL_TEXT_WIDTH 180	// 虚实回路侧边标签文本宽度
 #define DIRECT_WHOLE_SIDE_LABEL_SAFE_DISTANCE 120	// 虚实回路IED内部安全距离
-#define DIRECT_WHOLE_CENTER_ARROW_MIN_LENGTH 120	// 虚实回路中间实线箭头最小长度
 #define DIRECT_WHOLE_SIDE_LABEL_VERTICAL_PADDING 3	// 虚实回路侧边标签上下间距
 #define DIRECT_WHOLE_SIDE_LABEL_LINE_GAP 2	// 虚实回路侧边标签与线条间距
 #define DIRECT_WHOLE_SIDE_LABEL_BRACE_GAP 6	// 虚实回路侧边标签与括号间距
@@ -1047,7 +1046,7 @@ qreal DirectVirtualLineItem::SideLabelSafeDistance()
 
 qreal DirectVirtualLineItem::CenterArrowMinLength()
 {
-	return DIRECT_WHOLE_CENTER_ARROW_MIN_LENGTH;
+	return WHOLE_CENTER_ARROW_MIN_LENGTH;
 }
 
 qreal DirectVirtualLineItem::SideLabelVerticalPadding()
@@ -1358,6 +1357,14 @@ QRectF DirectWholeGroupItem::boundingRect() const
 	{
 		rect |= m_switchIconRect;
 	}
+	if (!m_leftPortRect.isNull())
+	{
+		rect |= m_leftPortRect;
+	}
+	if (!m_rightPortRect.isNull())
+	{
+		rect |= m_rightPortRect;
+	}
 	return rect.adjusted(-8.0, -8.0, 8.0, 8.0);
 }
 
@@ -1368,12 +1375,18 @@ void DirectWholeGroupItem::paint(QPainter* painter, const QStyleOptionGraphicsIt
 	painter->setBrush(Qt::NoBrush);
 	if (!m_braceBlinking || m_braceBlinkOn)
 	{
+		painter->save();
 		QPen bracePen(m_braceColor);
 		bracePen.setStyle(Qt::DashLine);
-		bracePen.setWidth(1);
+		bracePen.setWidth(0);
+		bracePen.setCapStyle(Qt::FlatCap);
+		bracePen.setJoinStyle(Qt::MiterJoin);
+		bracePen.setCosmetic(true);
+		painter->setRenderHint(QPainter::Antialiasing, false);
 		painter->setPen(bracePen);
 		direct_draw_whole_brace(painter, m_leftBraceRect, true);
 		direct_draw_whole_brace(painter, m_rightBraceRect, false);
+		painter->restore();
 	}
 	QPointF arrowStartPoint = m_centerArrowLine.p1();
 	QPointF arrowEndPoint = m_centerArrowLine.p2();
@@ -1415,6 +1428,21 @@ void DirectWholeGroupItem::paint(QPainter* painter, const QStyleOptionGraphicsIt
 			painter->drawRect(m_switchIconRect);
 		}
 	}
+	if (!m_leftPortText.isEmpty() || !m_rightPortText.isEmpty())
+	{
+		QFont font = painter->font();
+		font.setPointSize(WHOLE_PORT_TEXT_FONT_SIZE);
+		painter->setFont(font);
+		painter->setPen(Qt::white);
+		if (!m_leftPortText.isEmpty() && !m_leftPortRect.isNull())
+		{
+			painter->drawText(m_leftPortRect, Qt::AlignHCenter | Qt::AlignVCenter, m_leftPortText);
+		}
+		if (!m_rightPortText.isEmpty() && !m_rightPortRect.isNull())
+		{
+			painter->drawText(m_rightPortRect, Qt::AlignHCenter | Qt::AlignVCenter, m_rightPortText);
+		}
+	}
 }
 
 void DirectWholeGroupItem::setFromWholeGroupDecor(const WholeGroupDecor& groupDecor)
@@ -1426,6 +1454,10 @@ void DirectWholeGroupItem::setFromWholeGroupDecor(const WholeGroupDecor& groupDe
 	m_switchIconRect = groupDecor.switchIconRect;
 	m_hasSwitchIcon = groupDecor.hasSwitchIcon;
 	m_switchIedName = groupDecor.switchIedName;
+	m_leftPortText = groupDecor.leftPortText;
+	m_rightPortText = groupDecor.rightPortText;
+	m_leftPortRect = groupDecor.leftPortRect;
+	m_rightPortRect = groupDecor.rightPortRect;
 	update();
 }
 

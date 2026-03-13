@@ -389,6 +389,8 @@ struct WholeGroupDecor
 		gapStartX = 0;
 		gapEndX = 0;
 		hasSwitchIcon = false;
+		leftPortRect = QRectF();
+		rightPortRect = QRectF();
 	}
 
 	LogicCircuitLine* pLogicLine;
@@ -401,6 +403,10 @@ struct WholeGroupDecor
 	qreal gapEndX;
 	bool hasSwitchIcon;
 	QString switchIedName;
+	QString leftPortText;
+	QString rightPortText;
+	QRectF leftPortRect;
+	QRectF rightPortRect;
 };
 
 struct WholeCircuitSvg : public LogicSvg

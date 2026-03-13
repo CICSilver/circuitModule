@@ -13,6 +13,177 @@ enum wholeDiagramConfig
 	WHOLE_GROUP_TOP_BOTTOM_MARGIN = 4,
 	WHOLE_VALUE_ICON_SAFE_GAP = 4
 };
+
+static bool whole_fill_optical_side_ports(const OpticalCircuit* opticalCircuit, const QString& iedName, QString& iedPort, QString& switchPort)
+{
+	if (!opticalCircuit || iedName.isEmpty())
+	{
+		return false;
+	}
+	if (opticalCircuit->srcIedName == iedName)
+	{
+		iedPort = opticalCircuit->srcIedPort;
+		switchPort = opticalCircuit->destIedPort;
+		return !iedPort.isEmpty() && !switchPort.isEmpty();
+	}
+	if (opticalCircuit->destIedName == iedName)
+	{
+		iedPort = opticalCircuit->destIedPort;
+		switchPort = opticalCircuit->srcIedPort;
+		return !iedPort.isEmpty() && !switchPort.isEmpty();
+	}
+	return false;
+}
+
+static bool whole_fill_direct_ports(const OpticalCircuit* opticalCircuit, const QString& leftIedName, const QString& rightIedName, QString& leftPort, QString& rightPort)
+{
+	if (!opticalCircuit || leftIedName.isEmpty() || rightIedName.isEmpty())
+	{
+		return false;
+	}
+	if (opticalCircuit->srcIedName == leftIedName && opticalCircuit->destIedName == rightIedName)
+	{
+		leftPort = opticalCircuit->srcIedPort;
+		rightPort = opticalCircuit->destIedPort;
+		return !leftPort.isEmpty() && !rightPort.isEmpty();
+	}
+	if (opticalCircuit->srcIedName == rightIedName && opticalCircuit->destIedName == leftIedName)
+	{
+		leftPort = opticalCircuit->destIedPort;
+		rightPort = opticalCircuit->srcIedPort;
+		return !leftPort.isEmpty() && !rightPort.isEmpty();
+	}
+	return false;
+}
+
+static VirtualCircuit* whole_find_first_valid_virtual_circuit(const LogicCircuitLine* pLogicLine)
+{
+	if (!pLogicLine)
+	{
+		return NULL;
+	}
+	for (int i = 0; i < pLogicLine->virtual_line_list.size(); ++i)
+	{
+		VirtualCircuitLine* virtualLine = pLogicLine->virtual_line_list.at(i);
+		if (virtualLine && virtualLine->pVirtualCircuit)
+		{
+			return virtualLine->pVirtualCircuit;
+		}
+	}
+	return NULL;
+}
+
+static void whole_build_group_port_texts(CircuitConfig* circuitConfig, WholeGroupDecor* groupDecor, const LogicCircuitLine* pLogicLine)
+{
+	if (!circuitConfig || !groupDecor || !pLogicLine)
+	{
+		return;
+	}
+	groupDecor->leftPortText.clear();
+	groupDecor->rightPortText.clear();
+	const IedRect* leftIedRect = pLogicLine->pSrcIedRect;
+	const IedRect* rightIedRect = pLogicLine->pDestIedRect;
+	if (!leftIedRect || !rightIedRect)
+	{
+		return;
+	}
+	if (leftIedRect->x > rightIedRect->x)
+	{
+		const IedRect* tempRect = leftIedRect;
+		leftIedRect = rightIedRect;
+		rightIedRect = tempRect;
+	}
+	VirtualCircuit* virtualCircuit = whole_find_first_valid_virtual_circuit(pLogicLine);
+	if (!virtualCircuit)
+	{
+		return;
+	}
+	if (groupDecor->groupMode == WholeGroupMode_Direct)
+	{
+		OpticalCircuit* directOpticalCircuit = circuitConfig->getOpticalByCode(virtualCircuit->leftOpticalCode);
+		QString leftPort;
+		QString rightPort;
+		if (!whole_fill_direct_ports(directOpticalCircuit, leftIedRect->iedName, rightIedRect->iedName, leftPort, rightPort))
+		{
+			return;
+		}
+		groupDecor->leftPortText = leftPort;
+		groupDecor->rightPortText = rightPort;
+		return;
+	}
+	if (groupDecor->groupMode != WholeGroupMode_Switch)
+	{
+		return;
+	}
+	OpticalCircuit* firstOpticalCircuit = circuitConfig->getOpticalByCode(virtualCircuit->leftOpticalCode);
+	OpticalCircuit* secondOpticalCircuit = circuitConfig->getOpticalByCode(virtualCircuit->rightOpticalCode);
+	QString leftDevicePort;
+	QString leftSwitchPort;
+	QString rightDevicePort;
+	QString rightSwitchPort;
+	bool leftMatched = whole_fill_optical_side_ports(firstOpticalCircuit, leftIedRect->iedName, leftDevicePort, leftSwitchPort);
+	bool rightMatched = whole_fill_optical_side_ports(secondOpticalCircuit, rightIedRect->iedName, rightDevicePort, rightSwitchPort);
+	if (!leftMatched)
+	{
+		leftMatched = whole_fill_optical_side_ports(secondOpticalCircuit, leftIedRect->iedName, leftDevicePort, leftSwitchPort);
+	}
+	if (!rightMatched)
+	{
+		rightMatched = whole_fill_optical_side_ports(firstOpticalCircuit, rightIedRect->iedName, rightDevicePort, rightSwitchPort);
+	}
+	if (!leftMatched || !rightMatched)
+	{
+		return;
+	}
+	groupDecor->leftPortText = leftDevicePort + QString::fromLatin1(" / ") + leftSwitchPort;
+	groupDecor->rightPortText = rightSwitchPort + QString::fromLatin1(" / ") + rightDevicePort;
+}
+
+static void whole_build_group_port_layout(WholeGroupDecor* groupDecor)
+{
+	if (!groupDecor)
+	{
+		return;
+	}
+	groupDecor->leftPortRect = QRectF();
+	groupDecor->rightPortRect = QRectF();
+	if (groupDecor->centerArrowLine.isNull())
+	{
+		return;
+	}
+	QFont font;
+	font.setPointSize(WHOLE_PORT_TEXT_FONT_SIZE);
+	QFontMetrics fontMetrics(font);
+	qreal textHeight = fontMetrics.lineSpacing() + WHOLE_PORT_TEXT_VERTICAL_PADDING * 2;
+	qreal textTop = groupDecor->centerArrowLine.p1().y() - WHOLE_PORT_TEXT_LINE_GAP - textHeight;
+	qreal arrowLeftX = qMin(groupDecor->centerArrowLine.p1().x(), groupDecor->centerArrowLine.p2().x());
+	qreal arrowRightX = qMax(groupDecor->centerArrowLine.p1().x(), groupDecor->centerArrowLine.p2().x());
+	if (groupDecor->hasSwitchIcon && !groupDecor->switchIconRect.isNull())
+	{
+		qreal leftEndX = groupDecor->switchIconRect.left() - WHOLE_PORT_TEXT_SIDE_GAP;
+		qreal rightStartX = groupDecor->switchIconRect.right() + WHOLE_PORT_TEXT_SIDE_GAP;
+		if (!groupDecor->leftPortText.isEmpty() && leftEndX > arrowLeftX)
+		{
+			groupDecor->leftPortRect = QRectF(arrowLeftX, textTop, leftEndX - arrowLeftX, textHeight);
+		}
+		if (!groupDecor->rightPortText.isEmpty() && arrowRightX > rightStartX)
+		{
+			groupDecor->rightPortRect = QRectF(rightStartX, textTop, arrowRightX - rightStartX, textHeight);
+		}
+		return;
+	}
+	qreal centerX = (arrowLeftX + arrowRightX) * 0.5;
+	qreal leftEndX = centerX - WHOLE_PORT_TEXT_SIDE_GAP;
+	qreal rightStartX = centerX + WHOLE_PORT_TEXT_SIDE_GAP;
+	if (!groupDecor->leftPortText.isEmpty() && leftEndX > arrowLeftX)
+	{
+		groupDecor->leftPortRect = QRectF(arrowLeftX, textTop, leftEndX - arrowLeftX, textHeight);
+	}
+	if (!groupDecor->rightPortText.isEmpty() && arrowRightX > rightStartX)
+	{
+		groupDecor->rightPortRect = QRectF(rightStartX, textTop, arrowRightX - rightStartX, textHeight);
+	}
+}
 // #define WHOLE_GROUP_BRACE_WIDTH 18
 // #define WHOLE_GROUP_ARROW_MARGIN 16
 // #define WHOLE_GROUP_SWITCH_ICON_WIDTH 86
@@ -662,6 +833,8 @@ void WholeDiagramBuilder::BuildGroupDecorByLogicLine(WholeCircuitSvg& svg, Logic
 			WHOLE_GROUP_SWITCH_ICON_WIDTH,
 			WHOLE_GROUP_SWITCH_ICON_HEIGHT);
 	}
+	whole_build_group_port_texts(m_pCircuitConfig, groupDecor, pLogicLine);
+	whole_build_group_port_layout(groupDecor);
 }
 
 bool WholeDiagramBuilder::IsGroupDirectionRight(const LogicCircuitLine* pLogicLine) const

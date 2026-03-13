@@ -13,7 +13,13 @@
     <ClCompile Include="GeneratedFiles\Release\moc_secwidget.cpp">
       <Filter>Generated Files\Release</Filter>
     </ClCompile>
-    <ClCompile Include="directitems.cpp">
+    <ClCompile Include="directlinehelpers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="directlineitems.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="directnodeitems.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="circuitconfig.cpp">
@@ -153,7 +159,19 @@
     <ClInclude Include="SvgUtils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="directitembase.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="directitems.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="directlinehelpers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="directlineitems.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="directnodeitems.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -120,7 +120,9 @@
     <ClCompile Include="CircuitDiagramFactory.cpp" />
     <ClCompile Include="CircuitDiagramProxy.cpp" />
     <ClCompile Include="CircuitModuleApi.cpp" />
-    <ClCompile Include="directitems.cpp" />
+    <ClCompile Include="directlinehelpers.cpp" />
+    <ClCompile Include="directlineitems.cpp" />
+    <ClCompile Include="directnodeitems.cpp" />
     <ClCompile Include="directwidget.cpp" />
     <ClCompile Include="Logical\LogicDiagramBuilder.cpp" />
     <ClCompile Include="Optical\OpticalDiagramBuilder.cpp" />
@@ -235,7 +237,11 @@
     <ClInclude Include="CircuitDiagramFactory.h" />
     <ClInclude Include="CircuitDiagramProxy.h" />
     <ClInclude Include="..\circuitmodule_global.h" />
+    <ClInclude Include="directitembase.h" />
     <ClInclude Include="directitems.h" />
+    <ClInclude Include="directlinehelpers.h" />
+    <ClInclude Include="directlineitems.h" />
+    <ClInclude Include="directnodeitems.h" />
     <CustomBuild Include="directwidget.h">
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug_exe|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"  -DUNICODE -DWIN32 -DQT_DLL -DQT_CORE_LIB -DQT_GUI_LIB -DQT_SVG_LIB -DQT_XML_LIB  "-I.\GeneratedFiles" "-I." "-I$(QTDIR)\include" "-I.\GeneratedFiles\$(ConfigurationName)\." "-I$(QTDIR)\include\QtCore" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtSvg" "-I$(QTDIR)\include\QtXml"</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug_exe|Win32'">Moc%27ing %(Identity)...</Message>

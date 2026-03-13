@@ -43,7 +43,11 @@ HEADERS += \
     Whole/WholeDiagramBuilder.h \
     CircuitModuleApi.h \
     circuitmodule_global.h \
+    directitembase.h \
     directitems.h \
+    directlinehelpers.h \
+    directlineitems.h \
+    directnodeitems.h \
     directwidget.h \
     include/cime/cime.h \
     include/rtdb/rtdb_dll_def.h \
@@ -68,7 +72,9 @@ SOURCES += \
     circuitconfig.cpp \
     InteractiveSvgItem.cpp \
     CircuitModuleApi.cpp \
-    directitems.cpp \
+    directlinehelpers.cpp \
+    directlineitems.cpp \
+    directnodeitems.cpp \
     directwidget.cpp \
     legacy_svg/SvgTransformerLegacy.cpp \
     Logical/LogicDiagramBuilder.cpp \

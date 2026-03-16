@@ -1104,10 +1104,10 @@ void DirectWidget::ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64
 			}
 		}
 	}
-	if (svg.plateRectHash.isEmpty())
-	{
-		qWarning() << "plateRectHash is empty";
-	}
+	// if (svg.plateRectHash.isEmpty())
+	// {
+	// 	qWarning() << "plateRectHash is empty";
+	// }
 	QHash<QString, PlateRect>::const_iterator plateIt = svg.plateRectHash.constBegin();
 	for (; plateIt != svg.plateRectHash.constEnd(); ++plateIt)
 	{

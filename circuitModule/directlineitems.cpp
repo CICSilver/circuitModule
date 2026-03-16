@@ -12,20 +12,20 @@ namespace
 {
 	enum DirectLineConfig
 	{
-		DIRECT_PORT_TEXT_OFFSET = 12,
-		DIRECT_ARROW_OFFSET = 10,
-		DIRECT_BOUND_MARGIN = 12
+		DIRECT_PORT_TEXT_OFFSET = 12,	// 端口文字与连接圆的额外偏移，boundingRect 与端口文字绘制共用
+		DIRECT_ARROW_OFFSET = 10,		// 光纤线箭头相对连接圆再外推的距离
+		DIRECT_BOUND_MARGIN = 12		// 包围盒外扩余量，给 hover 命中和重绘留边
 	};
 
 	enum WholeLabelConfig
 	{
-		DIRECT_WHOLE_LABEL_FONT_SIZE = 8,
-		DIRECT_WHOLE_SIDE_LABEL_TEXT_WIDTH = 180,
-		DIRECT_WHOLE_SIDE_LABEL_SAFE_DISTANCE = 120,
-		DIRECT_WHOLE_SIDE_LABEL_VERTICAL_PADDING = 3,
-		DIRECT_WHOLE_SIDE_LABEL_LINE_GAP = 2,
-		DIRECT_WHOLE_SIDE_LABEL_BRACE_GAP = 6,
-		DIRECT_WHOLE_SIDE_LABEL_BOTTOM_PADDING = 1
+		DIRECT_WHOLE_LABEL_FONT_SIZE = 8,			// 虚回路左右标签字号，WholeDiagramBuilder 计算文本框时依赖这个值
+		DIRECT_WHOLE_SIDE_LABEL_TEXT_WIDTH = 180,	// 左右标签的标准文本宽度
+		DIRECT_WHOLE_SIDE_LABEL_SAFE_DISTANCE = 120,	// 标签避让中心箭头的最小安全距离
+		DIRECT_WHOLE_SIDE_LABEL_VERTICAL_PADDING = 3,	// 标签文本上下留白
+		DIRECT_WHOLE_SIDE_LABEL_LINE_GAP = 2,		// 标签多行之间的行距
+		DIRECT_WHOLE_SIDE_LABEL_BRACE_GAP = 6,		// 标签与分组括号之间的间隔
+		DIRECT_WHOLE_SIDE_LABEL_BOTTOM_PADDING = 1	// drawText 前额外扣掉的底部修正
 	};
 
 	void direct_draw_virtual_body(QPainter* painter, const QPointF& startPoint, const QPointF& endPoint, bool hasMiddleGap, qreal gapStartX, qreal gapEndX)
@@ -35,6 +35,7 @@ namespace
 			painter->drawLine(startPoint, endPoint);
 			return;
 		}
+		// 只有水平虚回路线才在中间留白，给值文字或交换符号让出一段空隙。
 		qreal leftGapX = qMin(gapStartX, gapEndX);
 		qreal rightGapX = qMax(gapStartX, gapEndX);
 		if (startPoint.x() <= endPoint.x())
@@ -647,6 +648,7 @@ void DirectWholeGroupItem::paint(QPainter* painter, const QStyleOptionGraphicsIt
 		QPen arrowPen(m_centerLineColor);
 		arrowPen.setWidth(4);
 		painter->setPen(arrowPen);
+		// 中间有交换机图标时，中心实线需要在图标两侧断开后分别绘制。
 		if (m_hasSwitchIcon && !m_switchIconRect.isNull())
 		{
 			if (arrowStartPoint.x() <= arrowEndPoint.x())
@@ -784,6 +786,7 @@ QRectF DirectOpticalLineItem::boundingRect() const
 	font.setPointSize(16);
 	QFontMetrics metrics(font);
 	int maxTextWidth = qMax(metrics.width(m_startPort), metrics.width(m_endPort));
+	// 光纤命中区除了线本身，还要覆盖连接圆、箭头和端口文字。
 	qreal padX = qMax((qreal)(qMax(1, m_lineWidth * 3) + CONN_R * 2 + 8), (qreal)(maxTextWidth / 2 + DIRECT_BOUND_MARGIN));
 	qreal padY = qMax((qreal)(qMax(1, m_lineWidth * 3) + CONN_R * 2 + 8),
 		(qreal)(metrics.height() + CONN_R * 2 + ARROW_LEN + DIRECT_PORT_TEXT_OFFSET + DIRECT_ARROW_OFFSET + DIRECT_BOUND_MARGIN));

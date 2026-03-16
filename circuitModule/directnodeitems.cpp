@@ -12,19 +12,19 @@ namespace
 {
 	enum LogicFrameConfig
 	{
-		DIRECT_LOGIC_FRAME_TITLE_FONT_SIZE = 8
+		DIRECT_LOGIC_FRAME_TITLE_FONT_SIZE = 8	// 逻辑框标题字号，directwidget.cpp 里计算标题占位时要保持一致
 	};
 
 	enum DirectMaintainPlateConfig
 	{
-		DIRECT_MAINT_PLATE_CIRCLE_RADIUS = 5,
-		DIRECT_MAINT_PLATE_ICON_SPAN = 36,
-		DIRECT_MAINT_PLATE_BODY_WIDTH = 26,
-		DIRECT_MAINT_PLATE_BODY_HEIGHT = 10,
-		DIRECT_MAINT_PLATE_TEXT_HEIGHT = 18,
-		DIRECT_MAINT_PLATE_TEXT_FONT_SIZE = 8,
-		DIRECT_MAINT_PLATE_TEXT_ICON_GAP = 30,
-		DIRECT_MAINT_PLATE_BOTTOM_MARGIN = 6
+		DIRECT_MAINT_PLATE_CIRCLE_RADIUS = 5,	// 检修压板两端触点圆半径
+		DIRECT_MAINT_PLATE_ICON_SPAN = 36,		// 两个触点中心的水平跨度，决定闭合和断开图元的整体宽度
+		DIRECT_MAINT_PLATE_BODY_WIDTH = 26,		// 断开刀闸主体的参考宽度
+		DIRECT_MAINT_PLATE_BODY_HEIGHT = 10,	// 断开刀闸主体的参考高度，也用于计算斜刀片厚度
+		DIRECT_MAINT_PLATE_TEXT_HEIGHT = 18,	// 文本区域固定高度，保证检修压板名称不挤压图标
+		DIRECT_MAINT_PLATE_TEXT_FONT_SIZE = 8,	// 文本字号，需要和文本区域高度一起控制省略效果
+		DIRECT_MAINT_PLATE_TEXT_ICON_GAP = 30,	// 文本与图标的垂直间距，rebuildGeometry 和 paint 共同依赖
+		DIRECT_MAINT_PLATE_BOTTOM_MARGIN = 6	// 整个检修压板相对IED底边的保留距离
 	};
 
 	QString direct_build_maint_plate_default_text()
@@ -146,6 +146,7 @@ void IedItem::drawText(QPainter* painter, const QRectF& rect, const QString& nam
 	int lineHeight = 0;
 	int totalTextHeight = 0;
 	int fontSize = pointSize;
+	// 名称和描述要一起落在IED框内，字号不够时逐级收缩，直到总高度放得下。
 	while (fontSize >= 8)
 	{
 		QFont font = painter->font();
@@ -440,6 +441,7 @@ void DirectMaintainPlateItem::paint(QPainter* painter, const QStyleOptionGraphic
 	}
 	else
 	{
+		// 断开态按斜刀闸绘制，两条平行边和端部封口一起构成刀片轮廓。
 		qreal bladeLength = qAbs(m_rightCircleCenter.x() - m_leftCircleCenter.x());
 		if (bladeLength < 1.0)
 		{
@@ -516,6 +518,7 @@ void DirectMaintainPlateItem::rebuildGeometry()
 		textWidth = m_anchorRect.width();
 		horizontalMargin = 0.0;
 	}
+	// 文本靠近IED底部居中摆放，图标固定压在文本下方，保证不同宽度IED上的布局一致。
 	qreal bottomY = m_anchorRect.y() + m_anchorRect.height() - DIRECT_MAINT_PLATE_BOTTOM_MARGIN;
 	qreal iconCenterY = bottomY - DIRECT_MAINT_PLATE_CIRCLE_RADIUS - 2.0;
 	qreal textTop = bottomY - DIRECT_MAINT_PLATE_TEXT_ICON_GAP - DIRECT_MAINT_PLATE_TEXT_HEIGHT;
@@ -544,6 +547,7 @@ void DirectMaintainPlateItem::rebuildGeometry()
 	QPointF openPoint2 = openPoint1 + direction * bladeLength;
 	QPointF openPoint3 = m_leftCircleCenter - normal * bladeHalfWidth;
 	QPointF openPoint4 = openPoint3 + direction * bladeLength;
+	// 包围盒同时覆盖闭合态和断开态，避免状态切换时绘制被裁剪。
 	QRectF openRect(openPoint1, openPoint1);
 	openRect = openRect.united(QRectF(openPoint2, openPoint2));
 	openRect = openRect.united(QRectF(openPoint3, openPoint3));

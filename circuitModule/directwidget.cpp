@@ -1,6 +1,7 @@
 #include "directwidget.h"
 #include "svgmodel.h"
 #include "directitems.h"
+#include "directlinehelpers.h"
 #include "SvgUtils.h"
 #include "circuitconfig.h"
 #include "CircuitDiagramProxy.h"
@@ -13,9 +14,14 @@
 #include <stdlib.h>
 #include <QMenu>
 #include <QAction>
+#include <QAbstractItemView>
+#include <QHeaderView>
 #include <QScrollBar>
+#include <QTableWidget>
+#include <QTableWidgetItem>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <QtAlgorithms>
 #include <string.h>
 static double dw_to_double(const char* val)
 {
@@ -40,6 +46,102 @@ static bool fill_optical_ports(const OpticalCircuit* oc, const QString& iedName,
 		return true;
 	}
 	return false;
+}
+
+static bool fill_optical_endpoint_info(const OpticalCircuitLine* line, bool isStartPoint, QString& iedName, QString& peerIedName, bool& isSwitch, bool& atTop)
+{
+	if (!line || !line->pSrcRect || !line->pDestRect || !line->pOpticalCircuit)
+	{
+		return false;
+	}
+	bool startIsSrc = directlinehelpers::IsPointAttachedToRect(line->startPoint, line->pSrcRect);
+	bool endIsSrc = directlinehelpers::IsPointAttachedToRect(line->endPoint, line->pSrcRect);
+	bool useStartAsSrc = true;
+	if (!startIsSrc && endIsSrc)
+	{
+		useStartAsSrc = false;
+	}
+	const IedRect* pRect = NULL;
+	const IedRect* pPeerRect = NULL;
+	QPoint point;
+	if (isStartPoint)
+	{
+		point = line->startPoint;
+		if (useStartAsSrc)
+		{
+			pRect = line->pSrcRect;
+			pPeerRect = line->pDestRect;
+		}
+		else
+		{
+			pRect = line->pDestRect;
+			pPeerRect = line->pSrcRect;
+		}
+	}
+	else
+	{
+		point = line->endPoint;
+		if (useStartAsSrc)
+		{
+			pRect = line->pDestRect;
+			pPeerRect = line->pSrcRect;
+		}
+		else
+		{
+			pRect = line->pSrcRect;
+			pPeerRect = line->pDestRect;
+		}
+	}
+	if (!pRect || !pPeerRect)
+	{
+		return false;
+	}
+	iedName = pRect->iedName;
+	peerIedName = pPeerRect->iedName;
+	isSwitch = iedName.contains("SW", Qt::CaseInsensitive);
+	atTop = directlinehelpers::IsTopAnchor(point, pRect);
+	return true;
+}
+
+static QString build_control_block_type_text(VirtualType type)
+{
+	return type == GOOSE ? QString::fromLatin1("GOOSE") : QString::fromLatin1("SV");
+}
+
+static QString build_control_block_party_text(ControlBlockPartyType partyType)
+{
+	return partyType == CB_PUBLISHER ? QString::fromLocal8Bit("发布") : QString::fromLocal8Bit("订阅");
+}
+
+static QString build_control_block_appid_text(int appid)
+{
+	if (appid < 0)
+	{
+		return QString();
+	}
+	return QString::fromLatin1("0x%1").arg(appid, 4, 16, QChar('0')).toUpper();
+}
+
+static bool control_block_info_less(const OpticalControlBlockInfo& left, const OpticalControlBlockInfo& right)
+{
+	if (left.type != right.type)
+	{
+		return left.type < right.type;
+	}
+	if (left.partyType != right.partyType)
+	{
+		return left.partyType < right.partyType;
+	}
+	int nameCompare = QString::compare(left.controlBlockName, right.controlBlockName, Qt::CaseInsensitive);
+	if (nameCompare != 0)
+	{
+		return nameCompare < 0;
+	}
+	if (left.controlBlockCode != right.controlBlockCode)
+	{
+		return left.controlBlockCode < right.controlBlockCode;
+	}
+	return QString::compare(left.endpointRef, right.endpointRef, Qt::CaseInsensitive) < 0;
 }
 static QString build_plate_tooltip(const DirectPlateItem* item)
 {
@@ -268,6 +370,92 @@ static void whole_build_side_label_layout(const VirtualCircuitLine* virtualLine,
 		}
 	}
 }
+
+class ControlBlockListWindow : public QWidget
+{
+public:
+	ControlBlockListWindow(QWidget* parent)
+		: QWidget(parent)
+		, m_tableWidget(new QTableWidget(this))
+	{
+		setAttribute(Qt::WA_DeleteOnClose, true);
+		QVBoxLayout* layout = new QVBoxLayout(this);
+		layout->setContentsMargins(0, 0, 0, 0);
+		layout->addWidget(m_tableWidget);
+		QStringList headerList;
+		headerList << QString::fromLocal8Bit("类型")
+			<< QString::fromLocal8Bit("角色")
+			<< QString::fromLocal8Bit("控制块名")
+			<< QString::fromLocal8Bit("控制块ID")
+			<< QString::fromLocal8Bit("控制块Ref")
+			<< QString::fromLocal8Bit("数据集")
+			<< QString::fromLocal8Bit("标识")
+			<< QString::fromLatin1("APPID")
+			<< QString::fromLatin1("MAC")
+			<< QString::fromLocal8Bit("对端IED")
+			<< QString::fromLocal8Bit("关联通道Ref");
+		m_tableWidget->setColumnCount(headerList.size());
+		m_tableWidget->setHorizontalHeaderLabels(headerList);
+		m_tableWidget->setEditTriggers(QAbstractItemView::NoEditTriggers);
+		m_tableWidget->setSelectionBehavior(QAbstractItemView::SelectRows);
+		m_tableWidget->setSelectionMode(QAbstractItemView::SingleSelection);
+		m_tableWidget->setAlternatingRowColors(true);
+		m_tableWidget->verticalHeader()->setVisible(false);
+		m_tableWidget->horizontalHeader()->setStretchLastSection(true);
+		resize(1100, 420);
+	}
+
+	bool LoadByOpticalConnPoint(quint64 opticalCode, const QString& iedName)
+	{
+		if (opticalCode == 0 || iedName.isEmpty() || iedName.contains("SW", Qt::CaseInsensitive))
+		{
+			return false;
+		}
+		CircuitConfig* circuitConfig = CircuitConfig::Instance();
+		if (!circuitConfig)
+		{
+			return false;
+		}
+		QList<OpticalControlBlockInfo> sourceList = circuitConfig->GetControlBlockInfoListByOpticalCode(opticalCode);
+		QList<OpticalControlBlockInfo> displayList;
+		for (int index = 0; index < sourceList.size(); ++index)
+		{
+			const OpticalControlBlockInfo& controlBlockInfo = sourceList.at(index);
+			if (controlBlockInfo.iedName == iedName)
+			{
+				displayList.append(controlBlockInfo);
+			}
+		}
+		if (displayList.isEmpty())
+		{
+			return false;
+		}
+		qSort(displayList.begin(), displayList.end(), control_block_info_less);
+		m_tableWidget->clearContents();
+		m_tableWidget->setRowCount(displayList.size());
+		for (int row = 0; row < displayList.size(); ++row)
+		{
+			const OpticalControlBlockInfo& controlBlockInfo = displayList.at(row);
+			m_tableWidget->setItem(row, 0, new QTableWidgetItem(build_control_block_type_text(controlBlockInfo.type)));
+			m_tableWidget->setItem(row, 1, new QTableWidgetItem(build_control_block_party_text(controlBlockInfo.partyType)));
+			m_tableWidget->setItem(row, 2, new QTableWidgetItem(controlBlockInfo.controlBlockName));
+			m_tableWidget->setItem(row, 3, new QTableWidgetItem(controlBlockInfo.controlBlockCode == 0 ? QString() : QString::number((qulonglong)controlBlockInfo.controlBlockCode)));
+			m_tableWidget->setItem(row, 4, new QTableWidgetItem(controlBlockInfo.controlBlockRef));
+			m_tableWidget->setItem(row, 5, new QTableWidgetItem(controlBlockInfo.dataSetName));
+			m_tableWidget->setItem(row, 6, new QTableWidgetItem(controlBlockInfo.identityName));
+			m_tableWidget->setItem(row, 7, new QTableWidgetItem(build_control_block_appid_text(controlBlockInfo.appid)));
+			m_tableWidget->setItem(row, 8, new QTableWidgetItem(controlBlockInfo.macAddr));
+			m_tableWidget->setItem(row, 9, new QTableWidgetItem(controlBlockInfo.peerIedName));
+			m_tableWidget->setItem(row, 10, new QTableWidgetItem(controlBlockInfo.endpointRef));
+		}
+		m_tableWidget->resizeColumnsToContents();
+		setWindowTitle(QString::fromLatin1("Control Blocks - %1 - Optical %2").arg(iedName).arg((qulonglong)opticalCode));
+		return true;
+	}
+
+private:
+	QTableWidget* m_tableWidget;
+};
 
 class DirectRelationWindow : public QWidget
 {
@@ -564,15 +752,29 @@ void DirectView::mouseReleaseEvent(QMouseEvent* event)
 		if (!m_dragging && m_leftPressed)
 		{
 			QGraphicsItem* item = itemAt(event->pos());
-			DirectOpticalLineItem* opticalLine = dynamic_cast<DirectOpticalLineItem*>(item);
-			if (opticalLine)
+			DirectOpticalConnPointItem* opticalConnPoint = dynamic_cast<DirectOpticalConnPointItem*>(item);
+			if (opticalConnPoint)
 			{
-				quint64 opticalCode = opticalLine->data(0).toULongLong();
+				quint64 opticalCode = opticalConnPoint->data(0).toULongLong();
 				if (opticalCode != 0)
 				{
-					QString srcIedName = opticalLine->data(1).toString();
-					QString destIedName = opticalLine->data(2).toString();
-					emit opticalLineClicked(opticalCode, srcIedName, destIedName);
+					QString iedName = opticalConnPoint->data(1).toString();
+					QString peerIedName = opticalConnPoint->data(2).toString();
+					emit opticalConnPointClicked(opticalCode, iedName, peerIedName);
+				}
+			}
+			else
+			{
+				DirectOpticalLineItem* opticalLine = dynamic_cast<DirectOpticalLineItem*>(item);
+				if (opticalLine)
+				{
+					quint64 opticalCode = opticalLine->data(0).toULongLong();
+					if (opticalCode != 0)
+					{
+						QString srcIedName = opticalLine->data(1).toString();
+						QString destIedName = opticalLine->data(2).toString();
+						emit opticalLineClicked(opticalCode, srcIedName, destIedName);
+					}
 				}
 			}
 			LineItem* logicLine = dynamic_cast<LineItem*>(item);
@@ -688,6 +890,7 @@ DirectWidget::DirectWidget(QWidget *parent)
 {
 	initView();
 	connect(m_view, SIGNAL(opticalLineClicked(quint64, const QString&, const QString&)), this, SLOT(OnOpticalLineClicked(quint64, const QString&, const QString&)));
+	connect(m_view, SIGNAL(opticalConnPointClicked(quint64, const QString&, const QString&)), this, SLOT(OnOpticalConnPointClicked(quint64, const QString&, const QString&)));
 	connect(m_view, SIGNAL(logicLineClicked(LineItem*)), this, SLOT(OnLogicLineClicked(LineItem*)));
 	connect(m_view, SIGNAL(maintainPlateToggled(const QString&, int)), this, SLOT(OnMaintainPlateToggled(const QString&, int)));
 	m_statusTimer = new QTimer(this);
@@ -937,7 +1140,7 @@ void DirectWidget::ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64
 		return;
 	}
 	ClearScene();
-	m_currentIedName = svg.mainIedRect ? svg.mainIedRect->iedName : QString();
+	m_currentIedName = svg.mainIedRect ? svg.mainIedRect->iedName : (svg.centerIedRectList.isEmpty() ? QString() : svg.centerIedRectList.first()->iedName);
 	m_scene->setSceneRect(0, 0, svg.viewBoxWidth, svg.viewBoxHeight);
 	bool hasFilter = !circuitCodeSet.isEmpty();
 	QSet<QString> visibleIedNameSet;
@@ -945,6 +1148,7 @@ void DirectWidget::ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64
 	QSet<quint64> visiblePlateCodeSet;
 	QMap<QString, QRectF> maintainPlateRectHash;
 	QList<IedRect*> allRectList;
+	allRectList += svg.centerIedRectList;
 	allRectList += svg.leftIedRectList;
 	allRectList += svg.rightIedRectList;
 	if (hasFilter)
@@ -1010,6 +1214,18 @@ void DirectWidget::ParseFromVirtualSvg(const VirtualSvg& svg, const QSet<quint64
 		item->setFromIedRect(*svg.mainIedRect, false);
 		m_scene->addItem(item);
 		maintainPlateRectHash.insert(svg.mainIedRect->iedName, build_virtual_ied_outer_rect(svg.mainIedRect));
+	}
+	for (int i = 0; i < svg.centerIedRectList.size(); ++i)
+	{
+		IedRect* rect = svg.centerIedRectList.at(i);
+		if (!rect)
+		{
+			continue;
+		}
+		IedItem* item = new IedItem();
+		item->setFromIedRect(*rect, false);
+		m_scene->addItem(item);
+		maintainPlateRectHash.insert(rect->iedName, build_virtual_ied_outer_rect(rect));
 	}
 	for (int i = 0; i < svg.leftIedRectList.size(); ++i)
 	{
@@ -1150,10 +1366,11 @@ void DirectWidget::ParseFromWholeSvg(const WholeCircuitSvg& svg)
 		return;
 	}
 	ClearScene();
-	m_currentIedName = svg.mainIedRect ? svg.mainIedRect->iedName : QString();
+	m_currentIedName = svg.mainIedRect ? svg.mainIedRect->iedName : (svg.centerIedRectList.isEmpty() ? QString() : svg.centerIedRectList.first()->iedName);
 	m_scene->setSceneRect(0, 0, svg.viewBoxWidth, svg.viewBoxHeight);
 	QMap<QString, QRectF> maintainPlateRectHash;
 	QList<IedRect*> allRectList;
+	allRectList += svg.centerIedRectList;
 	allRectList += svg.leftIedRectList;
 	allRectList += svg.rightIedRectList;
 	if (svg.mainIedRect)
@@ -1162,6 +1379,18 @@ void DirectWidget::ParseFromWholeSvg(const WholeCircuitSvg& svg)
 		item->setFromIedRect(*svg.mainIedRect, false);
 		m_scene->addItem(item);
 		maintainPlateRectHash.insert(svg.mainIedRect->iedName, build_virtual_ied_outer_rect(svg.mainIedRect));
+	}
+	for (int i = 0; i < svg.centerIedRectList.size(); ++i)
+	{
+		IedRect* rect = svg.centerIedRectList.at(i);
+		if (!rect)
+		{
+			continue;
+		}
+		IedItem* item = new IedItem();
+		item->setFromIedRect(*rect, false);
+		m_scene->addItem(item);
+		maintainPlateRectHash.insert(rect->iedName, build_virtual_ied_outer_rect(rect));
 	}
 	for (int i = 0; i < svg.leftIedRectList.size(); ++i)
 	{
@@ -1347,6 +1576,37 @@ void DirectWidget::ParseFromOpticalSvg(const OpticalSvg& svg)
 			lineItem->setData(2, QVariant(line->pDestRect ? line->pDestRect->iedName : QString()));
 		}
 		m_scene->addItem(lineItem);
+		if (line && line->pOpticalCircuit)
+		{
+			QString startIedName;
+			QString startPeerIedName;
+			QString endIedName;
+			QString endPeerIedName;
+			bool startIsSwitch = false;
+			bool endIsSwitch = false;
+			bool startAtTop = true;
+			bool endAtTop = false;
+			if (fill_optical_endpoint_info(line, true, startIedName, startPeerIedName, startIsSwitch, startAtTop))
+			{
+				DirectOpticalConnPointItem* startPointItem = new DirectOpticalConnPointItem();
+				startPointItem->setConnPoint(line->startPoint, startAtTop, lineItem);
+				startPointItem->setData(0, QVariant((qulonglong)line->pOpticalCircuit->code));
+				startPointItem->setData(1, QVariant(startIedName));
+				startPointItem->setData(2, QVariant(startPeerIedName));
+				startPointItem->setZValue(lineItem->zValue() + 1.0);
+				m_scene->addItem(startPointItem);
+			}
+			if (fill_optical_endpoint_info(line, false, endIedName, endPeerIedName, endIsSwitch, endAtTop))
+			{
+				DirectOpticalConnPointItem* endPointItem = new DirectOpticalConnPointItem();
+				endPointItem->setConnPoint(line->endPoint, endAtTop, lineItem);
+				endPointItem->setData(0, QVariant((qulonglong)line->pOpticalCircuit->code));
+				endPointItem->setData(1, QVariant(endIedName));
+				endPointItem->setData(2, QVariant(endPeerIedName));
+				endPointItem->setZValue(lineItem->zValue() + 1.0);
+				m_scene->addItem(endPointItem);
+			}
+		}
 	}
 	QRectF itemsRect = m_scene->itemsBoundingRect();
 	if (!itemsRect.isNull())
@@ -1375,6 +1635,24 @@ void DirectWidget::OnOpticalLineClicked(quint64 opticalCode, const QString& srcI
 	relationWindow->show();
 	relationWindow->raise();
 	relationWindow->activateWindow();
+}
+
+void DirectWidget::OnOpticalConnPointClicked(quint64 opticalCode, const QString& iedName, const QString& peerIedName)
+{
+	Q_UNUSED(peerIedName);
+	if (opticalCode == 0 || iedName.isEmpty() || iedName.contains("SW", Qt::CaseInsensitive))
+	{
+		return;
+	}
+	ControlBlockListWindow* controlBlockListWindow = new ControlBlockListWindow(NULL);
+	if (!controlBlockListWindow->LoadByOpticalConnPoint(opticalCode, iedName))
+	{
+		delete controlBlockListWindow;
+		return;
+	}
+	controlBlockListWindow->show();
+	controlBlockListWindow->raise();
+	controlBlockListWindow->activateWindow();
 }
 
 void DirectWidget::OnLogicLineClicked(LineItem* lineItem)

@@ -1,6 +1,5 @@
 #pragma once
 #include "Common/DiagramBuilderBase.h"
-
 class VirtualDiagramBuilder : public DiagramBuilderBase
 {
 public:
@@ -31,8 +30,8 @@ public:
 	// 函数返回:	VirtualSvg*
 	//************************************
 	VirtualSvg* BuildVirtualDiagramByIedName(const QString& iedName);
+	VirtualSvg* BuildVirtualDiagramByBayName(const QString& bayName);
 	VirtualSvg* BuildVirtualDiagramByIedPair(const QString& mainIedName, const QString& peerIedName);
-
 private:
 	//************************************
 	// 函数名称:	GenerateVirtualDiagramByIed
@@ -44,6 +43,9 @@ private:
 	// 函数返回:	void
 	//************************************
 	void GenerateVirtualDiagramByIed(const IED* pIed, VirtualSvg& svg);
+	void TakeOverWholeSvg(WholeCircuitSvg& wholeSvg, VirtualSvg& virtualSvg);
+	void AppendPeerLogicLines(IedRect* pPeerIedRect, IedRect* pMainIedRect, const QString& mainIedName, const QString& peerIedName);
+	void AdjustRectListPlateGap(QList<IedRect*>& rectList) const;
 	//************************************
 	// 函数名称:	AdjustVirtualCircuitLinePosition
 	// 函数全名:	VirtualDiagramBuilder::AdjustVirtualCircuitLinePosition

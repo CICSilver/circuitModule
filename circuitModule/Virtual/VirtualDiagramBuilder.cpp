@@ -1,4 +1,5 @@
 #include "Virtual/VirtualDiagramBuilder.h"
+#include "Whole/WholeDiagramBuilder.h"
 #include <QFont>
 #include <QFontMetrics>
 
@@ -27,6 +28,85 @@ VirtualSvg* VirtualDiagramBuilder::BuildVirtualDiagramByIedName(const QString& i
 	return svg;
 }
 
+VirtualSvg* VirtualDiagramBuilder::BuildVirtualDiagramByBayName(const QString& bayName)
+{
+	WholeDiagramBuilder wholeBuilder;
+	WholeCircuitSvg* wholeSvg = wholeBuilder.BuildWholeDiagramByBayName(bayName);
+	if (!wholeSvg)
+	{
+		return NULL;
+	}
+	VirtualSvg* svg = new VirtualSvg();
+	TakeOverWholeSvg(*wholeSvg, *svg);
+	delete wholeSvg;
+	return svg;
+}
+
+void VirtualDiagramBuilder::TakeOverWholeSvg(WholeCircuitSvg& wholeSvg, VirtualSvg& virtualSvg)
+{
+	virtualSvg.mainIedRect = wholeSvg.mainIedRect;
+	wholeSvg.mainIedRect = NULL;
+	virtualSvg.viewBoxX = wholeSvg.viewBoxX;
+	virtualSvg.viewBoxY = wholeSvg.viewBoxY;
+	virtualSvg.viewBoxWidth = wholeSvg.viewBoxWidth;
+	virtualSvg.viewBoxHeight = wholeSvg.viewBoxHeight;
+	virtualSvg.centerIedRectList = wholeSvg.centerIedRectList;
+	virtualSvg.leftIedRectList = wholeSvg.leftIedRectList;
+	virtualSvg.rightIedRectList = wholeSvg.rightIedRectList;
+	virtualSvg.descRectList = wholeSvg.descRectList;
+	virtualSvg.plateRectHash = wholeSvg.plateRectHash;
+	wholeSvg.centerIedRectList.clear();
+	wholeSvg.leftIedRectList.clear();
+	wholeSvg.rightIedRectList.clear();
+	wholeSvg.descRectList.clear();
+	wholeSvg.plateRectHash.clear();
+}
+
+void VirtualDiagramBuilder::AppendPeerLogicLines(IedRect* pPeerIedRect, IedRect* pMainIedRect, const QString& mainIedName, const QString& peerIedName)
+{
+	QList<LogicCircuit*> inCircuitList = m_pCircuitConfig->GetInLogicCircuitListByIedName(mainIedName);
+	QList<LogicCircuit*> outCircuitList = m_pCircuitConfig->GetOutLogicCircuitListByIedName(mainIedName);
+	for (int i = 0; i < inCircuitList.size(); ++i)
+	{
+		LogicCircuit* pLogicCircuit = inCircuitList.at(i);
+		if (!pLogicCircuit || !pLogicCircuit->pSrcIed || pLogicCircuit->pSrcIed->name != peerIedName)
+		{
+			continue;
+		}
+		LogicCircuitLine* pLine = new LogicCircuitLine();
+		pLine->pSrcIedRect = pPeerIedRect;
+		pLine->pDestIedRect = pMainIedRect;
+		pLine->pLogicCircuit = pLogicCircuit;
+		pPeerIedRect->logic_line_list.append(pLine);
+	}
+	for (int i = 0; i < outCircuitList.size(); ++i)
+	{
+		LogicCircuit* pLogicCircuit = outCircuitList.at(i);
+		if (!pLogicCircuit || !pLogicCircuit->pDestIed || pLogicCircuit->pDestIed->name != peerIedName)
+		{
+			continue;
+		}
+		LogicCircuitLine* pLine = new LogicCircuitLine();
+		pLine->pSrcIedRect = pMainIedRect;
+		pLine->pDestIedRect = pPeerIedRect;
+		pLine->pLogicCircuit = pLogicCircuit;
+		pPeerIedRect->logic_line_list.append(pLine);
+	}
+}
+
+void VirtualDiagramBuilder::AdjustRectListPlateGap(QList<IedRect*>& rectList) const
+{
+	for (int i = 0; i < rectList.size(); ++i)
+	{
+		IedRect* pRect = rectList.at(i);
+		if (!pRect)
+		{
+			continue;
+		}
+		pRect->extend_height += VIRTUAL_MAINT_PLATE_OUTER_GAP;
+	}
+}
+
 VirtualSvg* VirtualDiagramBuilder::BuildVirtualDiagramByIedPair(const QString& mainIedName, const QString& peerIedName)
 {
 	if (mainIedName.isEmpty() || peerIedName.isEmpty() || mainIedName == peerIedName)
@@ -51,34 +131,7 @@ VirtualSvg* VirtualDiagramBuilder::BuildVirtualDiagramByIedPair(const QString& m
 		ColorHelper::pure_red
 	);
 	IedRect* peerIedRect = GetOtherIedRect(0, svg->mainIedRect, pPeerIed, ColorHelper::pure_green);
-	QList<LogicCircuit*> inCircuitList = m_pCircuitConfig->GetInLogicCircuitListByIedName(pMainIed->name);
-	QList<LogicCircuit*> outCircuitList = m_pCircuitConfig->GetOutLogicCircuitListByIedName(pMainIed->name);
-	for (int i = 0; i < inCircuitList.size(); ++i)
-	{
-		LogicCircuit* logicCircuit = inCircuitList.at(i);
-		if (!logicCircuit || !logicCircuit->pSrcIed || logicCircuit->pSrcIed->name != pPeerIed->name)
-		{
-			continue;
-		}
-		LogicCircuitLine* line = new LogicCircuitLine();
-		line->pSrcIedRect = peerIedRect;
-		line->pDestIedRect = svg->mainIedRect;
-		line->pLogicCircuit = logicCircuit;
-		peerIedRect->logic_line_list.append(line);
-	}
-	for (int i = 0; i < outCircuitList.size(); ++i)
-	{
-		LogicCircuit* logicCircuit = outCircuitList.at(i);
-		if (!logicCircuit || !logicCircuit->pDestIed || logicCircuit->pDestIed->name != pPeerIed->name)
-		{
-			continue;
-		}
-		LogicCircuitLine* line = new LogicCircuitLine();
-		line->pSrcIedRect = svg->mainIedRect;
-		line->pDestIedRect = peerIedRect;
-		line->pLogicCircuit = logicCircuit;
-		peerIedRect->logic_line_list.append(line);
-	}
+	AppendPeerLogicLines(peerIedRect, svg->mainIedRect, pMainIed->name, pPeerIed->name);
 	if (peerIedRect->logic_line_list.isEmpty())
 	{
 		delete peerIedRect;
@@ -87,15 +140,7 @@ VirtualSvg* VirtualDiagramBuilder::BuildVirtualDiagramByIedPair(const QString& m
 	}
 	svg->leftIedRectList.append(peerIedRect);
 	AdjustExtendRectByCircuit(svg->leftIedRectList, *svg);
-	for (int i = 0; i < svg->leftIedRectList.size(); ++i)
-	{
-		IedRect* rect = svg->leftIedRectList.at(i);
-		if (!rect)
-		{
-			continue;
-		}
-		rect->extend_height += VIRTUAL_MAINT_PLATE_OUTER_GAP;
-	}
+	AdjustRectListPlateGap(svg->leftIedRectList);
 	size_t maxY = svg->leftIedRectList.last()->GetExtendBottomY();
 	svg->mainIedRect->extend_height = maxY;
 	int svgRightMargin = svg->leftIedRectList.first()->x - svg->leftIedRectList.first()->inner_gap;
@@ -132,27 +177,8 @@ void VirtualDiagramBuilder::GenerateVirtualDiagramByIed(const IED* pIed, Virtual
 	// 根据单侧关联IED数量和压板高度，调整高度
 	AdjustExtendRectByCircuit(svg.leftIedRectList, svg);
 	AdjustExtendRectByCircuit(svg.rightIedRectList, svg);
-	for (int i = 0; i < svg.leftIedRectList.size(); ++i)
-	{
-		IedRect* rect = svg.leftIedRectList.at(i);
-		if (!rect)
-		{
-			continue;
-		}
-		rect->extend_height += VIRTUAL_MAINT_PLATE_OUTER_GAP;
-	}
-	for (int i = 0; i < svg.rightIedRectList.size(); ++i)
-	{
-		IedRect* rect = svg.rightIedRectList.at(i);
-		if (!rect)
-		{
-			continue;
-		}
-		rect->extend_height += VIRTUAL_MAINT_PLATE_OUTER_GAP;
-	}
-	// 计算两侧IED的链路数量()
-	size_t leftCircuitSize = svg.GetLeftCircuitSize();
-	size_t rightCircuitSize = svg.GetRightCircuitSize();
+	AdjustRectListPlateGap(svg.leftIedRectList);
+	AdjustRectListPlateGap(svg.rightIedRectList);
 	// 计算主IED高度
 	size_t maxY = qMax(
 		svg.leftIedRectList.size() > 0 ? svg.leftIedRectList.last()->GetExtendBottomY() : 0,
@@ -196,7 +222,6 @@ void VirtualDiagramBuilder::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QL
 				pVtLine->pDestIedRect = destRect;
 				// 确定连接点索引
 				quint8* pConnectPtIndex = isLeft ? &rect->right_connect_index : &rect->left_connect_index;
-				quint8* pMainConnectPtIndex = isLeft ? &mainIed->right_connect_index : &mainIed->left_connect_index;
 				// 确定起始点X坐标和结束点X坐标
 				quint16 startPt_X, endPt_X, startIconPt_X, endIconPt_X, startVal_X, endVal_X;
 				QFont font;
@@ -274,10 +299,6 @@ void VirtualDiagramBuilder::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QL
 				quint16 pt_Y = rect->GetInnerBottomY() + CIRCUIT_VERTICAL_DISTANCE + ICON_LENGTH +
 					*pConnectPtIndex * (CIRCUIT_VERTICAL_DISTANCE + ICON_LENGTH);
 				quint16 icon_Y = pt_Y - ICON_LENGTH / 2;	// 保持中心与线段对齐
-				if (svg.mainIedRect->iedName == "P_B5012A" && pCircuit->srcIedName == "MIB5012A")
-				{
-					int a = 1;
-				}
 				// 设置线路起止点
 				pVtLine->startPoint = QPoint(startPt_X, pt_Y);
 				pVtLine->endPoint = QPoint(endPt_X, pt_Y);
@@ -289,10 +310,6 @@ void VirtualDiagramBuilder::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QL
 				pLogicLine->virtual_line_list.append(pVtLine);
 				// 生成并调整当前通道的压板矩形位置
 				QString key = QString("%1+%2").arg(srcRect->iedName).arg(destRect->iedName);	// 输出+输入
-				if (!pCircuit->destSoftPlateDesc.isEmpty() || !pCircuit->srcSoftPlateDesc.isEmpty())
-				{
-					int a = 0;
-				}
 				// 开入软压板，图形位于回路终点
 				AdjustVirtualCircuitPlatePosition(svg.plateRectHash, key, pVtLine->endPoint, pCircuit->destSoftPlateDesc, pCircuit->destSoftPlateRef, pCircuit->destSoftPlateCode, false, isSideSource, isLeft);
 				// 开出软压板，图形位于回路起点
@@ -302,7 +319,6 @@ void VirtualDiagramBuilder::AdjustVirtualCircuitLinePosition(VirtualSvg& svg, QL
 			}
 		}
 	}
-	// m_painter->restore();
 }
 
 void VirtualDiagramBuilder::AdjustVirtualCircuitPlatePosition(QHash<QString, PlateRect>& hash, const QString& iedName, const QPoint& linePt, const QString& plateDesc, const QString& plateRef, quint64 plateCode, bool isSrcPlate, bool isSideSrc, bool isLeft)

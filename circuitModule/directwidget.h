@@ -89,6 +89,7 @@ protected:
 
 signals:
 	void opticalLineClicked(quint64 opticalCode, const QString& srcIedName, const QString& destIedName);
+	void opticalConnPointClicked(quint64 opticalCode, const QString& iedName, const QString& peerIedName);
 	void logicLineClicked(LineItem* lineItem);
 	void maintainPlateToggled(const QString& iedName, int value);
 
@@ -155,6 +156,7 @@ private:
 
 private slots:
 	void OnOpticalLineClicked(quint64 opticalCode, const QString& srcIedName, const QString& destIedName);
+	void OnOpticalConnPointClicked(quint64 opticalCode, const QString& iedName, const QString& peerIedName);
 	void OnLogicLineClicked(LineItem* lineItem);
 	void OnMaintainPlateToggled(const QString& iedName, int value);
 	//************************************

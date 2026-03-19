@@ -28,6 +28,18 @@ namespace
 		DIRECT_WHOLE_SIDE_LABEL_BOTTOM_PADDING = 1	// drawText 前额外扣掉的底部修正
 	};
 
+	enum DirectConnPointConfig
+	{
+		DIRECT_CONN_POINT_HIT_MARGIN = 6,
+		DIRECT_CONN_POINT_HIGHLIGHT_RADIUS = 4,
+		DIRECT_CONN_POINT_HIGHLIGHT_WIDTH = 2
+	};
+
+	QPointF direct_optical_conn_circle_center(const QPoint& point, int radius, bool isCircleUnderPt)
+	{
+		return QPointF(point.x(), isCircleUnderPt ? point.y() + radius : point.y() - radius);
+	}
+
 	void direct_draw_virtual_body(QPainter* painter, const QPointF& startPoint, const QPointF& endPoint, bool hasMiddleGap, qreal gapStartX, qreal gapEndX)
 	{
 		if (!hasMiddleGap || qAbs(startPoint.y() - endPoint.y()) > 0.001)
@@ -806,18 +818,25 @@ void DirectOpticalLineItem::paint(QPainter* painter, const QStyleOptionGraphicsI
 	painter->setPen(pen);
 	painter->setBrush(Qt::NoBrush);
 	directlinehelpers::DrawPolyline(painter, m_points);
-	directlinehelpers::DrawConnCircle(painter, m_startPoint, CONN_R, m_startAtTop);
-	directlinehelpers::DrawConnCircle(painter, m_endPoint, CONN_R, m_endAtTop);
 	directlinehelpers::DrawPolylineArrows(painter, m_points, CONN_R, DIRECT_ARROW_OFFSET, m_startArrowState, m_endArrowState, m_lineColor, ARROW_LEN);
 	directlinehelpers::DrawPortText(painter, m_startPoint, m_endPoint, m_startAtTop, m_endAtTop,
 		m_startIsSwitch, m_endIsSwitch, m_startPort, m_endPort, CONN_R);
 }
 
+void DirectOpticalLineItem::setHighlighted(bool highlighted)
+{
+	if (m_highlighted == highlighted)
+	{
+		return;
+	}
+	m_highlighted = highlighted;
+	update();
+}
+
 void DirectOpticalLineItem::hoverEnterEvent(QGraphicsSceneHoverEvent* event)
 {
 	Q_UNUSED(event);
-	m_highlighted = true;
-	update();
+	setHighlighted(true);
 }
 
 QPainterPath DirectOpticalLineItem::shape() const
@@ -826,6 +845,86 @@ QPainterPath DirectOpticalLineItem::shape() const
 }
 
 void DirectOpticalLineItem::hoverLeaveEvent(QGraphicsSceneHoverEvent* event)
+{
+	Q_UNUSED(event);
+	setHighlighted(false);
+}
+
+DirectOpticalConnPointItem::DirectOpticalConnPointItem(QGraphicsItem* parent)
+	: m_anchorPoint(0, 0)
+	, m_isCircleUnderPt(true)
+	, m_pOpticalLineItem(NULL)
+	, m_highlighted(false)
+{
+	Q_UNUSED(parent);
+	m_itemType = Icon;
+	setAcceptHoverEvents(true);
+	setCursor(Qt::PointingHandCursor);
+}
+
+DirectOpticalConnPointItem::~DirectOpticalConnPointItem()
+{
+}
+
+QRectF DirectOpticalConnPointItem::boundingRect() const
+{
+	QPointF centerPoint = direct_optical_conn_circle_center(m_anchorPoint, CONN_R, m_isCircleUnderPt);
+	qreal outerRadius = CONN_R + DIRECT_CONN_POINT_HIT_MARGIN;
+	if (m_highlighted)
+	{
+		outerRadius = qMax(outerRadius, (qreal)(CONN_R + DIRECT_CONN_POINT_HIGHLIGHT_RADIUS + DIRECT_CONN_POINT_HIGHLIGHT_WIDTH));
+	}
+	return QRectF(centerPoint.x() - outerRadius, centerPoint.y() - outerRadius, outerRadius * 2.0, outerRadius * 2.0);
+}
+
+void DirectOpticalConnPointItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
+{
+	Q_UNUSED(option);
+	Q_UNUSED(widget);
+	QPointF centerPoint = direct_optical_conn_circle_center(m_anchorPoint, CONN_R, m_isCircleUnderPt);
+	if (m_highlighted)
+	{
+		QPen ringPen(QColor(255, 255, 180));
+		ringPen.setWidth(DIRECT_CONN_POINT_HIGHLIGHT_WIDTH);
+		painter->setPen(ringPen);
+		painter->setBrush(Qt::NoBrush);
+		painter->drawEllipse(centerPoint, CONN_R + DIRECT_CONN_POINT_HIGHLIGHT_RADIUS, CONN_R + DIRECT_CONN_POINT_HIGHLIGHT_RADIUS);
+	}
+	painter->setPen(Qt::NoPen);
+	painter->setBrush(QBrush(utils::ColorHelper::Color(utils::ColorHelper::pure_green)));
+	painter->drawEllipse(centerPoint, CONN_R, CONN_R);
+}
+
+QPainterPath DirectOpticalConnPointItem::shape() const
+{
+	QPainterPath path;
+	QPointF centerPoint = direct_optical_conn_circle_center(m_anchorPoint, CONN_R, m_isCircleUnderPt);
+	qreal hitRadius = CONN_R + DIRECT_CONN_POINT_HIT_MARGIN;
+	path.addEllipse(centerPoint, hitRadius, hitRadius);
+	return path;
+}
+
+void DirectOpticalConnPointItem::setConnPoint(const QPoint& anchorPoint, bool isCircleUnderPt, DirectOpticalLineItem* pOpticalLineItem)
+{
+	prepareGeometryChange();
+	m_anchorPoint = anchorPoint;
+	m_isCircleUnderPt = isCircleUnderPt;
+	m_pOpticalLineItem = pOpticalLineItem;
+	update();
+}
+
+void DirectOpticalConnPointItem::hoverEnterEvent(QGraphicsSceneHoverEvent* event)
+{
+	Q_UNUSED(event);
+	m_highlighted = true;
+	if (m_pOpticalLineItem)
+	{
+		m_pOpticalLineItem->setHighlighted(false);
+	}
+	update();
+}
+
+void DirectOpticalConnPointItem::hoverLeaveEvent(QGraphicsSceneHoverEvent* event)
 {
 	Q_UNUSED(event);
 	m_highlighted = false;

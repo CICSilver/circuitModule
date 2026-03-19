@@ -358,13 +358,19 @@ void CircuitModuleWidget::onStationTreeItemClicked(const QModelIndex& index)
 	}
 	if (nodeType == TreeNodeType_Bay)
 	{
+		QWidget* currentWidget = ui.tabWidget->currentWidget();
 		DisplayBayLogic(nodeKey);
 		DisplayBayOptical(nodeKey);
-		ReleaseDirectWidget(ui.tab_3, m_directVirtualWidget);
-		m_directVirtualWidget = CreateDirectWidget(ui.tab_3, ui.wholeView, "directVirtualWidget");
-		ReleaseDirectWidget(ui.tab_4, m_directWholeWidget);
-		m_directWholeWidget = CreateDirectWidget(ui.tab_4, ui.wholeRealView, "directWholeWidget");
-		ui.tabWidget->setCurrentWidget(ui.tab_2);
+		DisplayBayVirtual(nodeKey);
+		DisplayBayWhole(nodeKey);
+		if (currentWidget == ui.tab || currentWidget == ui.tab_2 || currentWidget == ui.tab_3 || currentWidget == ui.tab_4)
+		{
+			ui.tabWidget->setCurrentWidget(currentWidget);
+		}
+		else
+		{
+			ui.tabWidget->setCurrentWidget(ui.tab_4);
+		}
 		return;
 	}
 	DisplayIed(nodeKey);
@@ -493,6 +499,26 @@ void CircuitModuleWidget::DisplayVirtualIed(const QString& iedName)
 	delete virtualDiagram;
 }
 
+void CircuitModuleWidget::DisplayBayVirtual(const QString& bayName)
+{
+	if (!m_directVirtualWidget)
+	{
+		InitializeDirectWidgets();
+	}
+
+	CircuitDiagramProxy diagramProxy;
+	VirtualDiagramModel* virtualDiagram = diagramProxy.BuildVirtualDiagramByBayName(bayName);
+	if (!virtualDiagram)
+	{
+		ReleaseDirectWidget(ui.tab_3, m_directVirtualWidget);
+		m_directVirtualWidget = CreateDirectWidget(ui.tab_3, ui.wholeView, "directVirtualWidget");
+		return;
+	}
+
+	m_directVirtualWidget->ParseFromVirtualSvg(*virtualDiagram);
+	delete virtualDiagram;
+}
+
 void CircuitModuleWidget::DisplayWholeIed(const QString& iedName)
 {
 	if (!m_directWholeWidget)
@@ -502,6 +528,26 @@ void CircuitModuleWidget::DisplayWholeIed(const QString& iedName)
 
 	CircuitDiagramProxy diagramProxy;
 	WholeDiagramModel* wholeDiagram = diagramProxy.BuildWholeDiagramByIedName(iedName);
+	if (!wholeDiagram)
+	{
+		ReleaseDirectWidget(ui.tab_4, m_directWholeWidget);
+		m_directWholeWidget = CreateDirectWidget(ui.tab_4, ui.wholeRealView, "directWholeWidget");
+		return;
+	}
+
+	m_directWholeWidget->ParseFromWholeSvg(*wholeDiagram);
+	delete wholeDiagram;
+}
+
+void CircuitModuleWidget::DisplayBayWhole(const QString& bayName)
+{
+	if (!m_directWholeWidget)
+	{
+		InitializeDirectWidgets();
+	}
+
+	CircuitDiagramProxy diagramProxy;
+	WholeDiagramModel* wholeDiagram = diagramProxy.BuildWholeDiagramByBayName(bayName);
 	if (!wholeDiagram)
 	{
 		ReleaseDirectWidget(ui.tab_4, m_directWholeWidget);

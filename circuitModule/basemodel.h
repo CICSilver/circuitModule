@@ -21,6 +21,12 @@ enum VirtualType
 	SV
 };
 
+enum ControlBlockPartyType
+{
+	CB_PUBLISHER = 0,
+	CB_SUBSCRIBER
+};
+
 // 连接状态类型
 enum OptLinkStatusType
 {
@@ -96,6 +102,47 @@ struct VirtualCircuit
 	stuRtdbGseCircuit* pRtdbCircuit;// 实时库对应的GSE链路指针
 	float val;						// 原始值
 	bool connStatus;				// 通断状态
+};
+
+struct OpticalControlBlockInfo
+{
+	OpticalControlBlockInfo()
+	{
+		opticalCode = 0;
+		virtualCircuitCode = 0;
+		linkCode = 0;
+		controlBlockCode = 0;
+		endpointCode = 0;
+		softPlateCode = 0;
+		appid = -1;
+		type = GOOSE;
+		partyType = CB_PUBLISHER;
+		isLocalControlBlock = false;
+	}
+	quint64 opticalCode;
+	quint64 virtualCircuitCode;
+	quint64 linkCode;
+	quint64 controlBlockCode;
+	quint64 endpointCode;
+	quint64 softPlateCode;
+	int appid;
+	VirtualType type;
+	ControlBlockPartyType partyType;
+	bool isLocalControlBlock;
+	QString iedName;
+	QString iedDesc;
+	QString peerIedName;
+	QString peerIedDesc;
+	QString controlBlockName;
+	QString controlBlockRef;
+	QString dataSetName;
+	QString identityName;
+	QString macAddr;
+	QString endpointRef;
+	QString endpointName;
+	QString endpointDesc;
+	QString softPlateRef;
+	QString softPlateDesc;
 };
 
 struct IED

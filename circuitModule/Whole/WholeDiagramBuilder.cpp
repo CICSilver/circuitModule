@@ -3,6 +3,9 @@
 #include "directitems.h"
 #include <QFont>
 #include <QFontMetrics>
+#include <QMap>
+#include <QSet>
+#include <QStringList>
 enum WholeDiagramConfig
 {
 	WHOLE_GROUP_BRACE_WIDTH = 18,		// 虚实回路分组大括号宽度
@@ -14,7 +17,7 @@ enum WholeDiagramConfig
 	WHOLE_VALUE_ICON_SAFE_GAP = 4		// 值文本与图标之间的安全间距
 };
 
-static bool whole_fill_optical_side_ports(const OpticalCircuit* opticalCircuit, const QString& iedName, QString& iedPort, QString& switchPort)
+bool WholeDiagramBuilder::FillOpticalSidePorts(const OpticalCircuit* opticalCircuit, const QString& iedName, QString& iedPort, QString& switchPort) const
 {
 	if (!opticalCircuit || iedName.isEmpty())
 	{
@@ -35,7 +38,7 @@ static bool whole_fill_optical_side_ports(const OpticalCircuit* opticalCircuit, 
 	return false;
 }
 
-static bool whole_fill_direct_ports(const OpticalCircuit* opticalCircuit, const QString& leftIedName, const QString& rightIedName, QString& leftPort, QString& rightPort)
+bool WholeDiagramBuilder::FillDirectPorts(const OpticalCircuit* opticalCircuit, const QString& leftIedName, const QString& rightIedName, QString& leftPort, QString& rightPort) const
 {
 	if (!opticalCircuit || leftIedName.isEmpty() || rightIedName.isEmpty())
 	{
@@ -56,7 +59,7 @@ static bool whole_fill_direct_ports(const OpticalCircuit* opticalCircuit, const 
 	return false;
 }
 
-static VirtualCircuit* whole_find_first_valid_virtual_circuit(const LogicCircuitLine* pLogicLine)
+VirtualCircuit* WholeDiagramBuilder::GetFirstValidVirtualCircuit(const LogicCircuitLine* pLogicLine) const
 {
 	if (!pLogicLine)
 	{
@@ -73,9 +76,9 @@ static VirtualCircuit* whole_find_first_valid_virtual_circuit(const LogicCircuit
 	return NULL;
 }
 
-static void whole_build_group_port_texts(CircuitConfig* circuitConfig, WholeGroupDecor* groupDecor, const LogicCircuitLine* pLogicLine)
+void WholeDiagramBuilder::BuildGroupPortTexts(WholeGroupDecor* groupDecor, const LogicCircuitLine* pLogicLine)
 {
-	if (!circuitConfig || !groupDecor || !pLogicLine)
+	if (!m_pCircuitConfig || !groupDecor || !pLogicLine)
 	{
 		return;
 	}
@@ -93,17 +96,17 @@ static void whole_build_group_port_texts(CircuitConfig* circuitConfig, WholeGrou
 		leftIedRect = rightIedRect;
 		rightIedRect = tempRect;
 	}
-	VirtualCircuit* virtualCircuit = whole_find_first_valid_virtual_circuit(pLogicLine);
+	VirtualCircuit* virtualCircuit = GetFirstValidVirtualCircuit(pLogicLine);
 	if (!virtualCircuit)
 	{
 		return;
 	}
 	if (groupDecor->groupMode == WholeGroupMode_Direct)
 	{
-		OpticalCircuit* directOpticalCircuit = circuitConfig->getOpticalByCode(virtualCircuit->leftOpticalCode);
+		OpticalCircuit* directOpticalCircuit = m_pCircuitConfig->getOpticalByCode(virtualCircuit->leftOpticalCode);
 		QString leftPort;
 		QString rightPort;
-		if (!whole_fill_direct_ports(directOpticalCircuit, leftIedRect->iedName, rightIedRect->iedName, leftPort, rightPort))
+		if (!FillDirectPorts(directOpticalCircuit, leftIedRect->iedName, rightIedRect->iedName, leftPort, rightPort))
 		{
 			return;
 		}
@@ -115,21 +118,21 @@ static void whole_build_group_port_texts(CircuitConfig* circuitConfig, WholeGrou
 	{
 		return;
 	}
-	OpticalCircuit* firstOpticalCircuit = circuitConfig->getOpticalByCode(virtualCircuit->leftOpticalCode);
-	OpticalCircuit* secondOpticalCircuit = circuitConfig->getOpticalByCode(virtualCircuit->rightOpticalCode);
+	OpticalCircuit* firstOpticalCircuit = m_pCircuitConfig->getOpticalByCode(virtualCircuit->leftOpticalCode);
+	OpticalCircuit* secondOpticalCircuit = m_pCircuitConfig->getOpticalByCode(virtualCircuit->rightOpticalCode);
 	QString leftDevicePort;
 	QString leftSwitchPort;
 	QString rightDevicePort;
 	QString rightSwitchPort;
-	bool leftMatched = whole_fill_optical_side_ports(firstOpticalCircuit, leftIedRect->iedName, leftDevicePort, leftSwitchPort);
-	bool rightMatched = whole_fill_optical_side_ports(secondOpticalCircuit, rightIedRect->iedName, rightDevicePort, rightSwitchPort);
+	bool leftMatched = FillOpticalSidePorts(firstOpticalCircuit, leftIedRect->iedName, leftDevicePort, leftSwitchPort);
+	bool rightMatched = FillOpticalSidePorts(secondOpticalCircuit, rightIedRect->iedName, rightDevicePort, rightSwitchPort);
 	if (!leftMatched)
 	{
-		leftMatched = whole_fill_optical_side_ports(secondOpticalCircuit, leftIedRect->iedName, leftDevicePort, leftSwitchPort);
+		leftMatched = FillOpticalSidePorts(secondOpticalCircuit, leftIedRect->iedName, leftDevicePort, leftSwitchPort);
 	}
 	if (!rightMatched)
 	{
-		rightMatched = whole_fill_optical_side_ports(firstOpticalCircuit, rightIedRect->iedName, rightDevicePort, rightSwitchPort);
+		rightMatched = FillOpticalSidePorts(firstOpticalCircuit, rightIedRect->iedName, rightDevicePort, rightSwitchPort);
 	}
 	if (!leftMatched || !rightMatched)
 	{
@@ -139,7 +142,7 @@ static void whole_build_group_port_texts(CircuitConfig* circuitConfig, WholeGrou
 	groupDecor->rightPortText = rightSwitchPort + QString::fromLatin1(" / ") + rightDevicePort;
 }
 
-static void whole_build_group_port_layout(WholeGroupDecor* groupDecor)
+void WholeDiagramBuilder::BuildGroupPortLayout(WholeGroupDecor* groupDecor) const
 {
 	if (!groupDecor)
 	{
@@ -184,14 +187,8 @@ static void whole_build_group_port_layout(WholeGroupDecor* groupDecor)
 		groupDecor->rightPortRect = QRectF(rightStartX, textTop, arrowRightX - rightStartX, textHeight);
 	}
 }
-// #define WHOLE_GROUP_BRACE_WIDTH 18
-// #define WHOLE_GROUP_ARROW_MARGIN 16
-// #define WHOLE_GROUP_SWITCH_ICON_WIDTH 86
-// #define WHOLE_GROUP_SWITCH_ICON_HEIGHT 60
-// #define WHOLE_GROUP_SWITCH_ICON_SIDE_GAP 4
-// #define WHOLE_GROUP_TOP_BOTTOM_MARGIN 4
 
-static WholeGroupMode whole_group_mode_of_logic(const LogicCircuitLine* pLogicLine, QString& switchIedName)
+WholeGroupMode WholeDiagramBuilder::GetGroupMode(const LogicCircuitLine* pLogicLine, QString& switchIedName) const
 {
 	if (!pLogicLine || !pLogicLine->pLogicCircuit)
 	{
@@ -269,7 +266,7 @@ static qreal whole_required_edge_distance(bool hasSwitchIcon)
 	return textWidth * 2 + middleWidth;
 }
 
-static void whole_shift_rect_list(QList<IedRect*>& rectList, int offsetX)
+void WholeDiagramBuilder::ShiftRectList(QList<IedRect*>& rectList, int offsetX) const
 {
 	for (int i = 0; i < rectList.size(); ++i)
 	{
@@ -282,7 +279,7 @@ static void whole_shift_rect_list(QList<IedRect*>& rectList, int offsetX)
 	}
 }
 
-static qreal whole_max_right_edge(const WholeCircuitSvg& svg)
+qreal WholeDiagramBuilder::GetMaxRightEdge(const WholeCircuitSvg& svg) const
 {
 	qreal maxRight = svg.mainIedRect ? (svg.mainIedRect->x + svg.mainIedRect->width) : 0;
 	for (int i = 0; i < svg.leftIedRectList.size(); ++i)
@@ -304,7 +301,7 @@ static qreal whole_max_right_edge(const WholeCircuitSvg& svg)
 	return maxRight;
 }
 
-static qreal whole_min_left_edge(const WholeCircuitSvg& svg)
+qreal WholeDiagramBuilder::GetMinLeftEdge(const WholeCircuitSvg& svg) const
 {
 	qreal minLeft = svg.mainIedRect ? svg.mainIedRect->x : 0;
 	for (int i = 0; i < svg.leftIedRectList.size(); ++i)
@@ -326,7 +323,7 @@ static qreal whole_min_left_edge(const WholeCircuitSvg& svg)
 	return minLeft;
 }
 
-static void whole_shift_all_ieds(WholeCircuitSvg& svg, int offsetX)
+void WholeDiagramBuilder::ShiftAllIeds(WholeCircuitSvg& svg, int offsetX) const
 {
 	if (offsetX == 0)
 	{
@@ -336,11 +333,11 @@ static void whole_shift_all_ieds(WholeCircuitSvg& svg, int offsetX)
 	{
 		svg.mainIedRect->x = (quint16)(svg.mainIedRect->x + offsetX);
 	}
-	whole_shift_rect_list(svg.leftIedRectList, offsetX);
-	whole_shift_rect_list(svg.rightIedRectList, offsetX);
+	ShiftRectList(svg.leftIedRectList, offsetX);
+	ShiftRectList(svg.rightIedRectList, offsetX);
 }
 
-static void whole_reset_connect_index(IedRect* rect)
+void WholeDiagramBuilder::ResetConnectIndex(IedRect* rect) const
 {
 	if (!rect)
 	{
@@ -352,7 +349,7 @@ static void whole_reset_connect_index(IedRect* rect)
 	rect->top_connect_index = 0;
 }
 
-static void whole_clear_virtual_lines(QList<IedRect*>& rectList)
+void WholeDiagramBuilder::ClearVirtualLines(QList<IedRect*>& rectList)
 {
 	for (int i = 0; i < rectList.size(); ++i)
 	{
@@ -361,7 +358,7 @@ static void whole_clear_virtual_lines(QList<IedRect*>& rectList)
 		{
 			continue;
 		}
-		whole_reset_connect_index(rect);
+		ResetConnectIndex(rect);
 		for (int j = 0; j < rect->logic_line_list.size(); ++j)
 		{
 			LogicCircuitLine* logicLine = rect->logic_line_list.at(j);
@@ -375,15 +372,15 @@ static void whole_clear_virtual_lines(QList<IedRect*>& rectList)
 	}
 }
 
-static void whole_reset_virtual_state(WholeCircuitSvg& svg)
+void WholeDiagramBuilder::ResetVirtualState(WholeCircuitSvg& svg)
 {
-	whole_reset_connect_index(svg.mainIedRect);
-	whole_clear_virtual_lines(svg.leftIedRectList);
-	whole_clear_virtual_lines(svg.rightIedRectList);
+	ResetConnectIndex(svg.mainIedRect);
+	ClearVirtualLines(svg.leftIedRectList);
+	ClearVirtualLines(svg.rightIedRectList);
 	svg.plateRectHash.clear();
 }
 
-static void whole_adjust_virtual_plate_position(QHash<QString, PlateRect>& hash, const QString& iedName, const QPoint& linePt, const QString& plateDesc, const QString& plateRef, quint64 plateCode, bool isSrcPlate, bool isSideSrc, bool isLeft)
+void WholeDiagramBuilder::AdjustVirtualPlatePosition(QHash<QString, PlateRect>& hash, const QString& iedName, const QPoint& linePt, const QString& plateDesc, const QString& plateRef, quint64 plateCode, bool isSrcPlate, bool isSideSrc, bool isLeft)
 {
 	if (plateDesc.isEmpty() || plateRef.isEmpty())
 	{
@@ -433,8 +430,8 @@ static void whole_adjust_virtual_plate_position(QHash<QString, PlateRect>& hash,
 	}
 }
 
-static void whole_build_virtual_line_geometry(const WholeCircuitSvg& svg, IedRect* sideRect, IedRect* mainIed, bool isLeft, bool isSideSource, bool groupedMode,
-	int valWidth, int startOffset, VirtualCircuitLine* pVtLine, int& startValX, int& endValX, int& descRectX, int& descRectWidth)
+void WholeDiagramBuilder::BuildVirtualLineGeometry(IedRect* sideRect, IedRect* mainIed, bool isLeft, bool isSideSource, bool groupedMode,
+	int valWidth, int startOffset, VirtualCircuitLine* pVtLine, int& startValX, int& endValX, int& descRectX, int& descRectWidth) const
 {
 	IedRect* srcRect = isSideSource ? sideRect : mainIed;
 	IedRect* destRect = isSideSource ? mainIed : sideRect;
@@ -489,7 +486,7 @@ static void whole_build_virtual_line_geometry(const WholeCircuitSvg& svg, IedRec
 	}
 }
 
-static void whole_rebuild_virtual_lines_for_rect_list(WholeCircuitSvg& svg, QList<IedRect*>& rectList, IedRect* mainIed, bool isLeft)
+void WholeDiagramBuilder::RebuildVirtualLinesForRectList(WholeCircuitSvg& svg, QList<IedRect*>& rectList, IedRect* mainIed, bool isLeft)
 {
 	if (!mainIed)
 	{
@@ -515,7 +512,7 @@ static void whole_rebuild_virtual_lines_for_rect_list(WholeCircuitSvg& svg, QLis
 				continue;
 			}
 			QString switchIedName;
-			WholeGroupMode groupMode = whole_group_mode_of_logic(pLogicLine, switchIedName);
+			WholeGroupMode groupMode = GetGroupMode(pLogicLine, switchIedName);
 			bool groupedMode = groupMode != WholeGroupMode_Fallback;
 			for (int circuitIndex = 0; circuitIndex < pLogicLine->pLogicCircuit->circuitList.size(); ++circuitIndex)
 			{
@@ -536,7 +533,7 @@ static void whole_rebuild_virtual_lines_for_rect_list(WholeCircuitSvg& svg, QLis
 				int endValX = 0;
 				int descRectX = 0;
 				int descRectWidth = 0;
-				whole_build_virtual_line_geometry(svg, rect, mainIed, isLeft, isSideSource, groupedMode, valWidth, startOffset, pVtLine, startValX, endValX, descRectX, descRectWidth);
+				BuildVirtualLineGeometry(rect, mainIed, isLeft, isSideSource, groupedMode, valWidth, startOffset, pVtLine, startValX, endValX, descRectX, descRectWidth);
 				if (isSideSource)
 				{
 					pVtLine->circuitDesc = isLeft ? QString("%1 -> %2").arg(pCircuit->srcDesc, pCircuit->destDesc) : QString("%1 <- %2").arg(pCircuit->destDesc, pCircuit->srcDesc);
@@ -560,15 +557,15 @@ static void whole_rebuild_virtual_lines_for_rect_list(WholeCircuitSvg& svg, QLis
 				pVtLine->circuitDescRect = QRect(QPoint(descRectX, (int)(ptY - fm.height() * 1.2)), QSize(descRectWidth, fm.height()));
 				pLogicLine->virtual_line_list.append(pVtLine);
 				QString key = QString("%1+%2").arg(srcRect->iedName).arg(destRect->iedName);
-				whole_adjust_virtual_plate_position(svg.plateRectHash, key, pVtLine->endPoint, pCircuit->destSoftPlateDesc, pCircuit->destSoftPlateRef, pCircuit->destSoftPlateCode, false, isSideSource, isLeft);
-				whole_adjust_virtual_plate_position(svg.plateRectHash, key, pVtLine->startPoint, pCircuit->srcSoftPlateDesc, pCircuit->srcSoftPlateRef, pCircuit->srcSoftPlateCode, true, isSideSource, isLeft);
+				AdjustVirtualPlatePosition(svg.plateRectHash, key, pVtLine->endPoint, pCircuit->destSoftPlateDesc, pCircuit->destSoftPlateRef, pCircuit->destSoftPlateCode, false, isSideSource, isLeft);
+				AdjustVirtualPlatePosition(svg.plateRectHash, key, pVtLine->startPoint, pCircuit->srcSoftPlateDesc, pCircuit->srcSoftPlateRef, pCircuit->srcSoftPlateCode, true, isSideSource, isLeft);
 				++(*pConnectPtIndex);
 			}
 		}
 	}
 }
 
-static void whole_expand_side_distance(WholeCircuitSvg& svg)
+void WholeDiagramBuilder::ExpandSideDistance(WholeCircuitSvg& svg)
 {
 	if (!svg.mainIedRect)
 	{
@@ -586,7 +583,7 @@ static void whole_expand_side_distance(WholeCircuitSvg& svg)
 		{
 			LogicCircuitLine* logicLine = rect->logic_line_list.at(j);
 			QString switchIedName;
-			WholeGroupMode groupMode = whole_group_mode_of_logic(logicLine, switchIedName);
+			WholeGroupMode groupMode = GetGroupMode(logicLine, switchIedName);
 			if (groupMode == WholeGroupMode_Fallback)
 			{
 				continue;
@@ -613,7 +610,7 @@ static void whole_expand_side_distance(WholeCircuitSvg& svg)
 		{
 			LogicCircuitLine* logicLine = rect->logic_line_list.at(j);
 			QString switchIedName;
-			WholeGroupMode groupMode = whole_group_mode_of_logic(logicLine, switchIedName);
+			WholeGroupMode groupMode = GetGroupMode(logicLine, switchIedName);
 			if (groupMode == WholeGroupMode_Fallback)
 			{
 				continue;
@@ -630,30 +627,674 @@ static void whole_expand_side_distance(WholeCircuitSvg& svg)
 	}
 	if (leftShift > 0)
 	{
-		whole_shift_rect_list(svg.leftIedRectList, -leftShift);
+		ShiftRectList(svg.leftIedRectList, -leftShift);
 	}
 	if (rightShift > 0)
 	{
-		whole_shift_rect_list(svg.rightIedRectList, rightShift);
+		ShiftRectList(svg.rightIedRectList, rightShift);
 	}
-	qreal minLeft = whole_min_left_edge(svg);
+	qreal minLeft = GetMinLeftEdge(svg);
 	if (minLeft < 0)
 	{
-		whole_shift_all_ieds(svg, (int)(-minLeft));
+		ShiftAllIeds(svg, (int)(-minLeft));
 	}
-	qreal maxRight = whole_max_right_edge(svg);
+	qreal maxRight = GetMaxRightEdge(svg);
 	if (maxRight > svg.viewBoxWidth)
 	{
 		svg.viewBoxWidth = (quint16)(maxRight + 50);
 	}
 }
 
-static void whole_rebuild_virtual_layout(WholeCircuitSvg& svg)
+void WholeDiagramBuilder::RebuildVirtualLayout(WholeCircuitSvg& svg)
 {
-	whole_expand_side_distance(svg);
-	whole_reset_virtual_state(svg);
-	whole_rebuild_virtual_lines_for_rect_list(svg, svg.leftIedRectList, svg.mainIedRect, true);
-	whole_rebuild_virtual_lines_for_rect_list(svg, svg.rightIedRectList, svg.mainIedRect, false);
+	ExpandSideDistance(svg);
+	ResetVirtualState(svg);
+	RebuildVirtualLinesForRectList(svg, svg.leftIedRectList, svg.mainIedRect, true);
+	RebuildVirtualLinesForRectList(svg, svg.rightIedRectList, svg.mainIedRect, false);
+}
+
+
+
+static QString whole_read_local_text(const char* rawText, const QString& defaultText = QString())
+{
+	if (!rawText || rawText[0] == '\0')
+	{
+		return defaultText;
+	}
+	return QString::fromLocal8Bit(rawText);
+}
+
+static QString whole_get_bay_key(const CRtdbEleModelBay* pBay)
+{
+	if (!pBay || !pBay->m_pBayInfo)
+	{
+		return QString();
+	}
+	QString bayName = whole_read_local_text(pBay->m_pBayInfo->bayName);
+	if (!bayName.isEmpty())
+	{
+		return bayName;
+	}
+	return whole_read_local_text(pBay->m_pBayInfo->bayDesc);
+}
+
+static QStringList whole_collect_bay_ied_name_list(CircuitConfig* pCircuitConfig, const QString& bayName)
+{
+	QStringList bayIedNameList;
+	const CRtdbEleModelStation* pStation = pCircuitConfig ? pCircuitConfig->StationModel() : NULL;
+	if (!pStation || bayName.isEmpty())
+	{
+		return bayIedNameList;
+	}
+	for (std::list<CRtdbEleModelVoltLevel*>::const_iterator voltIt = pStation->m_listVoltLevel.begin();
+		voltIt != pStation->m_listVoltLevel.end(); ++voltIt)
+	{
+		const CRtdbEleModelVoltLevel* pVolt = *voltIt;
+		if (!pVolt)
+		{
+			continue;
+		}
+		for (std::list<CRtdbEleModelBay*>::const_iterator bayIt = pVolt->m_listBay.begin();
+			bayIt != pVolt->m_listBay.end(); ++bayIt)
+		{
+			const CRtdbEleModelBay* pBay = *bayIt;
+			if (whole_get_bay_key(pBay) != bayName)
+			{
+				continue;
+			}
+			for (std::list<CRtdbEleModelIed*>::const_iterator iedIt = pBay->m_listIed.begin();
+				iedIt != pBay->m_listIed.end(); ++iedIt)
+			{
+				const CRtdbEleModelIed* pModelIed = *iedIt;
+				if (!pModelIed || !pModelIed->m_pIedHead)
+				{
+					continue;
+				}
+				QString iedName = whole_read_local_text(pModelIed->m_pIedHead->iedName);
+				if (iedName.isEmpty() || !pCircuitConfig->GetIedByName(iedName) || bayIedNameList.contains(iedName))
+				{
+					continue;
+				}
+				bayIedNameList.append(iedName);
+			}
+			return bayIedNameList;
+		}
+	}
+	return bayIedNameList;
+}
+
+static void whole_collect_bay_relations(CircuitConfig* pCircuitConfig,
+	const QStringList& bayIedNameList,
+	QList<LogicCircuit*>& internalLogicList,
+	QMap<QString, QList<LogicCircuit*> >& externalLogicHash,
+	QMap<QString, QStringList>& peerNameHash)
+{
+	QSet<QString> bayIedNameSet;
+	QSet<QString> processedCircuitKeySet;
+	for (int i = 0; i < bayIedNameList.size(); ++i)
+	{
+		bayIedNameSet.insert(bayIedNameList.at(i));
+	}
+	for (int bayIndex = 0; bayIndex < bayIedNameList.size(); ++bayIndex)
+	{
+		QList<LogicCircuit*> logicCircuitList = pCircuitConfig->GetAllLogicCircuitListByIEDName(bayIedNameList.at(bayIndex));
+		for (int logicIndex = 0; logicIndex < logicCircuitList.size(); ++logicIndex)
+		{
+			LogicCircuit* pLogicCircuit = logicCircuitList.at(logicIndex);
+			if (!pLogicCircuit || !pLogicCircuit->pSrcIed || !pLogicCircuit->pDestIed)
+			{
+				continue;
+			}
+			QString circuitKey = QString("%1|%2|%3|%4")
+				.arg(pLogicCircuit->pSrcIed->name)
+				.arg(pLogicCircuit->pDestIed->name)
+				.arg((int)pLogicCircuit->type)
+				.arg(pLogicCircuit->cbName);
+			if (processedCircuitKeySet.contains(circuitKey))
+			{
+				continue;
+			}
+			processedCircuitKeySet.insert(circuitKey);
+			QString srcIedName = pLogicCircuit->pSrcIed->name;
+			QString destIedName = pLogicCircuit->pDestIed->name;
+			bool srcInBay = bayIedNameSet.contains(srcIedName);
+			bool destInBay = bayIedNameSet.contains(destIedName);
+			if (srcInBay && destInBay)
+			{
+				internalLogicList.append(pLogicCircuit);
+			}
+			else if (srcInBay || destInBay)
+			{
+				QString ownerIedName = srcInBay ? srcIedName : destIedName;
+				QString peerIedName = srcInBay ? destIedName : srcIedName;
+				externalLogicHash[ownerIedName].append(pLogicCircuit);
+				QStringList& peerNameList = peerNameHash[ownerIedName];
+				if (!peerIedName.isEmpty() && !peerNameList.contains(peerIedName))
+				{
+					peerNameList.append(peerIedName);
+				}
+			}
+		}
+	}
+}
+
+static void whole_split_peer_name_list(QStringList peerNameList, QStringList& leftPeerNameList, QStringList& rightPeerNameList)
+{
+	peerNameList.sort();
+	leftPeerNameList.clear();
+	rightPeerNameList.clear();
+	for (int i = 0; i < peerNameList.size(); ++i)
+	{
+		if (i % 2 == 0)
+		{
+			leftPeerNameList.append(peerNameList.at(i));
+		}
+		else
+		{
+			rightPeerNameList.append(peerNameList.at(i));
+		}
+	}
+}
+
+IedRect* WholeDiagramBuilder::CreateIedRectWithSize(const QString& iedName, int x, int y, int width, int height, quint32 borderColor) const
+{
+	IED* pIed = m_pCircuitConfig ? m_pCircuitConfig->GetIedByName(iedName) : NULL;
+	QString iedDesc = pIed ? pIed->desc : QString();
+	return utils::GetIedRect(iedName, iedDesc, (quint16)x, (quint16)y, (quint16)width, (quint16)height, borderColor, utils::ColorHelper::pure_black);
+}
+
+LogicCircuitLine* WholeDiagramBuilder::CreateLogicLine(LogicCircuit* pLogicCircuit, IedRect* pSrcRect, IedRect* pDestRect) const
+{
+	LogicCircuitLine* pLine = new LogicCircuitLine();
+	pLine->pLogicCircuit = pLogicCircuit;
+	pLine->pSrcIedRect = pSrcRect;
+	pLine->pDestIedRect = pDestRect;
+	pLine->srcArrowState = Arrow_None;
+	pLine->destArrowState = Arrow_In;
+	pLine->arrowState = Arrow_In;
+	return pLine;
+}
+
+void WholeDiagramBuilder::AdjustRectExtendHeight(IedRect* pRect) const
+{
+	if (!pRect)
+	{
+		return;
+	}
+	int circuitSize = 0;
+	for (int i = 0; i < pRect->logic_line_list.size(); ++i)
+	{
+		LogicCircuitLine* pLine = pRect->logic_line_list.at(i);
+		if (!pLine || !pLine->pLogicCircuit)
+		{
+			continue;
+		}
+		circuitSize += pLine->pLogicCircuit->circuitList.size();
+	}
+	pRect->extend_height = circuitSize * (CIRCUIT_VERTICAL_DISTANCE + ICON_LENGTH) + pRect->inner_gap + PLATE_HEIGHT;
+}
+
+int WholeDiagramBuilder::GetRectOuterBottom(const IedRect* pRect) const
+{
+	if (!pRect)
+	{
+		return 0;
+	}
+	return pRect->y + pRect->height + pRect->extend_height;
+}
+
+static void whole_adjust_bay_plate_position(QHash<QString, PlateRect>& hash, const QString& ownerKey, const QPoint& linePt,
+	const QString& plateDesc, const QString& plateRef, quint64 plateCode, const QString& iedName, bool placeRight)
+{
+	if (plateDesc.isEmpty() || plateRef.isEmpty())
+	{
+		return;
+	}
+	QString key = QString("%1_%2").arg(ownerKey, plateRef);
+	if (!hash.contains(key))
+	{
+		PlateRect plateRect;
+		plateRect.code = plateCode;
+		plateRect.iedName = iedName;
+		plateRect.desc = plateDesc;
+		plateRect.ref = plateRef;
+		int rectWidth = PLATE_WIDTH + 2 * PLATE_GAP;
+		int plateY = linePt.y() - ICON_LENGTH / 2;
+		int startOffset = (int)(ARROW_LEN * 1.5);
+		int plateX = placeRight ? linePt.x() + startOffset : linePt.x() - rectWidth - startOffset;
+		plateRect.rect = QRect(QPoint(plateX, plateY), QSize(rectWidth, ICON_LENGTH));
+		hash.insert(key, plateRect);
+	}
+	else
+	{
+		PlateRect& plateRect = hash[key];
+		plateRect.rect.setHeight(plateRect.rect.height() + ICON_LENGTH + CIRCUIT_VERTICAL_DISTANCE);
+	}
+}
+
+
+
+enum WholeBayTreeConfig
+{
+	WHOLE_BAY_TREE_LEFT_MARGIN = 80,
+	WHOLE_BAY_TREE_TOP_MARGIN = 40,
+	WHOLE_BAY_TREE_NODE_WIDTH = RECT_DEFAULT_WIDTH * 3 / 2,
+	WHOLE_BAY_TREE_COLUMN_GAP = 400,
+	WHOLE_BAY_TREE_NODE_GAP = 24,
+	WHOLE_BAY_TREE_BLOCK_GAP = 80,
+	WHOLE_BAY_TREE_MAINT_PLATE_GAP = 30,
+	WHOLE_BAY_TREE_VIEW_MARGIN = 60
+};
+
+struct WholeBayTreeNode
+{
+	WholeBayTreeNode()
+		: inBay(false)
+		, side(0)
+		, depth(0)
+		, pParent(NULL)
+		, pRect(NULL)
+	{
+	}
+
+	QString iedName;
+	bool inBay;
+	int side;
+	int depth;
+	WholeBayTreeNode* pParent;
+	IedRect* pRect;
+	QList<WholeBayTreeNode*> childNodeList;
+	QList<LogicCircuit*> parentLogicList;
+};
+
+static QString whole_bay_tree_pair_key(const QString& firstName, const QString& secondName)
+{
+	if (firstName.compare(secondName, Qt::CaseInsensitive) <= 0)
+	{
+		return firstName + QString::fromLatin1("|") + secondName;
+	}
+	return secondName + QString::fromLatin1("|") + firstName;
+}
+
+static void whole_bay_tree_collect_logic_maps(CircuitConfig* pCircuitConfig,
+	const QStringList& bayIedNameList,
+	QMap<QString, QList<LogicCircuit*> >& pairLogicHash,
+	QMap<QString, QSet<QString> >& bayAdjHash,
+	QMap<QString, QSet<QString> >& allAdjHash)
+{
+	QSet<QString> bayIedNameSet;
+	QSet<QString> processedCircuitKeySet;
+	for (int i = 0; i < bayIedNameList.size(); ++i)
+	{
+		bayIedNameSet.insert(bayIedNameList.at(i));
+	}
+	for (int bayIndex = 0; bayIndex < bayIedNameList.size(); ++bayIndex)
+	{
+		QList<LogicCircuit*> logicCircuitList = pCircuitConfig->GetAllLogicCircuitListByIEDName(bayIedNameList.at(bayIndex));
+		for (int logicIndex = 0; logicIndex < logicCircuitList.size(); ++logicIndex)
+		{
+			LogicCircuit* pLogicCircuit = logicCircuitList.at(logicIndex);
+			if (!pLogicCircuit || !pLogicCircuit->pSrcIed || !pLogicCircuit->pDestIed)
+			{
+				continue;
+			}
+			QString circuitKey = QString("%1|%2|%3|%4")
+				.arg(pLogicCircuit->pSrcIed->name)
+				.arg(pLogicCircuit->pDestIed->name)
+				.arg((int)pLogicCircuit->type)
+				.arg(pLogicCircuit->cbName);
+			if (processedCircuitKeySet.contains(circuitKey))
+			{
+				continue;
+			}
+			processedCircuitKeySet.insert(circuitKey);
+			QString srcIedName = pLogicCircuit->pSrcIed->name;
+			QString destIedName = pLogicCircuit->pDestIed->name;
+			bool srcInBay = bayIedNameSet.contains(srcIedName);
+			bool destInBay = bayIedNameSet.contains(destIedName);
+			if (!srcInBay && !destInBay)
+			{
+				continue;
+			}
+			pairLogicHash[whole_bay_tree_pair_key(srcIedName, destIedName)].append(pLogicCircuit);
+			allAdjHash[srcIedName].insert(destIedName);
+			allAdjHash[destIedName].insert(srcIedName);
+			if (srcInBay && destInBay)
+			{
+				bayAdjHash[srcIedName].insert(destIedName);
+				bayAdjHash[destIedName].insert(srcIedName);
+			}
+		}
+	}
+}
+
+static void whole_bay_tree_collect_component(const QString& startIedName,
+	const QMap<QString, QSet<QString> >& bayAdjHash,
+	QSet<QString>& visitedSet,
+	QStringList& componentList)
+{
+	QStringList pendingList;
+	pendingList.append(startIedName);
+	visitedSet.insert(startIedName);
+	while (!pendingList.isEmpty())
+	{
+		QString currentIedName = pendingList.takeFirst();
+		componentList.append(currentIedName);
+		QSet<QString> neighborSet = bayAdjHash.value(currentIedName);
+		QSet<QString>::const_iterator it = neighborSet.constBegin();
+		for (; it != neighborSet.constEnd(); ++it)
+		{
+			if (visitedSet.contains(*it))
+			{
+				continue;
+			}
+			visitedSet.insert(*it);
+			pendingList.append(*it);
+		}
+	}
+}
+
+static QStringList whole_bay_tree_sort_names(const QSet<QString>& nameSet, const QSet<QString>& bayIedNameSet)
+{
+	QStringList bayNameList;
+	QStringList externalNameList;
+	QSet<QString>::const_iterator it = nameSet.constBegin();
+	for (; it != nameSet.constEnd(); ++it)
+	{
+		if (bayIedNameSet.contains(*it))
+		{
+			bayNameList.append(*it);
+		}
+		else
+		{
+			externalNameList.append(*it);
+		}
+	}
+	bayNameList.sort();
+	externalNameList.sort();
+	return bayNameList + externalNameList;
+}
+
+static QString whole_bay_tree_select_center(const QStringList& componentList,
+	const QMap<QString, QSet<QString> >& allAdjHash,
+	const QMap<QString, int>& bayOrderHash)
+{
+	QString bestIedName;
+	int bestDegree = -1;
+	int bestOrder = 0x7fffffff;
+	for (int i = 0; i < componentList.size(); ++i)
+	{
+		QString iedName = componentList.at(i);
+		int degree = allAdjHash.value(iedName).size();
+		int order = bayOrderHash.value(iedName, 0x7fffffff);
+		if (degree > bestDegree)
+		{
+			bestDegree = degree;
+			bestOrder = order;
+			bestIedName = iedName;
+			continue;
+		}
+		if (degree == bestDegree)
+		{
+			if (order < bestOrder)
+			{
+				bestOrder = order;
+				bestIedName = iedName;
+				continue;
+			}
+			if (order == bestOrder && (bestIedName.isEmpty() || QString::compare(iedName, bestIedName, Qt::CaseInsensitive) < 0))
+			{
+				bestIedName = iedName;
+			}
+		}
+	}
+	return bestIedName;
+}
+
+static WholeBayTreeNode* whole_bay_tree_create_node(const QString& iedName, bool inBay, int side, int depth, WholeBayTreeNode* pParent)
+{
+	WholeBayTreeNode* pNode = new WholeBayTreeNode();
+	pNode->iedName = iedName;
+	pNode->inBay = inBay;
+	pNode->side = side;
+	pNode->depth = depth;
+	pNode->pParent = pParent;
+	return pNode;
+}
+
+static int whole_bay_tree_node_x(int depth, int side)
+{
+	int leftSecondX = WHOLE_BAY_TREE_LEFT_MARGIN;
+	int leftFirstX = leftSecondX + WHOLE_BAY_TREE_NODE_WIDTH + WHOLE_BAY_TREE_COLUMN_GAP;
+	int centerX = leftFirstX + WHOLE_BAY_TREE_NODE_WIDTH + WHOLE_BAY_TREE_COLUMN_GAP;
+	int rightFirstX = centerX + WHOLE_BAY_TREE_NODE_WIDTH + WHOLE_BAY_TREE_COLUMN_GAP;
+	int rightSecondX = rightFirstX + WHOLE_BAY_TREE_NODE_WIDTH + WHOLE_BAY_TREE_COLUMN_GAP;
+	if (depth == 0)
+	{
+		return centerX;
+	}
+	if (depth == 1)
+	{
+		return side < 0 ? leftFirstX : rightFirstX;
+	}
+	return side < 0 ? leftSecondX : rightSecondX;
+}
+
+void WholeDiagramBuilder::AttachBayTreeLogicLines(WholeBayTreeNode* pNode)
+{
+	if (!pNode || !pNode->pParent || !pNode->pRect || !pNode->pParent->pRect)
+	{
+		return;
+	}
+	for (int logicIndex = 0; logicIndex < pNode->parentLogicList.size(); ++logicIndex)
+	{
+		LogicCircuit* pLogicCircuit = pNode->parentLogicList.at(logicIndex);
+		if (!pLogicCircuit || !pLogicCircuit->pSrcIed || !pLogicCircuit->pDestIed)
+		{
+			continue;
+		}
+		IedRect* pSrcRect = NULL;
+		IedRect* pDestRect = NULL;
+		if (pLogicCircuit->pSrcIed->name == pNode->iedName)
+		{
+			pSrcRect = pNode->pRect;
+		}
+		else if (pLogicCircuit->pSrcIed->name == pNode->pParent->iedName)
+		{
+			pSrcRect = pNode->pParent->pRect;
+		}
+		if (pLogicCircuit->pDestIed->name == pNode->iedName)
+		{
+			pDestRect = pNode->pRect;
+		}
+		else if (pLogicCircuit->pDestIed->name == pNode->pParent->iedName)
+		{
+			pDestRect = pNode->pParent->pRect;
+		}
+		if (!pSrcRect || !pDestRect)
+		{
+			continue;
+		}
+		LogicCircuitLine* pLine = CreateLogicLine(pLogicCircuit, pSrcRect, pDestRect);
+		pNode->pRect->logic_line_list.append(pLine);
+	}
+}
+
+static int whole_bay_tree_rect_outer_height(const IedRect* pRect)
+{
+	if (!pRect)
+	{
+		return 0;
+	}
+	return pRect->height + pRect->extend_height;
+}
+
+static int whole_bay_tree_child_total_height(WholeBayTreeNode* pNode)
+{
+	if (!pNode)
+	{
+		return 0;
+	}
+	int childHeight = 0;
+	for (int i = 0; i < pNode->childNodeList.size(); ++i)
+	{
+		childHeight += whole_bay_tree_rect_outer_height(pNode->childNodeList.at(i)->pRect);
+		if (i > 0)
+		{
+			childHeight += WHOLE_BAY_TREE_NODE_GAP;
+		}
+	}
+	return childHeight;
+}
+
+static int whole_bay_tree_prepare_subtree_height(WholeBayTreeNode* pNode)
+{
+	if (!pNode || !pNode->pRect)
+	{
+		return 0;
+	}
+	for (int i = 0; i < pNode->childNodeList.size(); ++i)
+	{
+		whole_bay_tree_prepare_subtree_height(pNode->childNodeList.at(i));
+	}
+	int nodeHeight = whole_bay_tree_rect_outer_height(pNode->pRect);
+	int childHeight = whole_bay_tree_child_total_height(pNode);
+	if (childHeight > nodeHeight)
+	{
+		pNode->pRect->extend_height += (quint16)(childHeight - nodeHeight);
+		nodeHeight = childHeight;
+	}
+	return nodeHeight;
+}
+
+static int whole_bay_tree_subtree_height(WholeBayTreeNode* pNode)
+{
+	if (!pNode || !pNode->pRect)
+	{
+		return 0;
+	}
+	return whole_bay_tree_rect_outer_height(pNode->pRect);
+}
+
+static void whole_bay_tree_place_subtree(WholeBayTreeNode* pNode, int topY)
+{
+	if (!pNode || !pNode->pRect)
+	{
+		return;
+	}
+	pNode->pRect->y = (quint16)topY;
+	if (pNode->childNodeList.isEmpty())
+	{
+		return;
+	}
+	int currentChildY = topY;
+	for (int i = 0; i < pNode->childNodeList.size(); ++i)
+	{
+		WholeBayTreeNode* pChildNode = pNode->childNodeList.at(i);
+		whole_bay_tree_place_subtree(pChildNode, currentChildY);
+		currentChildY += whole_bay_tree_subtree_height(pChildNode) + WHOLE_BAY_TREE_NODE_GAP;
+	}
+}
+
+static int whole_bay_tree_list_height(const QList<WholeBayTreeNode*>& nodeList)
+{
+	int totalHeight = 0;
+	for (int i = 0; i < nodeList.size(); ++i)
+	{
+		totalHeight += whole_bay_tree_subtree_height(nodeList.at(i));
+		if (i > 0)
+		{
+			totalHeight += WHOLE_BAY_TREE_NODE_GAP;
+		}
+	}
+	return totalHeight;
+}
+
+static void whole_bay_tree_place_list(const QList<WholeBayTreeNode*>& nodeList, int topY)
+{
+	int currentY = topY;
+	for (int i = 0; i < nodeList.size(); ++i)
+	{
+		WholeBayTreeNode* pNode = nodeList.at(i);
+		whole_bay_tree_place_subtree(pNode, currentY);
+		currentY += whole_bay_tree_subtree_height(pNode) + WHOLE_BAY_TREE_NODE_GAP;
+	}
+}
+
+void WholeDiagramBuilder::BuildBayTreeVirtualLinesForRect(WholeCircuitSvg& svg, IedRect* pOwnerRect)
+{
+	if (!pOwnerRect)
+	{
+		return;
+	}
+	QFont font;
+	font.setPointSize(18);
+	QFontMetrics fm(font);
+	QString valueWidthSampleText = "000.00";
+	int valWidth = fm.width(valueWidthSampleText);
+	for (int logicIndex = 0; logicIndex < pOwnerRect->logic_line_list.size(); ++logicIndex)
+	{
+		LogicCircuitLine* pLogicLine = pOwnerRect->logic_line_list.at(logicIndex);
+		if (!pLogicLine || !pLogicLine->pLogicCircuit || !pLogicLine->pSrcIedRect || !pLogicLine->pDestIedRect)
+		{
+			continue;
+		}
+		IedRect* pSrcRect = pLogicLine->pSrcIedRect;
+		IedRect* pDestRect = pLogicLine->pDestIedRect;
+		IedRect* pPeerRect = pOwnerRect == pSrcRect ? pDestRect : pSrcRect;
+		bool ownerOnLeft = pOwnerRect->x <= pPeerRect->x;
+		quint8* pConnectIndex = ownerOnLeft ? &pOwnerRect->right_connect_index : &pOwnerRect->left_connect_index;
+		IedRect* pLeftRect = pSrcRect->x <= pDestRect->x ? pSrcRect : pDestRect;
+		IedRect* pRightRect = pSrcRect->x <= pDestRect->x ? pDestRect : pSrcRect;
+		int safeDistance = (int)DirectVirtualLineItem::SideLabelSafeDistance();
+		int descRectX = pLeftRect->x + pLeftRect->width + pLeftRect->inner_gap * 2;
+		int descRectWidth = pRightRect->x - pLeftRect->x - pLeftRect->width - pLeftRect->inner_gap * 4;
+		if (descRectWidth < 0)
+		{
+			descRectWidth = 0;
+		}
+		for (int circuitIndex = 0; circuitIndex < pLogicLine->pLogicCircuit->circuitList.size(); ++circuitIndex)
+		{
+			VirtualCircuit* pCircuit = pLogicLine->pLogicCircuit->circuitList.at(circuitIndex);
+			if (!pCircuit)
+			{
+				continue;
+			}
+			VirtualCircuitLine* pVtLine = new VirtualCircuitLine(pCircuit);
+			pVtLine->pSrcIedRect = pSrcRect;
+			pVtLine->pDestIedRect = pDestRect;
+			bool srcOnLeft = pSrcRect->x <= pDestRect->x;
+			int startPtX = srcOnLeft ? pSrcRect->x + pSrcRect->width - safeDistance : pSrcRect->x + safeDistance;
+			int endPtX = srcOnLeft ? pDestRect->x + safeDistance : pDestRect->x + pDestRect->width - safeDistance;
+			int startIconOffset = ICON_LENGTH + pSrcRect->inner_gap;
+			int endIconOffset = ICON_LENGTH + pDestRect->inner_gap;
+			int valueLeftOffset = valWidth + WHOLE_VALUE_ICON_SAFE_GAP;
+			int valueRightOffset = ICON_LENGTH + WHOLE_VALUE_ICON_SAFE_GAP;
+			int startIconX = srcOnLeft ? startPtX - startIconOffset : startPtX + pSrcRect->inner_gap;
+			int endIconX = srcOnLeft ? endPtX + pDestRect->inner_gap : endPtX - endIconOffset;
+			int startValX = srcOnLeft ? startIconX - valueLeftOffset : startIconX + valueRightOffset;
+			int endValX = srcOnLeft ? endIconX + valueRightOffset : endIconX - valueLeftOffset;
+			int ptY = pOwnerRect->GetInnerBottomY() + CIRCUIT_VERTICAL_DISTANCE + ICON_LENGTH + (*pConnectIndex) * (CIRCUIT_VERTICAL_DISTANCE + ICON_LENGTH);
+			int iconY = ptY - ICON_LENGTH / 2;
+			pVtLine->startPoint = QPoint(startPtX, ptY);
+			pVtLine->endPoint = QPoint(endPtX, ptY);
+			pVtLine->startIconPt = QPoint(startIconX, iconY);
+			pVtLine->endIconPt = QPoint(endIconX, iconY);
+			pVtLine->startValRect = QRect(QPoint(startValX, iconY), QSize(valWidth, fm.height()));
+			pVtLine->endValRect = QRect(QPoint(endValX, iconY), QSize(valWidth, fm.height()));
+			pVtLine->circuitDesc = QString("%1 -> %2").arg(pCircuit->srcDesc, pCircuit->destDesc);
+			if (descRectWidth > 0 && fm.width(pVtLine->circuitDesc) > descRectWidth)
+			{
+				pVtLine->circuitDesc = fm.elidedText(pVtLine->circuitDesc, Qt::ElideRight, descRectWidth);
+			}
+			pVtLine->circuitDescRect = QRect(QPoint(descRectX, (int)(ptY - fm.height() * 1.2)), QSize(descRectWidth, fm.height()));
+			pLogicLine->virtual_line_list.append(pVtLine);
+			QString key = QString("%1+%2").arg(pSrcRect->iedName).arg(pDestRect->iedName);
+			whole_adjust_bay_plate_position(svg.plateRectHash, key, pVtLine->startPoint, pCircuit->srcSoftPlateDesc, pCircuit->srcSoftPlateRef, pCircuit->srcSoftPlateCode, pSrcRect->iedName, startPtX < endPtX);
+			whole_adjust_bay_plate_position(svg.plateRectHash, key, pVtLine->endPoint, pCircuit->destSoftPlateDesc, pCircuit->destSoftPlateRef, pCircuit->destSoftPlateCode, pDestRect->iedName, endPtX < startPtX);
+			++(*pConnectIndex);
+		}
+	}
 }
 
 WholeDiagramBuilder::WholeDiagramBuilder()
@@ -676,7 +1317,20 @@ WholeCircuitSvg* WholeDiagramBuilder::BuildWholeDiagramByIedName(const QString& 
 	WholeCircuitSvg* svg = new WholeCircuitSvg();
 	TakeOverVirtualSvg(*virtualSvg, *svg);
 	delete virtualSvg;
-	whole_rebuild_virtual_layout(*svg);
+	RebuildVirtualLayout(*svg);
+	BuildGroupDecor(*svg);
+	return svg;
+}
+
+WholeCircuitSvg* WholeDiagramBuilder::BuildWholeDiagramByBayName(const QString& bayName)
+{
+	WholeCircuitSvg* svg = new WholeCircuitSvg();
+	GenerateWholeDiagramByBay(bayName, *svg);
+	if (svg->centerIedRectList.isEmpty())
+	{
+		delete svg;
+		return NULL;
+	}
 	BuildGroupDecor(*svg);
 	return svg;
 }
@@ -685,6 +1339,217 @@ void WholeDiagramBuilder::GenerateWholeDiagramByIed(const IED* pIed, WholeCircui
 {
 	Q_UNUSED(pIed);
 	Q_UNUSED(svg);
+}
+
+
+void WholeDiagramBuilder::GenerateWholeDiagramByBay(const QString& bayName, WholeCircuitSvg& svg)
+{
+	QStringList bayIedNameList = whole_collect_bay_ied_name_list(m_pCircuitConfig, bayName);
+	if (bayIedNameList.isEmpty())
+	{
+		return;
+	}
+	QSet<QString> bayIedNameSet;
+	QMap<QString, int> bayOrderHash;
+	for (int i = 0; i < bayIedNameList.size(); ++i)
+	{
+		bayIedNameSet.insert(bayIedNameList.at(i));
+		bayOrderHash.insert(bayIedNameList.at(i), i);
+	}
+	QMap<QString, QList<LogicCircuit*> > pairLogicHash;
+	QMap<QString, QSet<QString> > bayAdjHash;
+	QMap<QString, QSet<QString> > allAdjHash;
+	whole_bay_tree_collect_logic_maps(m_pCircuitConfig, bayIedNameList, pairLogicHash, bayAdjHash, allAdjHash);
+	QSet<QString> visitedSet;
+	int currentTopY = WHOLE_BAY_TREE_TOP_MARGIN;
+	int maxBottom = 0;
+	int maxRightX = 0;
+	for (int bayIndex = 0; bayIndex < bayIedNameList.size(); ++bayIndex)
+	{
+		QString startIedName = bayIedNameList.at(bayIndex);
+		if (visitedSet.contains(startIedName))
+		{
+			continue;
+		}
+		QStringList componentList;
+		whole_bay_tree_collect_component(startIedName, bayAdjHash, visitedSet, componentList);
+		if (componentList.isEmpty())
+		{
+			componentList.append(startIedName);
+			visitedSet.insert(startIedName);
+		}
+		QString centerIedName = whole_bay_tree_select_center(componentList, allAdjHash, bayOrderHash);
+		if (centerIedName.isEmpty())
+		{
+			centerIedName = startIedName;
+		}
+		QList<WholeBayTreeNode*> allNodeList;
+		QList<WholeBayTreeNode*> leftRootNodeList;
+		QList<WholeBayTreeNode*> rightRootNodeList;
+		WholeBayTreeNode* pCenterNode = whole_bay_tree_create_node(centerIedName, true, 0, 0, NULL);
+		allNodeList.append(pCenterNode);
+		QSet<QString> firstHopSet = allAdjHash.value(centerIedName);
+		QStringList firstHopNameList = whole_bay_tree_sort_names(firstHopSet, bayIedNameSet);
+		for (int firstIndex = 0; firstIndex < firstHopNameList.size(); ++firstIndex)
+		{
+			QString firstHopName = firstHopNameList.at(firstIndex);
+			int side = (firstIndex % 2 == 0) ? -1 : 1;
+			WholeBayTreeNode* pFirstNode = whole_bay_tree_create_node(firstHopName, bayIedNameSet.contains(firstHopName), side, 1, pCenterNode);
+			pFirstNode->parentLogicList = pairLogicHash.value(whole_bay_tree_pair_key(centerIedName, firstHopName));
+			allNodeList.append(pFirstNode);
+			if (side < 0)
+			{
+				leftRootNodeList.append(pFirstNode);
+			}
+			else
+			{
+				rightRootNodeList.append(pFirstNode);
+			}
+			QSet<QString> secondHopSet = allAdjHash.value(firstHopName);
+			QStringList secondHopNameList;
+			QSet<QString>::const_iterator secondIt = secondHopSet.constBegin();
+			for (; secondIt != secondHopSet.constEnd(); ++secondIt)
+			{
+				if (!bayIedNameSet.contains(*secondIt))
+				{
+					continue;
+				}
+				if (*secondIt == centerIedName)
+				{
+					continue;
+				}
+				if (firstHopSet.contains(*secondIt))
+				{
+					continue;
+				}
+				secondHopNameList.append(*secondIt);
+			}
+			secondHopNameList.sort();
+			for (int secondIndex = 0; secondIndex < secondHopNameList.size(); ++secondIndex)
+			{
+				QString secondHopName = secondHopNameList.at(secondIndex);
+				WholeBayTreeNode* pSecondNode = whole_bay_tree_create_node(secondHopName, true, side, 2, pFirstNode);
+				pSecondNode->parentLogicList = pairLogicHash.value(whole_bay_tree_pair_key(firstHopName, secondHopName));
+				pFirstNode->childNodeList.append(pSecondNode);
+				allNodeList.append(pSecondNode);
+			}
+		}
+		for (int nodeIndex = 0; nodeIndex < allNodeList.size(); ++nodeIndex)
+		{
+			WholeBayTreeNode* pNode = allNodeList.at(nodeIndex);
+			if (!pNode)
+			{
+				continue;
+			}
+			quint32 borderColor = pNode->depth == 0 ? utils::ColorHelper::pure_red : utils::ColorHelper::pure_green;
+			pNode->pRect = CreateIedRectWithSize(pNode->iedName, whole_bay_tree_node_x(pNode->depth, pNode->side), currentTopY, WHOLE_BAY_TREE_NODE_WIDTH, RECT_DEFAULT_HEIGHT, borderColor);
+			if (!pNode->pRect)
+			{
+				continue;
+			}
+			if (pNode->depth == 0)
+			{
+				svg.centerIedRectList.append(pNode->pRect);
+			}
+			else if (pNode->side < 0)
+			{
+				svg.leftIedRectList.append(pNode->pRect);
+			}
+			else
+			{
+				svg.rightIedRectList.append(pNode->pRect);
+			}
+		}
+		for (int nodeIndex = 0; nodeIndex < allNodeList.size(); ++nodeIndex)
+		{
+			WholeBayTreeNode* pNode = allNodeList.at(nodeIndex);
+			if (!pNode || pNode->depth == 0)
+			{
+				continue;
+			}
+			AttachBayTreeLogicLines(pNode);
+		}
+		for (int nodeIndex = 0; nodeIndex < allNodeList.size(); ++nodeIndex)
+		{
+			WholeBayTreeNode* pNode = allNodeList.at(nodeIndex);
+			if (!pNode || !pNode->pRect)
+			{
+				continue;
+			}
+			AdjustRectExtendHeight(pNode->pRect);
+			pNode->pRect->extend_height += WHOLE_BAY_TREE_MAINT_PLATE_GAP;
+		}
+		for (int rootIndex = 0; rootIndex < leftRootNodeList.size(); ++rootIndex)
+		{
+			whole_bay_tree_prepare_subtree_height(leftRootNodeList.at(rootIndex));
+		}
+		for (int rootIndex = 0; rootIndex < rightRootNodeList.size(); ++rootIndex)
+		{
+			whole_bay_tree_prepare_subtree_height(rightRootNodeList.at(rootIndex));
+		}
+		int centerHeight = whole_bay_tree_rect_outer_height(pCenterNode->pRect);
+		int leftHeight = whole_bay_tree_list_height(leftRootNodeList);
+		int rightHeight = whole_bay_tree_list_height(rightRootNodeList);
+		int sideHeight = qMax(leftHeight, rightHeight);
+		if (pCenterNode->pRect && sideHeight > centerHeight)
+		{
+			pCenterNode->pRect->extend_height += (quint16)(sideHeight - centerHeight);
+			centerHeight = whole_bay_tree_rect_outer_height(pCenterNode->pRect);
+		}
+		int graphHeight = qMax(centerHeight, sideHeight);
+		if (graphHeight <= 0)
+		{
+			graphHeight = centerHeight;
+		}
+		if (leftHeight > 0)
+		{
+			whole_bay_tree_place_list(leftRootNodeList, currentTopY);
+		}
+		if (rightHeight > 0)
+		{
+			whole_bay_tree_place_list(rightRootNodeList, currentTopY);
+		}
+		if (pCenterNode->pRect)
+		{
+			pCenterNode->pRect->y = (quint16)currentTopY;
+		}
+		for (int nodeIndex = 0; nodeIndex < allNodeList.size(); ++nodeIndex)
+		{
+			WholeBayTreeNode* pNode = allNodeList.at(nodeIndex);
+			if (!pNode || pNode->depth == 0 || !pNode->pRect)
+			{
+				continue;
+			}
+			BuildBayTreeVirtualLinesForRect(svg, pNode->pRect);
+		}
+		for (int nodeIndex = 0; nodeIndex < allNodeList.size(); ++nodeIndex)
+		{
+			WholeBayTreeNode* pNode = allNodeList.at(nodeIndex);
+			if (!pNode || !pNode->pRect)
+			{
+				continue;
+			}
+			maxBottom = qMax(maxBottom, GetRectOuterBottom(pNode->pRect));
+			maxRightX = qMax(maxRightX, pNode->pRect->x + pNode->pRect->width);
+		}
+		currentTopY += graphHeight + WHOLE_BAY_TREE_BLOCK_GAP;
+		qDeleteAll(allNodeList);
+	}
+	QHash<QString, PlateRect>::const_iterator plateIt = svg.plateRectHash.constBegin();
+	for (; plateIt != svg.plateRectHash.constEnd(); ++plateIt)
+	{
+		const QRect& rect = plateIt.value().rect;
+		maxBottom = qMax(maxBottom, rect.bottom());
+		maxRightX = qMax(maxRightX, rect.right());
+	}
+	if (maxRightX <= 0)
+	{
+		maxRightX = whole_bay_tree_node_x(2, 1) + WHOLE_BAY_TREE_NODE_WIDTH + WHOLE_BAY_TREE_VIEW_MARGIN;
+	}
+	svg.viewBoxX = 0;
+	svg.viewBoxY = 0;
+	svg.viewBoxWidth = (quint16)(maxRightX + WHOLE_BAY_TREE_VIEW_MARGIN);
+	svg.viewBoxHeight = (quint16)(maxBottom + WHOLE_BAY_TREE_VIEW_MARGIN);
 }
 
 void WholeDiagramBuilder::TakeOverVirtualSvg(VirtualSvg& virtualSvg, WholeCircuitSvg& wholeSvg)
@@ -708,21 +1573,41 @@ void WholeDiagramBuilder::TakeOverVirtualSvg(VirtualSvg& virtualSvg, WholeCircui
 
 void WholeDiagramBuilder::BuildGroupDecor(WholeCircuitSvg& svg)
 {
-	for (int i = 0; i < svg.leftIedRectList.size(); ++i)
+	if (svg.mainIedRect)
 	{
-		IedRect* rect = svg.leftIedRectList.at(i);
-		if (!rect)
+		for (int i = 0; i < svg.leftIedRectList.size(); ++i)
 		{
-			continue;
+			IedRect* rect = svg.leftIedRectList.at(i);
+			if (!rect)
+			{
+				continue;
+			}
+			for (int j = 0; j < rect->logic_line_list.size(); ++j)
+			{
+				BuildGroupDecorByLogicLine(svg, rect->logic_line_list.at(j));
+			}
 		}
-		for (int j = 0; j < rect->logic_line_list.size(); ++j)
+		for (int i = 0; i < svg.rightIedRectList.size(); ++i)
 		{
-			BuildGroupDecorByLogicLine(svg, rect->logic_line_list.at(j));
+			IedRect* rect = svg.rightIedRectList.at(i);
+			if (!rect)
+			{
+				continue;
+			}
+			for (int j = 0; j < rect->logic_line_list.size(); ++j)
+			{
+				BuildGroupDecorByLogicLine(svg, rect->logic_line_list.at(j));
+			}
 		}
+		return;
 	}
-	for (int i = 0; i < svg.rightIedRectList.size(); ++i)
+	QList<IedRect*> rectList;
+	rectList += svg.centerIedRectList;
+	rectList += svg.leftIedRectList;
+	rectList += svg.rightIedRectList;
+	for (int i = 0; i < rectList.size(); ++i)
 	{
-		IedRect* rect = svg.rightIedRectList.at(i);
+		IedRect* rect = rectList.at(i);
 		if (!rect)
 		{
 			continue;
@@ -748,7 +1633,7 @@ void WholeDiagramBuilder::BuildGroupDecorByLogicLine(WholeCircuitSvg& svg, Logic
 		return;
 	}
 	QString switchIedName;
-	WholeGroupMode groupMode = whole_group_mode_of_logic(pLogicLine, switchIedName);
+	WholeGroupMode groupMode = GetGroupMode(pLogicLine, switchIedName);
 	groupDecor->groupMode = groupMode;
 	if (groupMode == WholeGroupMode_Fallback)
 	{
@@ -833,8 +1718,8 @@ void WholeDiagramBuilder::BuildGroupDecorByLogicLine(WholeCircuitSvg& svg, Logic
 			WHOLE_GROUP_SWITCH_ICON_WIDTH,
 			WHOLE_GROUP_SWITCH_ICON_HEIGHT);
 	}
-	whole_build_group_port_texts(m_pCircuitConfig, groupDecor, pLogicLine);
-	whole_build_group_port_layout(groupDecor);
+	BuildGroupPortTexts(groupDecor, pLogicLine);
+	BuildGroupPortLayout(groupDecor);
 }
 
 bool WholeDiagramBuilder::IsGroupDirectionRight(const LogicCircuitLine* pLogicLine) const

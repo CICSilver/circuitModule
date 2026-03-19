@@ -142,6 +142,7 @@ public:
 	void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget);
 	QPainterPath shape() const;
 	void setFromOpticalLine(const OpticalCircuitLine& line);
+	void setHighlighted(bool highlighted);
 	void hoverEnterEvent(QGraphicsSceneHoverEvent* event);
 	void hoverLeaveEvent(QGraphicsSceneHoverEvent* event);
 
@@ -161,6 +162,27 @@ private:
 	quint16 m_lineCode;
 	QColor m_lineColor;
 	int m_lineWidth;
+	bool m_highlighted;
+};
+
+class DirectOpticalConnPointItem : public directItemBase
+{
+public:
+	DirectOpticalConnPointItem(QGraphicsItem* parent = NULL);
+	~DirectOpticalConnPointItem();
+	QRectF boundingRect() const;
+	void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget);
+	QPainterPath shape() const;
+	void setConnPoint(const QPoint& anchorPoint, bool isCircleUnderPt, DirectOpticalLineItem* pOpticalLineItem);
+
+protected:
+	void hoverEnterEvent(QGraphicsSceneHoverEvent* event);
+	void hoverLeaveEvent(QGraphicsSceneHoverEvent* event);
+
+private:
+	QPoint m_anchorPoint;
+	bool m_isCircleUnderPt;
+	DirectOpticalLineItem* m_pOpticalLineItem;
 	bool m_highlighted;
 };
 

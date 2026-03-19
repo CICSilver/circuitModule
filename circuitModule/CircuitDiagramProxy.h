@@ -96,6 +96,8 @@ public:
 	// 返回值:	VirtualDiagramModel*
 	//************************************
 	VirtualDiagramModel* BuildVirtualDiagramByIedName(const QString& iedName);
+	VirtualDiagramModel* BuildVirtualDiagramByBayName(const QString& bayName);
+
 	VirtualDiagramModel* BuildVirtualDiagramByIedPair(const QString& mainIedName, const QString& peerIedName);
 	//************************************
 	// 函数名称:	BuildWholeDiagramByIedName
@@ -107,6 +109,7 @@ public:
 	// 返回值:	WholeDiagramModel*
 	//************************************
 	WholeDiagramModel* BuildWholeDiagramByIedName(const QString& iedName);
+	WholeDiagramModel* BuildWholeDiagramByBayName(const QString& bayName);
 
 private:
 	Q_DISABLE_COPY(CircuitDiagramProxy)

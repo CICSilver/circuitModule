@@ -235,6 +235,7 @@ public:
 	// 返回值:	OpticalCircuit*
 	//************************************
 	OpticalCircuit* getOpticalByCode(quint64 code) const;
+	QList<OpticalControlBlockInfo> GetControlBlockInfoListByOpticalCode(quint64 opticalCode) const;
 
 	// 根据IED名称和交换机名称获取经过该交换机的逻辑链路
 	//QList<LogicCircuit*> getLogicCircuitListByIedNameAndSw(const QString& iedName, const QString& swName)

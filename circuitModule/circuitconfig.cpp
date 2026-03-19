@@ -10,6 +10,69 @@
 #include "RtdbUtils.h"
 bool debug = false;
 
+namespace
+{
+	static QString readRtdbText(const char* pText)
+	{
+		if (!pText || !pText[0])
+		{
+			return QString();
+		}
+		return QString::fromLocal8Bit(pText);
+	}
+
+	static void fillGseControlBlockInfo(const CRtdbEleModelGse* pControlBlock, OpticalControlBlockInfo& controlBlockInfo)
+	{
+		if (!pControlBlock || !pControlBlock->m_pGseHead)
+		{
+			return;
+		}
+		controlBlockInfo.controlBlockCode = pControlBlock->m_pGseHead->code;
+		controlBlockInfo.controlBlockName = readRtdbText(pControlBlock->m_pGseHead->name);
+		controlBlockInfo.controlBlockRef = readRtdbText(pControlBlock->m_pGseHead->ref);
+		controlBlockInfo.dataSetName = readRtdbText(pControlBlock->m_pGseHead->dsName);
+		controlBlockInfo.identityName = readRtdbText(pControlBlock->m_pGseHead->goid);
+		controlBlockInfo.appid = pControlBlock->m_pGseHead->appid;
+		controlBlockInfo.macAddr = readRtdbText(pControlBlock->m_pGseHead->mac);
+	}
+
+	static void fillSvControlBlockInfo(const CRtdbEleModelSmv* pControlBlock, OpticalControlBlockInfo& controlBlockInfo)
+	{
+		if (!pControlBlock || !pControlBlock->m_pSmvHead)
+		{
+			return;
+		}
+		controlBlockInfo.controlBlockCode = pControlBlock->m_pSmvHead->code;
+		controlBlockInfo.controlBlockName = readRtdbText(pControlBlock->m_pSmvHead->name);
+		controlBlockInfo.controlBlockRef = readRtdbText(pControlBlock->m_pSmvHead->ref);
+		controlBlockInfo.dataSetName = readRtdbText(pControlBlock->m_pSmvHead->dsName);
+		controlBlockInfo.identityName = readRtdbText(pControlBlock->m_pSmvHead->svid);
+		controlBlockInfo.appid = pControlBlock->m_pSmvHead->appid;
+		controlBlockInfo.macAddr = readRtdbText(pControlBlock->m_pSmvHead->mac);
+	}
+
+	static QString buildControlBlockInfoKey(const OpticalControlBlockInfo& controlBlockInfo)
+	{
+		return QString::number((qulonglong)controlBlockInfo.opticalCode) + '|' +
+			QString::number((qulonglong)controlBlockInfo.virtualCircuitCode) + '|' +
+			QString::number((int)controlBlockInfo.partyType) + '|' +
+			controlBlockInfo.iedName + '|' +
+			QString::number((qulonglong)controlBlockInfo.controlBlockCode) + '|' +
+			QString::number((qulonglong)controlBlockInfo.endpointCode);
+	}
+
+	static void appendControlBlockInfo(QList<OpticalControlBlockInfo>& controlBlockInfoList, QHash<QString, bool>& keyHash, const OpticalControlBlockInfo& controlBlockInfo)
+	{
+		QString key = buildControlBlockInfoKey(controlBlockInfo);
+		if (keyHash.contains(key))
+		{
+			return;
+		}
+		keyHash.insert(key, true);
+		controlBlockInfoList.append(controlBlockInfo);
+	}
+}
+
 CircuitConfig::CircuitConfig()
 	: m_rtdb(RtdbClient::Instance())
 	, m_stationModel(NULL)
@@ -227,7 +290,7 @@ bool CircuitConfig::LoadSvFromRtdb()
 		// src
 		pSv->srcIedName = QString::fromLocal8Bit(pRtdbSrcIed->m_pIedHead->iedName);
 		pSv->srcIedDesc = QString::fromLocal8Bit(pRtdbSrcIed->m_pIedHead->iedDesc);
-		const CRtdbEleModelSmv* pRtdbOutSmv = utils::asModelSmv(pRtdbSvCircuit->m_pOutChl);
+		const CRtdbEleModelSmv* pRtdbOutSmv = utils::asModelSmv(pRtdbSvCircuit->m_pOutSvcb);
 		pSv->srcCbName = pRtdbOutSmv ? QString::fromLocal8Bit(pRtdbOutSmv->m_pSmvHead->name) : "";
 		pSv->srcRef = QString::fromLocal8Bit(pRtdbSvCircuit->m_pSvCurcuitInfo->outRef);
 		setChlDesc(pSv, pRtdbSvCircuit->m_pOutChl, true);
@@ -235,9 +298,12 @@ bool CircuitConfig::LoadSvFromRtdb()
 		const stuRtdbStatus* pDestPlateStatus = utils::asPlateStatus(pRtdbSvCircuit->m_pInRyb);
 		pSv->destIedName = QString::fromLocal8Bit(pRtdbDestIed->m_pIedHead->iedName);
 		pSv->destIedDesc = QString::fromLocal8Bit(pRtdbDestIed->m_pIedHead->iedDesc);
+		pSv->destSoftPlateCode = pDestPlateStatus ? pDestPlateStatus->code : 0;
 		pSv->destSoftPlateDesc = pDestPlateStatus ? QString::fromLocal8Bit(pDestPlateStatus->desc) : "";
 		pSv->destSoftPlateRef  = pDestPlateStatus ? QString::fromLocal8Bit(pDestPlateStatus->ref)  : "";
 		pSv->destRef = QString::fromLocal8Bit(pRtdbSvCircuit->m_pSvCurcuitInfo->inRef);
+		pSv->outRemoteCode = pRtdbSvCircuit->m_pSvCurcuitInfo->outCode;
+		pSv->inRemoteCode = pRtdbSvCircuit->m_pSvCurcuitInfo->inCode;
 		setChlDesc(pSv, pRtdbSvCircuit->m_pInChl, false);
 
 		buildCircuitRelations(pSv, logicHash);
@@ -486,13 +552,129 @@ void CircuitConfig::Clear()
 
 OpticalCircuit* CircuitConfig::getOpticalByCode(quint64 code) const
 {
-	if (code == 0) return NULL;
+	if (code == 0)
+	{
+		return NULL;
+	}
 	for (int i = 0; i < m_opticalCircuitList.size(); ++i)
 	{
-		OpticalCircuit* p = m_opticalCircuitList[i];
-		if (p && p->code == code) return p;
+		OpticalCircuit* pOpticalCircuit = m_opticalCircuitList[i];
+		if (pOpticalCircuit && pOpticalCircuit->code == code)
+		{
+			return pOpticalCircuit;
+		}
 	}
 	return NULL;
+}
+
+QList<OpticalControlBlockInfo> CircuitConfig::GetControlBlockInfoListByOpticalCode(quint64 opticalCode) const
+{
+	QList<OpticalControlBlockInfo> controlBlockInfoList;
+	if (opticalCode == 0)
+	{
+		return controlBlockInfoList;
+	}
+	QList<VirtualCircuit*> virtualCircuitList = GetVirtualCircuitListByOpticalCode(opticalCode);
+	QHash<QString, bool> keyHash;
+	for (int i = 0; i < virtualCircuitList.size(); ++i)
+	{
+		VirtualCircuit* pVirtualCircuit = virtualCircuitList.at(i);
+		if (!pVirtualCircuit)
+		{
+			continue;
+		}
+
+		OpticalControlBlockInfo publisherInfo;
+		publisherInfo.opticalCode = opticalCode;
+		publisherInfo.virtualCircuitCode = pVirtualCircuit->code;
+		publisherInfo.linkCode = pVirtualCircuit->linkCode;
+		publisherInfo.type = pVirtualCircuit->type;
+		publisherInfo.partyType = CB_PUBLISHER;
+		publisherInfo.isLocalControlBlock = true;
+		publisherInfo.iedName = pVirtualCircuit->srcIedName;
+		publisherInfo.iedDesc = pVirtualCircuit->srcIedDesc;
+		publisherInfo.peerIedName = pVirtualCircuit->destIedName;
+		publisherInfo.peerIedDesc = pVirtualCircuit->destIedDesc;
+		publisherInfo.controlBlockName = pVirtualCircuit->srcCbName;
+		publisherInfo.endpointCode = pVirtualCircuit->outRemoteCode;
+		publisherInfo.endpointRef = pVirtualCircuit->srcRef;
+		publisherInfo.endpointName = pVirtualCircuit->srcName;
+		publisherInfo.endpointDesc = pVirtualCircuit->srcDesc;
+		publisherInfo.softPlateCode = pVirtualCircuit->srcSoftPlateCode;
+		publisherInfo.softPlateRef = pVirtualCircuit->srcSoftPlateRef;
+		publisherInfo.softPlateDesc = pVirtualCircuit->srcSoftPlateDesc;
+
+		OpticalControlBlockInfo subscriberInfo;
+		subscriberInfo.opticalCode = opticalCode;
+		subscriberInfo.virtualCircuitCode = pVirtualCircuit->code;
+		subscriberInfo.linkCode = pVirtualCircuit->linkCode;
+		subscriberInfo.type = pVirtualCircuit->type;
+		subscriberInfo.partyType = CB_SUBSCRIBER;
+		subscriberInfo.isLocalControlBlock = false;
+		subscriberInfo.iedName = pVirtualCircuit->destIedName;
+		subscriberInfo.iedDesc = pVirtualCircuit->destIedDesc;
+		subscriberInfo.peerIedName = pVirtualCircuit->srcIedName;
+		subscriberInfo.peerIedDesc = pVirtualCircuit->srcIedDesc;
+		subscriberInfo.controlBlockName = pVirtualCircuit->srcCbName;
+		subscriberInfo.endpointCode = pVirtualCircuit->inRemoteCode;
+		subscriberInfo.endpointRef = pVirtualCircuit->destRef;
+		subscriberInfo.endpointName = pVirtualCircuit->destName;
+		subscriberInfo.endpointDesc = pVirtualCircuit->destDesc;
+		subscriberInfo.softPlateCode = pVirtualCircuit->destSoftPlateCode;
+		subscriberInfo.softPlateRef = pVirtualCircuit->destSoftPlateRef;
+		subscriberInfo.softPlateDesc = pVirtualCircuit->destSoftPlateDesc;
+
+		if (pVirtualCircuit->type == GOOSE)
+		{
+			stuRtdbGseCircuit* pGseCircuit = m_rtdb.getGseCircuit(pVirtualCircuit->code);
+			if (pGseCircuit)
+			{
+				const CRtdbEleModelGse* pControlBlock = utils::asModelGse(pGseCircuit->m_pOutGocb);
+				fillGseControlBlockInfo(pControlBlock, publisherInfo);
+				fillGseControlBlockInfo(pControlBlock, subscriberInfo);
+				if (publisherInfo.controlBlockCode == 0 && pGseCircuit->m_pGseCurcuitInfo)
+				{
+					publisherInfo.controlBlockCode = pGseCircuit->m_pGseCurcuitInfo->outGocb;
+				}
+				subscriberInfo.controlBlockCode = publisherInfo.controlBlockCode;
+				if (publisherInfo.endpointCode == 0 && pGseCircuit->m_pGseCurcuitInfo)
+				{
+					publisherInfo.endpointCode = pGseCircuit->m_pGseCurcuitInfo->outCode;
+				}
+				if (subscriberInfo.endpointCode == 0 && pGseCircuit->m_pGseCurcuitInfo)
+				{
+					subscriberInfo.endpointCode = pGseCircuit->m_pGseCurcuitInfo->inCode;
+				}
+			}
+		}
+		else if (pVirtualCircuit->type == SV)
+		{
+			stuRtdbSvCircuit* pSvCircuit = m_rtdb.getSvCircuit(pVirtualCircuit->code);
+			if (pSvCircuit)
+			{
+				const CRtdbEleModelSmv* pControlBlock = utils::asModelSmv(pSvCircuit->m_pOutSvcb);
+				fillSvControlBlockInfo(pControlBlock, publisherInfo);
+				fillSvControlBlockInfo(pControlBlock, subscriberInfo);
+				if (publisherInfo.controlBlockCode == 0 && pSvCircuit->m_pSvCurcuitInfo)
+				{
+					publisherInfo.controlBlockCode = pSvCircuit->m_pSvCurcuitInfo->outSvcb;
+				}
+				subscriberInfo.controlBlockCode = publisherInfo.controlBlockCode;
+				if (publisherInfo.endpointCode == 0 && pSvCircuit->m_pSvCurcuitInfo)
+				{
+					publisherInfo.endpointCode = pSvCircuit->m_pSvCurcuitInfo->outCode;
+				}
+				if (subscriberInfo.endpointCode == 0 && pSvCircuit->m_pSvCurcuitInfo)
+				{
+					subscriberInfo.endpointCode = pSvCircuit->m_pSvCurcuitInfo->inCode;
+				}
+			}
+		}
+
+		appendControlBlockInfo(controlBlockInfoList, keyHash, publisherInfo);
+		appendControlBlockInfo(controlBlockInfoList, keyHash, subscriberInfo);
+	}
+	return controlBlockInfoList;
 }
 
 void CircuitConfig::buildOpticalRelation(VirtualCircuit* pVtCircuit, const IED* pSrcIed, const IED* pDestIed)

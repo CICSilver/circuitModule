@@ -5,7 +5,6 @@
 #include <QFile>
 #include <QDebug>
 #include "svgmodel.h"
-#include "secwidget.h"
 #include <QMap>
 #include <QTransform>
 #include <cmath>

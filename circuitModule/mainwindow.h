@@ -42,7 +42,10 @@ protected:
 	void DisplayBayLogic(const QString& bayName);
 	void DisplayOpticalIed(const QString& iedName);
 	void DisplayVirtualIed(const QString& iedName);
+	void DisplayBayVirtual(const QString& bayName);
+
 	void DisplayWholeIed(const QString& iedName);
+	void DisplayBayWhole(const QString& bayName);
 	void DisplayStationOptical();
 	void DisplayBayOptical(const QString& bayName);
 

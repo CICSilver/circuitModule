@@ -4,15 +4,6 @@
     <ClCompile Include="include\pugixml\pugixml.cpp">
       <Filter>thirdparty\pugixml</Filter>
     </ClCompile>
-    <ClCompile Include="GeneratedFiles\Debug_exe\moc_secwidget.cpp">
-      <Filter>Generated Files\Debug_exe</Filter>
-    </ClCompile>
-    <ClCompile Include="GeneratedFiles\Debug\moc_secwidget.cpp">
-      <Filter>Generated Files\Debug</Filter>
-    </ClCompile>
-    <ClCompile Include="GeneratedFiles\Release\moc_secwidget.cpp">
-      <Filter>Generated Files\Release</Filter>
-    </ClCompile>
     <ClCompile Include="directlinehelpers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

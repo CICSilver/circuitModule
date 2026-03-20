@@ -1224,7 +1224,7 @@ OpticalSvg* OpticalDiagramBuilder::BuildOpticalDiagramByBayName(const QString& b
 	}
 	QString bayText = bayTextHash.value(bayName, bayName);
 	OpticalSvg* svg = new OpticalSvg();
-	BuildScopedOpticalSvg(m_pCircuitConfig, bayText, QString("Bay Optical"), visibleBayOrder, bayVisibleIedHash, opticalList, *svg);
+	BuildScopedOpticalSvg(m_pCircuitConfig, bayText, QString::fromLocal8Bit("º‰∏Ùπ‚œÀÕº"), visibleBayOrder, bayVisibleIedHash, opticalList, *svg);
 	return svg;
 }
 

@@ -230,6 +230,10 @@
     <ClInclude Include="directlinehelpers.h" />
     <ClInclude Include="directlineitems.h" />
     <ClInclude Include="directnodeitems.h" />
+    <ClInclude Include="Logical\LogicDiagramBuilder.h" />
+    <ClInclude Include="Optical\OpticalDiagramBuilder.h" />
+    <ClInclude Include="Virtual\VirtualDiagramBuilder.h" />
+    <ClInclude Include="Whole\WholeDiagramBuilder.h" />
     <CustomBuild Include="directwidget.h">
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug_exe|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"  -DUNICODE -DWIN32 -DQT_DLL -DQT_CORE_LIB -DQT_GUI_LIB -DQT_SVG_LIB -DQT_XML_LIB  "-I.\GeneratedFiles" "-I." "-I$(QTDIR)\include" "-I.\GeneratedFiles\$(ConfigurationName)\." "-I$(QTDIR)\include\QtCore" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtSvg" "-I$(QTDIR)\include\QtXml"</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug_exe|Win32'">Moc%27ing %(Identity)...</Message>

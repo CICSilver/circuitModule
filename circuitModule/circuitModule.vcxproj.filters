@@ -165,6 +165,18 @@
     <ClInclude Include="directnodeitems.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Virtual\VirtualDiagramBuilder.h">
+      <Filter>Header Files\Virtual</Filter>
+    </ClInclude>
+    <ClInclude Include="Optical\OpticalDiagramBuilder.h">
+      <Filter>Header Files\Optical</Filter>
+    </ClInclude>
+    <ClInclude Include="Logical\LogicDiagramBuilder.h">
+      <Filter>Header Files\Logical</Filter>
+    </ClInclude>
+    <ClInclude Include="Whole\WholeDiagramBuilder.h">
+      <Filter>Header Files\Whole</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="mainwindow.ui">
@@ -263,6 +275,18 @@
       <UniqueIdentifier>{b9c2cb1c-7cfb-4dd3-9114-660f17dd586d}</UniqueIdentifier>
       <Extensions>cpp;moc</Extensions>
       <SourceControlFiles>False</SourceControlFiles>
+    </Filter>
+    <Filter Include="Header Files\Virtual">
+      <UniqueIdentifier>{e0933125-d8b0-498f-9be5-2bfa71c26173}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Optical">
+      <UniqueIdentifier>{a6af15a0-8892-4b91-984a-8138e5e624ed}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Logical">
+      <UniqueIdentifier>{0c6f66fe-8257-44a5-b396-30b9292d4db7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Whole">
+      <UniqueIdentifier>{613d7507-3e7f-49ee-8b9f-52da5254174a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

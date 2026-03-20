@@ -879,7 +879,7 @@ enum WholeBayTreeConfig
 	WHOLE_BAY_TREE_LEFT_MARGIN = 80,
 	WHOLE_BAY_TREE_TOP_MARGIN = 40,
 	WHOLE_BAY_TREE_NODE_WIDTH = RECT_DEFAULT_WIDTH * 3 / 2,
-	WHOLE_BAY_TREE_COLUMN_GAP = 400,
+	WHOLE_BAY_TREE_COLUMN_GAP = 650,	// 间隔虚实回路图的设备列之间距离，若小于610则会退化为虚回路图
 	WHOLE_BAY_TREE_NODE_GAP = 24,
 	WHOLE_BAY_TREE_BLOCK_GAP = 80,
 	WHOLE_BAY_TREE_MAINT_PLATE_GAP = 30,
@@ -1062,13 +1062,13 @@ static WholeBayTreeNode* whole_bay_tree_create_node(const QString& iedName, bool
 	return pNode;
 }
 
-static int whole_bay_tree_node_x(int depth, int side)
+static int whole_bay_tree_node_x(int depth, int side, int columnGap)
 {
 	int leftSecondX = WHOLE_BAY_TREE_LEFT_MARGIN;
-	int leftFirstX = leftSecondX + WHOLE_BAY_TREE_NODE_WIDTH + WHOLE_BAY_TREE_COLUMN_GAP;
-	int centerX = leftFirstX + WHOLE_BAY_TREE_NODE_WIDTH + WHOLE_BAY_TREE_COLUMN_GAP;
-	int rightFirstX = centerX + WHOLE_BAY_TREE_NODE_WIDTH + WHOLE_BAY_TREE_COLUMN_GAP;
-	int rightSecondX = rightFirstX + WHOLE_BAY_TREE_NODE_WIDTH + WHOLE_BAY_TREE_COLUMN_GAP;
+	int leftFirstX = leftSecondX + WHOLE_BAY_TREE_NODE_WIDTH + columnGap;
+	int centerX = leftFirstX + WHOLE_BAY_TREE_NODE_WIDTH + columnGap;
+	int rightFirstX = centerX + WHOLE_BAY_TREE_NODE_WIDTH + columnGap;
+	int rightSecondX = rightFirstX + WHOLE_BAY_TREE_NODE_WIDTH + columnGap;
 	if (depth == 0)
 	{
 		return centerX;
@@ -1324,8 +1324,13 @@ WholeCircuitSvg* WholeDiagramBuilder::BuildWholeDiagramByIedName(const QString& 
 
 WholeCircuitSvg* WholeDiagramBuilder::BuildWholeDiagramByBayName(const QString& bayName)
 {
+	return BuildWholeDiagramByBayName(bayName, WHOLE_BAY_TREE_COLUMN_GAP);
+}
+
+WholeCircuitSvg* WholeDiagramBuilder::BuildWholeDiagramByBayName(const QString& bayName, int columnGap)
+{
 	WholeCircuitSvg* svg = new WholeCircuitSvg();
-	GenerateWholeDiagramByBay(bayName, *svg);
+	GenerateWholeDiagramByBay(bayName, *svg, columnGap);
 	if (svg->centerIedRectList.isEmpty())
 	{
 		delete svg;
@@ -1343,6 +1348,11 @@ void WholeDiagramBuilder::GenerateWholeDiagramByIed(const IED* pIed, WholeCircui
 
 
 void WholeDiagramBuilder::GenerateWholeDiagramByBay(const QString& bayName, WholeCircuitSvg& svg)
+{
+	GenerateWholeDiagramByBay(bayName, svg, WHOLE_BAY_TREE_COLUMN_GAP);
+}
+
+void WholeDiagramBuilder::GenerateWholeDiagramByBay(const QString& bayName, WholeCircuitSvg& svg, int columnGap)
 {
 	QStringList bayIedNameList = whole_collect_bay_ied_name_list(m_pCircuitConfig, bayName);
 	if (bayIedNameList.isEmpty())
@@ -1442,7 +1452,7 @@ void WholeDiagramBuilder::GenerateWholeDiagramByBay(const QString& bayName, Whol
 				continue;
 			}
 			quint32 borderColor = pNode->depth == 0 ? utils::ColorHelper::pure_red : utils::ColorHelper::pure_green;
-			pNode->pRect = CreateIedRectWithSize(pNode->iedName, whole_bay_tree_node_x(pNode->depth, pNode->side), currentTopY, WHOLE_BAY_TREE_NODE_WIDTH, RECT_DEFAULT_HEIGHT, borderColor);
+			pNode->pRect = CreateIedRectWithSize(pNode->iedName, whole_bay_tree_node_x(pNode->depth, pNode->side, columnGap), currentTopY, WHOLE_BAY_TREE_NODE_WIDTH, RECT_DEFAULT_HEIGHT, borderColor);
 			if (!pNode->pRect)
 			{
 				continue;
@@ -1544,7 +1554,7 @@ void WholeDiagramBuilder::GenerateWholeDiagramByBay(const QString& bayName, Whol
 	}
 	if (maxRightX <= 0)
 	{
-		maxRightX = whole_bay_tree_node_x(2, 1) + WHOLE_BAY_TREE_NODE_WIDTH + WHOLE_BAY_TREE_VIEW_MARGIN;
+		maxRightX = whole_bay_tree_node_x(2, 1, columnGap) + WHOLE_BAY_TREE_NODE_WIDTH + WHOLE_BAY_TREE_VIEW_MARGIN;
 	}
 	svg.viewBoxX = 0;
 	svg.viewBoxY = 0;

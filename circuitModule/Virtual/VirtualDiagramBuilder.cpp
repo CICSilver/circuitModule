@@ -6,7 +6,8 @@
 enum VirtualDiagramConfig
 {
 	VIRTUAL_MAINT_PLATE_OUTER_GAP = 30,	// 虚回路区与检修压板整体的间距
-	VIRTUAL_VALUE_ICON_SAFE_GAP = 10		// 值和图标之间的安全距离
+	VIRTUAL_VALUE_ICON_SAFE_GAP = 10,		// 值和图标之间的安全距离
+	VIRTUAL_BAY_TREE_COLUMN_GAP = 400	// 间隔虚回路图设备列之间距离，独立于全图配置
 };
 
 using utils::ColorHelper;
@@ -31,7 +32,7 @@ VirtualSvg* VirtualDiagramBuilder::BuildVirtualDiagramByIedName(const QString& i
 VirtualSvg* VirtualDiagramBuilder::BuildVirtualDiagramByBayName(const QString& bayName)
 {
 	WholeDiagramBuilder wholeBuilder;
-	WholeCircuitSvg* wholeSvg = wholeBuilder.BuildWholeDiagramByBayName(bayName);
+	WholeCircuitSvg* wholeSvg = wholeBuilder.BuildWholeDiagramByBayName(bayName, VIRTUAL_BAY_TREE_COLUMN_GAP);
 	if (!wholeSvg)
 	{
 		return NULL;

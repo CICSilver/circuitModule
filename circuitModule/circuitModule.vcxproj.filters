@@ -64,7 +64,7 @@
     <ClCompile Include="Virtual\VirtualDiagramBuilder.cpp">
       <Filter>Source Files\Virtual</Filter>
     </ClCompile>
-    <ClCompile Include="Whole\WholeBayDiagramComposer.cpp">
+    <ClCompile Include="Whole\WholeBayDiagramBuilder.cpp">
       <Filter>Source Files\Whole</Filter>
     </ClCompile>
     <ClCompile Include="Whole\WholeDiagramBuilder.cpp">
@@ -177,7 +177,7 @@
     <ClInclude Include="Virtual\VirtualDiagramBuilder.h">
       <Filter>Header Files\Virtual</Filter>
     </ClInclude>
-    <ClInclude Include="Whole\WholeBayDiagramComposer.h">
+    <ClInclude Include="Whole\WholeBayDiagramBuilder.h">
       <Filter>Header Files\Whole</Filter>
     </ClInclude>
     <ClInclude Include="Optical\OpticalDiagramBuilder.h">

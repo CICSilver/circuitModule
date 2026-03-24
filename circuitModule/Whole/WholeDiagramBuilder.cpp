@@ -1,6 +1,6 @@
 #include "Whole/WholeDiagramBuilder.h"
 #include "Virtual/VirtualDiagramBuilder.h"
-#include "Whole/WholeBayDiagramComposer.h"
+#include "Whole/WholeBayDiagramBuilder.h"
 #include "directitems.h"
 #include <QFont>
 #include <QFontMetrics>
@@ -719,8 +719,8 @@ void WholeDiagramBuilder::GenerateWholeDiagramByBay(const QString& bayName, Whol
 
 void WholeDiagramBuilder::GenerateWholeDiagramByBay(const QString& bayName, WholeCircuitSvg& svg, int columnGap)
 {
-	WholeBayDiagramComposer bayDiagramComposer(m_pCircuitConfig);
-	bayDiagramComposer.Generate(bayName, svg, columnGap);
+	WholeBayDiagramBuilder bayDiagramBuilder(m_pCircuitConfig);
+	bayDiagramBuilder.Generate(bayName, svg, columnGap);
 }
 
 void WholeDiagramBuilder::TakeOverVirtualSvg(VirtualSvg& virtualSvg, WholeCircuitSvg& wholeSvg)

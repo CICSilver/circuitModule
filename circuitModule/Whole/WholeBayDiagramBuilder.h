@@ -5,16 +5,15 @@
 class CircuitConfig;
 struct WholeCircuitSvg;
 
-enum WholeBayDiagramComposerConfig
+enum WholeBayDiagramBuilderConfig
 {
 	WHOLE_BAY_TREE_COLUMN_GAP = 650
 };
 
-class WholeBayDiagramComposer
+class WholeBayDiagramBuilder
 {
 public:
-	WholeBayDiagramComposer(CircuitConfig* pCircuitConfig);
-
+	WholeBayDiagramBuilder(CircuitConfig* pCircuitConfig);
 	void Generate(const QString& bayName, WholeCircuitSvg& svg, int columnGap);
 
 private:

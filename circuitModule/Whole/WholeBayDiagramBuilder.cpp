@@ -1,4 +1,4 @@
-#include "Whole/WholeBayDiagramComposer.h"
+#include "Whole/WholeBayDiagramBuilder.h"
 #include "circuitconfig.h"
 #include "directitems.h"
 #include "SvgUtils.h"
@@ -23,7 +23,7 @@ enum WholeBayTreeLayoutConfig
 
 namespace
 {
-	static QString whole_read_local_text(const char* rawText, const QString& defaultText = QString())
+	static QString read_local_text(const char* rawText, const QString& defaultText = QString())
 	{
 		if (!rawText || rawText[0] == '\0')
 		{
@@ -32,21 +32,7 @@ namespace
 		return QString::fromLocal8Bit(rawText);
 	}
 
-	static QString whole_get_bay_key(const CRtdbEleModelBay* pBay)
-	{
-		if (!pBay || !pBay->m_pBayInfo)
-		{
-			return QString();
-		}
-		QString bayName = whole_read_local_text(pBay->m_pBayInfo->bayName);
-		if (!bayName.isEmpty())
-		{
-			return bayName;
-		}
-		return whole_read_local_text(pBay->m_pBayInfo->bayDesc);
-	}
-
-	static QStringList whole_collect_bay_ied_name_list(CircuitConfig* pCircuitConfig, const QString& bayName)
+	static QStringList collect_bay_ied_name_list(CircuitConfig* pCircuitConfig, const QString& bayName)
 	{
 		QStringList bayIedNameList;
 		const CRtdbEleModelStation* pStation = pCircuitConfig ? pCircuitConfig->StationModel() : NULL;
@@ -66,7 +52,16 @@ namespace
 				bayIt != pVolt->m_listBay.end(); ++bayIt)
 			{
 				const CRtdbEleModelBay* pBay = *bayIt;
-				if (whole_get_bay_key(pBay) != bayName)
+				if (!pBay || !pBay->m_pBayInfo)
+				{
+					continue;
+				}
+				QString currentBayName = read_local_text(pBay->m_pBayInfo->bayName);
+				if (currentBayName.isEmpty())
+				{
+					currentBayName = read_local_text(pBay->m_pBayInfo->bayDesc);
+				}
+				if (currentBayName != bayName)
 				{
 					continue;
 				}
@@ -78,7 +73,7 @@ namespace
 					{
 						continue;
 					}
-					QString iedName = whole_read_local_text(pModelIed->m_pIedHead->iedName);
+					QString iedName = read_local_text(pModelIed->m_pIedHead->iedName);
 					if (iedName.isEmpty() || !pCircuitConfig->GetIedByName(iedName) || bayIedNameList.contains(iedName))
 					{
 						continue;
@@ -112,7 +107,7 @@ namespace
 		QList<LogicCircuit*> parentLogicList;
 	};
 
-	static QString whole_bay_tree_pair_key(const QString& firstName, const QString& secondName)
+	static QString bay_tree_pair_key(const QString& firstName, const QString& secondName)
 	{
 		if (firstName.compare(secondName, Qt::CaseInsensitive) <= 0)
 		{
@@ -121,7 +116,7 @@ namespace
 		return secondName + QString::fromLatin1("|") + firstName;
 	}
 
-	static void whole_bay_tree_collect_logic_maps(CircuitConfig* pCircuitConfig,
+	static void bay_tree_collect_logic_maps(CircuitConfig* pCircuitConfig,
 		const QStringList& bayIedNameList,
 		QMap<QString, QList<LogicCircuit*> >& pairLogicHash,
 		QMap<QString, QSet<QString> >& bayAdjHash,
@@ -161,7 +156,7 @@ namespace
 				{
 					continue;
 				}
-				pairLogicHash[whole_bay_tree_pair_key(srcIedName, destIedName)].append(pLogicCircuit);
+				pairLogicHash[bay_tree_pair_key(srcIedName, destIedName)].append(pLogicCircuit);
 				allAdjHash[srcIedName].insert(destIedName);
 				allAdjHash[destIedName].insert(srcIedName);
 				if (srcInBay && destInBay)
@@ -173,7 +168,7 @@ namespace
 		}
 	}
 
-	static void whole_bay_tree_collect_component(const QString& startIedName,
+	static void bay_tree_collect_component(const QString& startIedName,
 		const QMap<QString, QSet<QString> >& bayAdjHash,
 		QSet<QString>& visitedSet,
 		QStringList& componentList)
@@ -199,28 +194,7 @@ namespace
 		}
 	}
 
-	static QStringList whole_bay_tree_sort_names(const QSet<QString>& nameSet, const QSet<QString>& bayIedNameSet)
-	{
-		QStringList bayNameList;
-		QStringList externalNameList;
-		QSet<QString>::const_iterator it = nameSet.constBegin();
-		for (; it != nameSet.constEnd(); ++it)
-		{
-			if (bayIedNameSet.contains(*it))
-			{
-				bayNameList.append(*it);
-			}
-			else
-			{
-				externalNameList.append(*it);
-			}
-		}
-		bayNameList.sort();
-		externalNameList.sort();
-		return bayNameList + externalNameList;
-	}
-
-	static QString whole_bay_tree_select_center(const QStringList& componentList,
+	static QString bay_tree_select_center(const QStringList& componentList,
 		const QMap<QString, QSet<QString> >& allAdjHash,
 		const QMap<QString, int>& bayOrderHash)
 	{
@@ -256,18 +230,7 @@ namespace
 		return bestIedName;
 	}
 
-	static WholeBayTreeNode* whole_bay_tree_create_node(const QString& iedName, bool inBay, int side, int depth, WholeBayTreeNode* pParent)
-	{
-		WholeBayTreeNode* pNode = new WholeBayTreeNode();
-		pNode->iedName = iedName;
-		pNode->inBay = inBay;
-		pNode->side = side;
-		pNode->depth = depth;
-		pNode->pParent = pParent;
-		return pNode;
-	}
-
-	static int whole_bay_tree_node_x(int depth, int side, int columnGap)
+	static int bay_tree_node_x(int depth, int side, int columnGap)
 	{
 		int leftSecondX = WHOLE_BAY_TREE_LEFT_MARGIN;
 		int leftFirstX = leftSecondX + WHOLE_BAY_TREE_NODE_WIDTH + columnGap;
@@ -285,54 +248,7 @@ namespace
 		return side < 0 ? leftSecondX : rightSecondX;
 	}
 
-	static LogicCircuitLine* whole_create_logic_line(LogicCircuit* pLogicCircuit, IedRect* pSrcRect, IedRect* pDestRect)
-	{
-		LogicCircuitLine* pLine = new LogicCircuitLine();
-		pLine->pLogicCircuit = pLogicCircuit;
-		pLine->pSrcIedRect = pSrcRect;
-		pLine->pDestIedRect = pDestRect;
-		pLine->srcArrowState = Arrow_None;
-		pLine->destArrowState = Arrow_In;
-		pLine->arrowState = Arrow_In;
-		return pLine;
-	}
-
-	static IedRect* whole_create_ied_rect_with_size(CircuitConfig* pCircuitConfig, const QString& iedName, int x, int y, int width, int height, quint32 borderColor)
-	{
-		IED* pIed = pCircuitConfig ? pCircuitConfig->GetIedByName(iedName) : NULL;
-		QString iedDesc = pIed ? pIed->desc : QString();
-		return utils::GetIedRect(iedName, iedDesc, (quint16)x, (quint16)y, (quint16)width, (quint16)height, borderColor, utils::ColorHelper::pure_black);
-	}
-
-	static void whole_adjust_rect_extend_height(IedRect* pRect)
-	{
-		if (!pRect)
-		{
-			return;
-		}
-		int circuitSize = 0;
-		for (int i = 0; i < pRect->logic_line_list.size(); ++i)
-		{
-			LogicCircuitLine* pLine = pRect->logic_line_list.at(i);
-			if (!pLine || !pLine->pLogicCircuit)
-			{
-				continue;
-			}
-			circuitSize += pLine->pLogicCircuit->circuitList.size();
-		}
-		pRect->extend_height = circuitSize * (CIRCUIT_VERTICAL_DISTANCE + ICON_LENGTH) + pRect->inner_gap + PLATE_HEIGHT;
-	}
-
-	static int whole_get_rect_outer_bottom(const IedRect* pRect)
-	{
-		if (!pRect)
-		{
-			return 0;
-		}
-		return pRect->y + pRect->height + pRect->extend_height;
-	}
-
-	static void whole_attach_bay_tree_logic_lines(WholeBayTreeNode* pNode)
+	static void attach_bay_tree_logic_lines(WholeBayTreeNode* pNode)
 	{
 		if (!pNode || !pNode->pParent || !pNode->pRect || !pNode->pParent->pRect)
 		{
@@ -367,50 +283,35 @@ namespace
 			{
 				continue;
 			}
-			LogicCircuitLine* pLine = whole_create_logic_line(pLogicCircuit, pSrcRect, pDestRect);
+			LogicCircuitLine* pLine = new LogicCircuitLine();
+			pLine->pLogicCircuit = pLogicCircuit;
+			pLine->pSrcIedRect = pSrcRect;
+			pLine->pDestIedRect = pDestRect;
+			pLine->srcArrowState = Arrow_None;
+			pLine->destArrowState = Arrow_In;
+			pLine->arrowState = Arrow_In;
 			pNode->pRect->logic_line_list.append(pLine);
 		}
 	}
 
-	static int whole_bay_tree_rect_outer_height(const IedRect* pRect)
+	static int bay_tree_prepare_subtree_height(WholeBayTreeNode* pNode)
 	{
-		if (!pRect)
-		{
-			return 0;
-		}
-		return pRect->height + pRect->extend_height;
-	}
-
-	static int whole_bay_tree_child_total_height(WholeBayTreeNode* pNode)
-	{
-		if (!pNode)
+		if (!pNode || !pNode->pRect)
 		{
 			return 0;
 		}
 		int childHeight = 0;
 		for (int i = 0; i < pNode->childNodeList.size(); ++i)
 		{
-			childHeight += whole_bay_tree_rect_outer_height(pNode->childNodeList.at(i)->pRect);
+			WholeBayTreeNode* pChildNode = pNode->childNodeList.at(i);
+			bay_tree_prepare_subtree_height(pChildNode);
+			childHeight += pChildNode->pRect->height + pChildNode->pRect->extend_height;
 			if (i > 0)
 			{
 				childHeight += WHOLE_BAY_TREE_NODE_GAP;
 			}
 		}
-		return childHeight;
-	}
-
-	static int whole_bay_tree_prepare_subtree_height(WholeBayTreeNode* pNode)
-	{
-		if (!pNode || !pNode->pRect)
-		{
-			return 0;
-		}
-		for (int i = 0; i < pNode->childNodeList.size(); ++i)
-		{
-			whole_bay_tree_prepare_subtree_height(pNode->childNodeList.at(i));
-		}
-		int nodeHeight = whole_bay_tree_rect_outer_height(pNode->pRect);
-		int childHeight = whole_bay_tree_child_total_height(pNode);
+		int nodeHeight = pNode->pRect->height + pNode->pRect->extend_height;
 		if (childHeight > nodeHeight)
 		{
 			pNode->pRect->extend_height += (quint16)(childHeight - nodeHeight);
@@ -419,16 +320,7 @@ namespace
 		return nodeHeight;
 	}
 
-	static int whole_bay_tree_subtree_height(WholeBayTreeNode* pNode)
-	{
-		if (!pNode || !pNode->pRect)
-		{
-			return 0;
-		}
-		return whole_bay_tree_rect_outer_height(pNode->pRect);
-	}
-
-	static void whole_bay_tree_place_subtree(WholeBayTreeNode* pNode, int topY)
+	static void bay_tree_place_subtree(WholeBayTreeNode* pNode, int topY)
 	{
 		if (!pNode || !pNode->pRect)
 		{
@@ -443,37 +335,12 @@ namespace
 		for (int i = 0; i < pNode->childNodeList.size(); ++i)
 		{
 			WholeBayTreeNode* pChildNode = pNode->childNodeList.at(i);
-			whole_bay_tree_place_subtree(pChildNode, currentChildY);
-			currentChildY += whole_bay_tree_subtree_height(pChildNode) + WHOLE_BAY_TREE_NODE_GAP;
+			bay_tree_place_subtree(pChildNode, currentChildY);
+			currentChildY += pChildNode->pRect->height + pChildNode->pRect->extend_height + WHOLE_BAY_TREE_NODE_GAP;
 		}
 	}
 
-	static int whole_bay_tree_list_height(const QList<WholeBayTreeNode*>& nodeList)
-	{
-		int totalHeight = 0;
-		for (int i = 0; i < nodeList.size(); ++i)
-		{
-			totalHeight += whole_bay_tree_subtree_height(nodeList.at(i));
-			if (i > 0)
-			{
-				totalHeight += WHOLE_BAY_TREE_NODE_GAP;
-			}
-		}
-		return totalHeight;
-	}
-
-	static void whole_bay_tree_place_list(const QList<WholeBayTreeNode*>& nodeList, int topY)
-	{
-		int currentY = topY;
-		for (int i = 0; i < nodeList.size(); ++i)
-		{
-			WholeBayTreeNode* pNode = nodeList.at(i);
-			whole_bay_tree_place_subtree(pNode, currentY);
-			currentY += whole_bay_tree_subtree_height(pNode) + WHOLE_BAY_TREE_NODE_GAP;
-		}
-	}
-
-	static void whole_adjust_bay_plate_position(QHash<QString, PlateRect>& hash, const QString& ownerKey, const QPoint& linePt,
+	static void adjust_bay_plate_position(QHash<QString, PlateRect>& hash, const QString& ownerKey, const QPoint& linePt,
 		const QString& plateDesc, const QString& plateRef, quint64 plateCode, const QString& iedName, bool placeRight)
 	{
 		if (plateDesc.isEmpty() || plateRef.isEmpty())
@@ -502,7 +369,7 @@ namespace
 		}
 	}
 
-	static void whole_build_bay_tree_virtual_lines(WholeCircuitSvg& svg, IedRect* pOwnerRect)
+	static void build_bay_tree_virtual_lines(WholeCircuitSvg& svg, IedRect* pOwnerRect)
 	{
 		if (!pOwnerRect)
 		{
@@ -571,22 +438,22 @@ namespace
 				pVtLine->circuitDescRect = QRect(QPoint(descRectX, (int)(ptY - fm.height() * 1.2)), QSize(descRectWidth, fm.height()));
 				pLogicLine->virtual_line_list.append(pVtLine);
 				QString key = QString("%1+%2").arg(pSrcRect->iedName).arg(pDestRect->iedName);
-				whole_adjust_bay_plate_position(svg.plateRectHash, key, pVtLine->startPoint, pCircuit->srcSoftPlateDesc, pCircuit->srcSoftPlateRef, pCircuit->srcSoftPlateCode, pSrcRect->iedName, startPtX < endPtX);
-				whole_adjust_bay_plate_position(svg.plateRectHash, key, pVtLine->endPoint, pCircuit->destSoftPlateDesc, pCircuit->destSoftPlateRef, pCircuit->destSoftPlateCode, pDestRect->iedName, endPtX < startPtX);
+				adjust_bay_plate_position(svg.plateRectHash, key, pVtLine->startPoint, pCircuit->srcSoftPlateDesc, pCircuit->srcSoftPlateRef, pCircuit->srcSoftPlateCode, pSrcRect->iedName, startPtX < endPtX);
+				adjust_bay_plate_position(svg.plateRectHash, key, pVtLine->endPoint, pCircuit->destSoftPlateDesc, pCircuit->destSoftPlateRef, pCircuit->destSoftPlateCode, pDestRect->iedName, endPtX < startPtX);
 				++(*pConnectIndex);
 			}
 		}
 	}
 }
 
-WholeBayDiagramComposer::WholeBayDiagramComposer(CircuitConfig* pCircuitConfig)
+WholeBayDiagramBuilder::WholeBayDiagramBuilder(CircuitConfig* pCircuitConfig)
 	: m_pCircuitConfig(pCircuitConfig)
 {
 }
 
-void WholeBayDiagramComposer::Generate(const QString& bayName, WholeCircuitSvg& svg, int columnGap)
+void WholeBayDiagramBuilder::Generate(const QString& bayName, WholeCircuitSvg& svg, int columnGap)
 {
-	QStringList bayIedNameList = whole_collect_bay_ied_name_list(m_pCircuitConfig, bayName);
+	QStringList bayIedNameList = collect_bay_ied_name_list(m_pCircuitConfig, bayName);
 	if (bayIedNameList.isEmpty())
 	{
 		return;
@@ -601,7 +468,7 @@ void WholeBayDiagramComposer::Generate(const QString& bayName, WholeCircuitSvg& 
 	QMap<QString, QList<LogicCircuit*> > pairLogicHash;
 	QMap<QString, QSet<QString> > bayAdjHash;
 	QMap<QString, QSet<QString> > allAdjHash;
-	whole_bay_tree_collect_logic_maps(m_pCircuitConfig, bayIedNameList, pairLogicHash, bayAdjHash, allAdjHash);
+	bay_tree_collect_logic_maps(m_pCircuitConfig, bayIedNameList, pairLogicHash, bayAdjHash, allAdjHash);
 	QSet<QString> visitedSet;
 	int currentTopY = WHOLE_BAY_TREE_TOP_MARGIN;
 	int maxBottom = 0;
@@ -614,13 +481,13 @@ void WholeBayDiagramComposer::Generate(const QString& bayName, WholeCircuitSvg& 
 			continue;
 		}
 		QStringList componentList;
-		whole_bay_tree_collect_component(startIedName, bayAdjHash, visitedSet, componentList);
+		bay_tree_collect_component(startIedName, bayAdjHash, visitedSet, componentList);
 		if (componentList.isEmpty())
 		{
 			componentList.append(startIedName);
 			visitedSet.insert(startIedName);
 		}
-		QString centerIedName = whole_bay_tree_select_center(componentList, allAdjHash, bayOrderHash);
+		QString centerIedName = bay_tree_select_center(componentList, allAdjHash, bayOrderHash);
 		if (centerIedName.isEmpty())
 		{
 			centerIedName = startIedName;
@@ -628,16 +495,39 @@ void WholeBayDiagramComposer::Generate(const QString& bayName, WholeCircuitSvg& 
 		QList<WholeBayTreeNode*> allNodeList;
 		QList<WholeBayTreeNode*> leftRootNodeList;
 		QList<WholeBayTreeNode*> rightRootNodeList;
-		WholeBayTreeNode* pCenterNode = whole_bay_tree_create_node(centerIedName, true, 0, 0, NULL);
+		WholeBayTreeNode* pCenterNode = new WholeBayTreeNode();
+		pCenterNode->iedName = centerIedName;
+		pCenterNode->inBay = true;
 		allNodeList.append(pCenterNode);
 		QSet<QString> firstHopSet = allAdjHash.value(centerIedName);
-		QStringList firstHopNameList = whole_bay_tree_sort_names(firstHopSet, bayIedNameSet);
+		QStringList bayFirstHopNameList;
+		QStringList externalFirstHopNameList;
+		QSet<QString>::const_iterator firstHopIt = firstHopSet.constBegin();
+		for (; firstHopIt != firstHopSet.constEnd(); ++firstHopIt)
+		{
+			if (bayIedNameSet.contains(*firstHopIt))
+			{
+				bayFirstHopNameList.append(*firstHopIt);
+			}
+			else
+			{
+				externalFirstHopNameList.append(*firstHopIt);
+			}
+		}
+		bayFirstHopNameList.sort();
+		externalFirstHopNameList.sort();
+		QStringList firstHopNameList = bayFirstHopNameList + externalFirstHopNameList;
 		for (int firstIndex = 0; firstIndex < firstHopNameList.size(); ++firstIndex)
 		{
 			QString firstHopName = firstHopNameList.at(firstIndex);
 			int side = (firstIndex % 2 == 0) ? -1 : 1;
-			WholeBayTreeNode* pFirstNode = whole_bay_tree_create_node(firstHopName, bayIedNameSet.contains(firstHopName), side, 1, pCenterNode);
-			pFirstNode->parentLogicList = pairLogicHash.value(whole_bay_tree_pair_key(centerIedName, firstHopName));
+			WholeBayTreeNode* pFirstNode = new WholeBayTreeNode();
+			pFirstNode->iedName = firstHopName;
+			pFirstNode->inBay = bayIedNameSet.contains(firstHopName);
+			pFirstNode->side = side;
+			pFirstNode->depth = 1;
+			pFirstNode->pParent = pCenterNode;
+			pFirstNode->parentLogicList = pairLogicHash.value(bay_tree_pair_key(centerIedName, firstHopName));
 			allNodeList.append(pFirstNode);
 			if (side < 0)
 			{
@@ -670,8 +560,13 @@ void WholeBayDiagramComposer::Generate(const QString& bayName, WholeCircuitSvg& 
 			for (int secondIndex = 0; secondIndex < secondHopNameList.size(); ++secondIndex)
 			{
 				QString secondHopName = secondHopNameList.at(secondIndex);
-				WholeBayTreeNode* pSecondNode = whole_bay_tree_create_node(secondHopName, true, side, 2, pFirstNode);
-				pSecondNode->parentLogicList = pairLogicHash.value(whole_bay_tree_pair_key(firstHopName, secondHopName));
+				WholeBayTreeNode* pSecondNode = new WholeBayTreeNode();
+				pSecondNode->iedName = secondHopName;
+				pSecondNode->inBay = true;
+				pSecondNode->side = side;
+				pSecondNode->depth = 2;
+				pSecondNode->pParent = pFirstNode;
+				pSecondNode->parentLogicList = pairLogicHash.value(bay_tree_pair_key(firstHopName, secondHopName));
 				pFirstNode->childNodeList.append(pSecondNode);
 				allNodeList.append(pSecondNode);
 			}
@@ -684,7 +579,12 @@ void WholeBayDiagramComposer::Generate(const QString& bayName, WholeCircuitSvg& 
 				continue;
 			}
 			quint32 borderColor = pNode->depth == 0 ? utils::ColorHelper::pure_red : utils::ColorHelper::pure_green;
-			pNode->pRect = whole_create_ied_rect_with_size(m_pCircuitConfig, pNode->iedName, whole_bay_tree_node_x(pNode->depth, pNode->side, columnGap), currentTopY, WHOLE_BAY_TREE_NODE_WIDTH, RECT_DEFAULT_HEIGHT, borderColor);
+			IED* pIed = m_pCircuitConfig ? m_pCircuitConfig->GetIedByName(pNode->iedName) : NULL;
+			QString iedDesc = pIed ? pIed->desc : QString();
+			pNode->pRect = utils::GetIedRect(pNode->iedName, iedDesc,
+				(quint16)bay_tree_node_x(pNode->depth, pNode->side, columnGap), (quint16)currentTopY,
+				(quint16)WHOLE_BAY_TREE_NODE_WIDTH, (quint16)RECT_DEFAULT_HEIGHT,
+				borderColor, utils::ColorHelper::pure_black);
 			if (!pNode->pRect)
 			{
 				continue;
@@ -709,7 +609,7 @@ void WholeBayDiagramComposer::Generate(const QString& bayName, WholeCircuitSvg& 
 			{
 				continue;
 			}
-			whole_attach_bay_tree_logic_lines(pNode);
+			attach_bay_tree_logic_lines(pNode);
 		}
 		for (int nodeIndex = 0; nodeIndex < allNodeList.size(); ++nodeIndex)
 		{
@@ -718,25 +618,45 @@ void WholeBayDiagramComposer::Generate(const QString& bayName, WholeCircuitSvg& 
 			{
 				continue;
 			}
-			whole_adjust_rect_extend_height(pNode->pRect);
+			int circuitSize = 0;
+			for (int logicIndex = 0; logicIndex < pNode->pRect->logic_line_list.size(); ++logicIndex)
+			{
+				LogicCircuitLine* pLine = pNode->pRect->logic_line_list.at(logicIndex);
+				if (!pLine || !pLine->pLogicCircuit)
+				{
+					continue;
+				}
+				circuitSize += pLine->pLogicCircuit->circuitList.size();
+			}
+			pNode->pRect->extend_height = circuitSize * (CIRCUIT_VERTICAL_DISTANCE + ICON_LENGTH) + pNode->pRect->inner_gap + PLATE_HEIGHT;
 			pNode->pRect->extend_height += WHOLE_BAY_TREE_MAINT_PLATE_GAP;
 		}
+		int leftHeight = 0;
 		for (int rootIndex = 0; rootIndex < leftRootNodeList.size(); ++rootIndex)
 		{
-			whole_bay_tree_prepare_subtree_height(leftRootNodeList.at(rootIndex));
+			bay_tree_prepare_subtree_height(leftRootNodeList.at(rootIndex));
+			leftHeight += leftRootNodeList.at(rootIndex)->pRect->height + leftRootNodeList.at(rootIndex)->pRect->extend_height;
+			if (rootIndex > 0)
+			{
+				leftHeight += WHOLE_BAY_TREE_NODE_GAP;
+			}
 		}
+		int rightHeight = 0;
 		for (int rootIndex = 0; rootIndex < rightRootNodeList.size(); ++rootIndex)
 		{
-			whole_bay_tree_prepare_subtree_height(rightRootNodeList.at(rootIndex));
+			bay_tree_prepare_subtree_height(rightRootNodeList.at(rootIndex));
+			rightHeight += rightRootNodeList.at(rootIndex)->pRect->height + rightRootNodeList.at(rootIndex)->pRect->extend_height;
+			if (rootIndex > 0)
+			{
+				rightHeight += WHOLE_BAY_TREE_NODE_GAP;
+			}
 		}
-		int centerHeight = whole_bay_tree_rect_outer_height(pCenterNode->pRect);
-		int leftHeight = whole_bay_tree_list_height(leftRootNodeList);
-		int rightHeight = whole_bay_tree_list_height(rightRootNodeList);
+		int centerHeight = pCenterNode->pRect ? pCenterNode->pRect->height + pCenterNode->pRect->extend_height : 0;
 		int sideHeight = qMax(leftHeight, rightHeight);
 		if (pCenterNode->pRect && sideHeight > centerHeight)
 		{
 			pCenterNode->pRect->extend_height += (quint16)(sideHeight - centerHeight);
-			centerHeight = whole_bay_tree_rect_outer_height(pCenterNode->pRect);
+			centerHeight = pCenterNode->pRect->height + pCenterNode->pRect->extend_height;
 		}
 		int graphHeight = qMax(centerHeight, sideHeight);
 		if (graphHeight <= 0)
@@ -745,11 +665,23 @@ void WholeBayDiagramComposer::Generate(const QString& bayName, WholeCircuitSvg& 
 		}
 		if (leftHeight > 0)
 		{
-			whole_bay_tree_place_list(leftRootNodeList, currentTopY);
+			int currentY = currentTopY;
+			for (int rootIndex = 0; rootIndex < leftRootNodeList.size(); ++rootIndex)
+			{
+				WholeBayTreeNode* pRootNode = leftRootNodeList.at(rootIndex);
+				bay_tree_place_subtree(pRootNode, currentY);
+				currentY += pRootNode->pRect->height + pRootNode->pRect->extend_height + WHOLE_BAY_TREE_NODE_GAP;
+			}
 		}
 		if (rightHeight > 0)
 		{
-			whole_bay_tree_place_list(rightRootNodeList, currentTopY);
+			int currentY = currentTopY;
+			for (int rootIndex = 0; rootIndex < rightRootNodeList.size(); ++rootIndex)
+			{
+				WholeBayTreeNode* pRootNode = rightRootNodeList.at(rootIndex);
+				bay_tree_place_subtree(pRootNode, currentY);
+				currentY += pRootNode->pRect->height + pRootNode->pRect->extend_height + WHOLE_BAY_TREE_NODE_GAP;
+			}
 		}
 		if (pCenterNode->pRect)
 		{
@@ -762,7 +694,7 @@ void WholeBayDiagramComposer::Generate(const QString& bayName, WholeCircuitSvg& 
 			{
 				continue;
 			}
-			whole_build_bay_tree_virtual_lines(svg, pNode->pRect);
+			build_bay_tree_virtual_lines(svg, pNode->pRect);
 		}
 		for (int nodeIndex = 0; nodeIndex < allNodeList.size(); ++nodeIndex)
 		{
@@ -771,7 +703,7 @@ void WholeBayDiagramComposer::Generate(const QString& bayName, WholeCircuitSvg& 
 			{
 				continue;
 			}
-			maxBottom = qMax(maxBottom, whole_get_rect_outer_bottom(pNode->pRect));
+			maxBottom = qMax(maxBottom, (int)(pNode->pRect->y + pNode->pRect->height + pNode->pRect->extend_height));
 			maxRightX = qMax(maxRightX, pNode->pRect->x + pNode->pRect->width);
 		}
 		currentTopY += graphHeight + WHOLE_BAY_TREE_BLOCK_GAP;
@@ -786,7 +718,7 @@ void WholeBayDiagramComposer::Generate(const QString& bayName, WholeCircuitSvg& 
 	}
 	if (maxRightX <= 0)
 	{
-		maxRightX = whole_bay_tree_node_x(2, 1, columnGap) + WHOLE_BAY_TREE_NODE_WIDTH + WHOLE_BAY_TREE_VIEW_MARGIN;
+		maxRightX = bay_tree_node_x(2, 1, columnGap) + WHOLE_BAY_TREE_NODE_WIDTH + WHOLE_BAY_TREE_VIEW_MARGIN;
 	}
 	svg.viewBoxX = 0;
 	svg.viewBoxY = 0;

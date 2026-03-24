@@ -40,7 +40,7 @@ HEADERS += \
     SvgTransformer.h \
     SvgUtils.h \
     Virtual/VirtualDiagramBuilder.h \
-    Whole/WholeBayDiagramComposer.h \
+    Whole/WholeBayDiagramBuilder.h \
     Whole/WholeDiagramBuilder.h \
     CircuitModuleApi.h \
     circuitmodule_global.h \
@@ -87,7 +87,7 @@ SOURCES += \
     SvgTransformer.cpp \
     SvgUtils.cpp \
     Virtual/VirtualDiagramBuilder.cpp \
-    Whole/WholeBayDiagramComposer.cpp \
+    Whole/WholeBayDiagramBuilder.cpp \
     Whole/WholeDiagramBuilder.cpp \
     include/pugixml/pugixml.cpp \
     include/rtdb/rtdb_dll.cpp

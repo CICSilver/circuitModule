@@ -40,9 +40,11 @@ HEADERS += \
     SvgTransformer.h \
     SvgUtils.h \
     Virtual/VirtualDiagramBuilder.h \
+    Whole/WholeBayDiagramComposer.h \
     Whole/WholeDiagramBuilder.h \
     CircuitModuleApi.h \
     circuitmodule_global.h \
+    ControlBlockListWindow.h \
     directitembase.h \
     directitems.h \
     directlinehelpers.h \
@@ -72,6 +74,7 @@ SOURCES += \
     circuitconfig.cpp \
     InteractiveSvgItem.cpp \
     CircuitModuleApi.cpp \
+    ControlBlockListWindow.cpp \
     directlinehelpers.cpp \
     directlineitems.cpp \
     directnodeitems.cpp \
@@ -84,6 +87,7 @@ SOURCES += \
     SvgTransformer.cpp \
     SvgUtils.cpp \
     Virtual/VirtualDiagramBuilder.cpp \
+    Whole/WholeBayDiagramComposer.cpp \
     Whole/WholeDiagramBuilder.cpp \
     include/pugixml/pugixml.cpp \
     include/rtdb/rtdb_dll.cpp

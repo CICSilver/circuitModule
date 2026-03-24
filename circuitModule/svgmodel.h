@@ -418,3 +418,35 @@ struct WholeCircuitSvg : public LogicSvg
 	QHash<QString, PlateRect> plateRectHash;
 	QList<WholeGroupDecor*> groupDecorList;
 };
+
+inline void MoveLogicSvgState(LogicSvg& sourceSvg, LogicSvg& targetSvg)
+{
+	targetSvg.mainIedRect = sourceSvg.mainIedRect;
+	sourceSvg.mainIedRect = NULL;
+	targetSvg.viewBoxX = sourceSvg.viewBoxX;
+	targetSvg.viewBoxY = sourceSvg.viewBoxY;
+	targetSvg.viewBoxWidth = sourceSvg.viewBoxWidth;
+	targetSvg.viewBoxHeight = sourceSvg.viewBoxHeight;
+	targetSvg.centerIedRectList = sourceSvg.centerIedRectList;
+	targetSvg.leftIedRectList = sourceSvg.leftIedRectList;
+	targetSvg.rightIedRectList = sourceSvg.rightIedRectList;
+	targetSvg.descRectList = sourceSvg.descRectList;
+	sourceSvg.centerIedRectList.clear();
+	sourceSvg.leftIedRectList.clear();
+	sourceSvg.rightIedRectList.clear();
+	sourceSvg.descRectList.clear();
+}
+
+inline void MoveSharedVirtualSvgState(VirtualSvg& sourceSvg, WholeCircuitSvg& targetSvg)
+{
+	MoveLogicSvgState(sourceSvg, targetSvg);
+	targetSvg.plateRectHash = sourceSvg.plateRectHash;
+	sourceSvg.plateRectHash.clear();
+}
+
+inline void MoveSharedVirtualSvgState(WholeCircuitSvg& sourceSvg, VirtualSvg& targetSvg)
+{
+	MoveLogicSvgState(sourceSvg, targetSvg);
+	targetSvg.plateRectHash = sourceSvg.plateRectHash;
+	sourceSvg.plateRectHash.clear();
+}

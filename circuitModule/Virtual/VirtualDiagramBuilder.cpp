@@ -45,22 +45,7 @@ VirtualSvg* VirtualDiagramBuilder::BuildVirtualDiagramByBayName(const QString& b
 
 void VirtualDiagramBuilder::TakeOverWholeSvg(WholeCircuitSvg& wholeSvg, VirtualSvg& virtualSvg)
 {
-	virtualSvg.mainIedRect = wholeSvg.mainIedRect;
-	wholeSvg.mainIedRect = NULL;
-	virtualSvg.viewBoxX = wholeSvg.viewBoxX;
-	virtualSvg.viewBoxY = wholeSvg.viewBoxY;
-	virtualSvg.viewBoxWidth = wholeSvg.viewBoxWidth;
-	virtualSvg.viewBoxHeight = wholeSvg.viewBoxHeight;
-	virtualSvg.centerIedRectList = wholeSvg.centerIedRectList;
-	virtualSvg.leftIedRectList = wholeSvg.leftIedRectList;
-	virtualSvg.rightIedRectList = wholeSvg.rightIedRectList;
-	virtualSvg.descRectList = wholeSvg.descRectList;
-	virtualSvg.plateRectHash = wholeSvg.plateRectHash;
-	wholeSvg.centerIedRectList.clear();
-	wholeSvg.leftIedRectList.clear();
-	wholeSvg.rightIedRectList.clear();
-	wholeSvg.descRectList.clear();
-	wholeSvg.plateRectHash.clear();
+	MoveSharedVirtualSvgState(wholeSvg, virtualSvg);
 }
 
 void VirtualDiagramBuilder::AppendPeerLogicLines(IedRect* pPeerIedRect, IedRect* pMainIedRect, const QString& mainIedName, const QString& peerIedName)

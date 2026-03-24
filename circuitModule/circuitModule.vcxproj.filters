@@ -19,6 +19,9 @@
     <ClCompile Include="CircuitModuleApi.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ControlBlockListWindow.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="InteractiveSvgItem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -60,6 +63,9 @@
     </ClCompile>
     <ClCompile Include="Virtual\VirtualDiagramBuilder.cpp">
       <Filter>Source Files\Virtual</Filter>
+    </ClCompile>
+    <ClCompile Include="Whole\WholeBayDiagramComposer.cpp">
+      <Filter>Source Files\Whole</Filter>
     </ClCompile>
     <ClCompile Include="Whole\WholeDiagramBuilder.cpp">
       <Filter>Source Files\Whole</Filter>
@@ -123,6 +129,9 @@
     <ClInclude Include="..\CircuitModuleApi.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ControlBlockListWindow.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="CircuitDiagramFactory.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -167,6 +176,9 @@
     </ClInclude>
     <ClInclude Include="Virtual\VirtualDiagramBuilder.h">
       <Filter>Header Files\Virtual</Filter>
+    </ClInclude>
+    <ClInclude Include="Whole\WholeBayDiagramComposer.h">
+      <Filter>Header Files\Whole</Filter>
     </ClInclude>
     <ClInclude Include="Optical\OpticalDiagramBuilder.h">
       <Filter>Header Files\Optical</Filter>

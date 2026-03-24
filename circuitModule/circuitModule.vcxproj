@@ -51,7 +51,7 @@
   <PropertyGroup>
     <_ProjectFileVersion>10.0.40219.1</_ProjectFileVersion>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..\..\out\win32\</OutDir>
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug_exe|Win32'">$(SolutionDir)$(PlatForm)\$(Configuration)</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug_exe|Win32'">$(SolutionDir)$(PlatForm)\$(Configuration)\</OutDir>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..\..\out\win32\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -120,6 +120,7 @@
     <ClCompile Include="CircuitDiagramFactory.cpp" />
     <ClCompile Include="CircuitDiagramProxy.cpp" />
     <ClCompile Include="CircuitModuleApi.cpp" />
+    <ClCompile Include="ControlBlockListWindow.cpp" />
     <ClCompile Include="directlinehelpers.cpp" />
     <ClCompile Include="directlineitems.cpp" />
     <ClCompile Include="directnodeitems.cpp" />
@@ -128,6 +129,7 @@
     <ClCompile Include="Optical\OpticalDiagramBuilder.cpp" />
     <ClCompile Include="legacy_svg\SvgTransformerLegacy.cpp" />
     <ClCompile Include="Virtual\VirtualDiagramBuilder.cpp" />
+    <ClCompile Include="Whole\WholeBayDiagramComposer.cpp" />
     <ClCompile Include="Whole\WholeDiagramBuilder.cpp" />
     <ClCompile Include="GeneratedFiles\Debug\moc_directwidget.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
@@ -222,6 +224,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\CircuitModuleApi.h" />
+    <ClInclude Include="ControlBlockListWindow.h" />
     <ClInclude Include="CircuitDiagramFactory.h" />
     <ClInclude Include="CircuitDiagramProxy.h" />
     <ClInclude Include="..\circuitmodule_global.h" />
@@ -233,6 +236,7 @@
     <ClInclude Include="Logical\LogicDiagramBuilder.h" />
     <ClInclude Include="Optical\OpticalDiagramBuilder.h" />
     <ClInclude Include="Virtual\VirtualDiagramBuilder.h" />
+    <ClInclude Include="Whole\WholeBayDiagramComposer.h" />
     <ClInclude Include="Whole\WholeDiagramBuilder.h" />
     <CustomBuild Include="directwidget.h">
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug_exe|Win32'">"$(QTDIR)\bin\moc.exe"  "%(FullPath)" -o ".\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"  -DUNICODE -DWIN32 -DQT_DLL -DQT_CORE_LIB -DQT_GUI_LIB -DQT_SVG_LIB -DQT_XML_LIB  "-I.\GeneratedFiles" "-I." "-I$(QTDIR)\include" "-I.\GeneratedFiles\$(ConfigurationName)\." "-I$(QTDIR)\include\QtCore" "-I$(QTDIR)\include\QtGui" "-I$(QTDIR)\include\QtSvg" "-I$(QTDIR)\include\QtXml"</Command>
